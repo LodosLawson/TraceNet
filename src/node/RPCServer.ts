@@ -8,6 +8,7 @@ import { ValidatorPool } from '../consensus/ValidatorPool';
 import { TransactionModel, Transaction } from '../blockchain/models/Transaction';
 import { KeyManager } from '../blockchain/crypto/KeyManager';
 import { UserService } from '../services/UserService';
+import { ContentService } from '../services/ContentService';
 
 /**
  * RPC Server for blockchain node
@@ -19,6 +20,7 @@ export class RPCServer {
     private walletService: WalletService;
     private validatorPool: ValidatorPool;
     private userService?: UserService;
+    private contentService?: ContentService;
     private port: number;
 
     constructor(
@@ -114,6 +116,12 @@ export class RPCServer {
         this.app.get('/api/user/:userId', this.getUserById.bind(this));
         this.app.get('/api/user/search', this.searchUsers.bind(this));
         this.app.get('/api/user/check-nickname/:nickname', this.checkNickname.bind(this));
+
+        // Content API endpoints
+        this.app.post('/api/content/create', this.createContent.bind(this));
+        this.app.get('/api/content/:contentId', this.getContentById.bind(this));
+        this.app.get('/api/content/user/:walletId', this.getUserContent.bind(this));
+        this.app.get('/api/content/feed', this.getContentFeed.bind(this));
 
         // Validator endpoints
         this.app.post('/api/validator/register', this.registerValidator.bind(this));
@@ -669,6 +677,141 @@ export class RPCServer {
             res.json({
                 nickname,
                 available,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Set content service (to be called after construction)
+     */
+    setContentService(contentService: ContentService): void {
+        this.contentService = contentService;
+    }
+
+    /**
+     * Create content
+     */
+    private async createContent(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.contentService) {
+                res.status(503).json({ error: 'Content service not available' });
+                return;
+            }
+
+            const { wallet_id, content_type, title, description, content_url, media_type, duration, size, tags } =
+                req.body;
+
+            if (!wallet_id || !content_type) {
+                res.status(400).json({ error: 'wallet_id and content_type are required' });
+                return;
+            }
+
+            const result = this.contentService.createContent({
+                wallet_id,
+                content_type,
+                title,
+                description,
+                content_url,
+                media_type,
+                duration,
+                size,
+                tags,
+            });
+
+            res.json({
+                success: true,
+                content: result.content,
+                tx_id: result.tx_id,
+            });
+        } catch (error) {
+            res.status(400).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get content by ID
+     */
+    private async getContentById(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.contentService) {
+                res.status(503).json({ error: 'Content service not available' });
+                return;
+            }
+
+            const { contentId } = req.params;
+            const content = this.contentService.getContent(contentId);
+
+            if (!content) {
+                res.status(404).json({ error: 'Content not found' });
+                return;
+            }
+
+            res.json({
+                success: true,
+                content,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get user's content
+     */
+    private async getUserContent(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.contentService) {
+                res.status(503).json({ error: 'Content service not available' });
+                return;
+            }
+
+            const { walletId } = req.params;
+            const limit = parseInt(req.query.limit as string) || 50;
+
+            const contents = this.contentService.getUserContent(walletId, limit);
+
+            res.json({
+                success: true,
+                wallet_id: walletId,
+                contents,
+                count: contents.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get content feed
+     */
+    private async getContentFeed(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.contentService) {
+                res.status(503).json({ error: 'Content service not available' });
+                return;
+            }
+
+            const limit = parseInt(req.query.limit as string) || 20;
+            const offset = parseInt(req.query.offset as string) || 0;
+
+            const result = this.contentService.getContentFeed(limit, offset);
+
+            res.json({
+                success: true,
+                contents: result.contents,
+                total: result.total,
+                limit,
+                offset,
             });
         } catch (error) {
             res.status(500).json({
