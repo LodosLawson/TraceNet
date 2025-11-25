@@ -276,54 +276,27 @@
             <div
                 style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; text-align: center;">
                 <h3 style="margin: 0 0 10px 0;">🌐 Base URL</h3>
-                <div id="base-url-display" style="font-family: monospace; font-size: 16px; word-break: break-all;">
-                    Loading...
-                </div>
-            </div>
+                // Get blockchain status
+                fetch(`${API}/rpc/status`)
+                .then(r => r.json())
+                .then(data => {
+                console.log('Blocks:', data.blockchain.blockCount);
+                console.log('Transactions:', data.blockchain.totalTransactions);
+                });
 
-            <h3>🔗 Blockchain RPC</h3>
-            <div class="api-endpoint"><strong>GET</strong> /health - Server health check</div>
-            <div class="api-endpoint"><strong>GET</strong> /rpc/status - Blockchain status</div>
-            <div class="api-endpoint"><strong>GET</strong> /rpc/block/:index - Block details</div>
-            <div class="api-endpoint"><strong>GET</strong> /rpc/transaction/:txId - TX info</div>
-            <div class="api-endpoint"><strong>GET</strong> /rpc/balance/:walletId - Wallet balance</div>
-            <div class="api-endpoint"><strong>POST</strong> /rpc/sendRawTx - Submit transaction</div>
+                // Get specific block
+                fetch(`${API}/rpc/block/0`)
+                .then(r => r.json())
+                .then(block => console.log('Block:', block));
 
-            <h3 style="margin-top: 30px;">💰 Economy API</h3>
-            <div class="api-endpoint"><strong>GET</strong> /economy/tokenPrice - Token price & market data</div>
-            <div class="api-endpoint"><strong>GET</strong> /economy/treasury - Treasury stats</div>
-            <div class="api-endpoint"><strong>GET</strong> /economy/distribution - Token distribution</div>
-
-            <h3 style="margin-top: 30px;">💼 Wallet API</h3>
-            <div class="api-endpoint"><strong>POST</strong> /api/wallet/create - Create new wallet</div>
-            <div class="api-endpoint"><strong>GET</strong> /api/wallet/list/:userId - List user wallets</div>
-            <div class="api-endpoint"><strong>GET</strong> /api/wallet/:walletId - Wallet details</div>
-
-            <h3 style="margin-top: 40px;">📘 JavaScript Example</h3>
-            <div class="code-block">
-                <pre id="js-example">const API = 'YOUR_API_URL';
-
-// Get blockchain status
-fetch(`${API}/rpc/status`)
-  .then(r => r.json())
-  .then(data => {
-    console.log('Blocks:', data.blockchain.blockCount);
-    console.log('Transactions:', data.blockchain.totalTransactions);
-  });
-
-// Get specific block
-fetch(`${API}/rpc/block/0`)
-  .then(r => r.json())
-  .then(block => console.log('Block:', block));
-
-// Create wallet
-fetch(`${API}/api/wallet/create`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ user_id: 'user123' })
-})
-  .then(r => r.json())
-  .then(wallet => console.log('New Wallet:', wallet));</pre>
+                // Create wallet
+                fetch(`${API}/api/wallet/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: 'user123' })
+                })
+                .then(r => r.json())
+                .then(wallet => console.log('New Wallet:', wallet));</pre>
             </div>
 
             <h3 style="margin-top: 30px;">🐍 Python Example</h3>
