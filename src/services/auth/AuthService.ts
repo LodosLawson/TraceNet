@@ -1,18 +1,8 @@
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
-import { User, CreateUserInput, UserRole, UserStatus } from '../models/User';
-
-/**
- * JWT payload for access token
- */
-export interface AccessTokenPayload {
-    sub: string;                    // User system_id
-    email: string;
-    roles: UserRole[];
-    wallet_ids: string[];
-    exp: number;                    // 15 minutes
-    iat: number;
+email: string;
+roles: UserRole[];
+wallet_ids: string[];
+exp: number;                    // 15 minutes
+iat: number;
 }
 
 /**

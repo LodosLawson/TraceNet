@@ -1,10 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-import { User, CreateUserInput, UpdateUserInput, UserRole, UserStatus, MetadataEntry } from '../models/User';
-import { AuthService } from '../../auth/AuthService';
-import { WalletService } from '../../../wallet/WalletService';
-import { AirdropService } from '../../../wallet/AirdropService';
-import { TransactionModel, TransactionType } from '../../../blockchain/models/Transaction';
-
 /**
  * User Service for managing user profiles and metadata
  */

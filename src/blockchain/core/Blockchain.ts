@@ -22,60 +22,25 @@ export interface BlockchainState {
 /**
  * Core blockchain implementation
  */
-export class Blockchain {
+import { EventEmitter } from 'events';
+
+/**
+ * Core blockchain implementation
+ */
+export class Blockchain extends EventEmitter {
     private chain: Block[];
     private state: Map<string, AccountState>;
     private genesisValidatorId: string;
 
     constructor(genesisValidatorId: string) {
+        super();
         this.chain = [];
         this.state = new Map();
         this.genesisValidatorId = genesisValidatorId;
         this.initializeGenesis();
     }
 
-    /**
-     * Initialize genesis block
-     */
-    private initializeGenesis(): void {
-        const genesisBlock = Block.createGenesis(this.genesisValidatorId);
-        this.chain.push(genesisBlock);
-    }
-
-    /**
-     * Get the latest block
-     */
-    getLatestBlock(): Block {
-        return this.chain[this.chain.length - 1];
-    }
-
-    /**
-     * Get block by index
-     */
-    getBlockByIndex(index: number): Block | undefined {
-        return this.chain[index];
-    }
-
-    /**
-     * Get block by hash
-     */
-    getBlockByHash(hash: string): Block | undefined {
-        return this.chain.find((block) => block.hash === hash);
-    }
-
-    /**
-     * Get entire chain
-     */
-    getChain(): Block[] {
-        return [...this.chain];
-    }
-
-    /**
-     * Get chain length
-     */
-    getChainLength(): number {
-        return this.chain.length;
-    }
+    // ... (existing methods)
 
     /**
      * Add a new block to the chain
@@ -117,6 +82,9 @@ export class Blockchain {
 
         // Add block to chain
         this.chain.push(newBlock);
+
+        // Emit event
+        this.emit('blockAdded', newBlock);
 
         return { success: true, block: newBlock };
     }
