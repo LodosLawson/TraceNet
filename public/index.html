@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TraceNet Blockchain - LockTrace Network API Documentation</title>
+    <title>TraceNet Blockchain - LockTrace Network</title>
     <meta name="description"
-        content="TraceNet: LockTrace Network sosyal medya blockchain - Canlı network monitoring ve kapsamlı API dokümantasyonu">
+        content="TraceNet: Sosyal medya blockchain platformu - Canlı monitoring ve API dokümantasyonu">
     <style>
         * {
             margin: 0;
@@ -18,6 +18,8 @@
             --primary: #6366f1;
             --primary-dark: #4f46e5;
             --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
             --bg: #0f172a;
             --card-bg: #1e293b;
             --text: #f1f5f9;
@@ -26,33 +28,34 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
+            overflow-x: hidden;
         }
 
+        /* Header */
         .header {
-            background: var(--card-bg);
-            border-bottom: 2px solid var(--primary);
-            padding: 2rem 1.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 20px;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 3px solid var(--primary);
+            padding: 1.5rem 1rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
 
         .brand-section {
             text-align: center;
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
         .brand-title {
-            font-size: 2.5rem;
+            font-size: clamp(1.8rem, 5vw, 3rem);
             font-weight: 800;
-            background: linear-gradient(135deg, #6366f1, #a855f7);
+            background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -62,85 +65,170 @@
 
         .brand-subtitle {
             color: var(--text);
-            font-size: 1.1rem;
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
             font-weight: 600;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
         }
 
         .brand-tagline {
             color: var(--text-secondary);
-            font-size: 0.95rem;
+            font-size: clamp(0.75rem, 2vw, 0.95rem);
         }
 
+        /* Status Bar */
         .status-bar {
             background: linear-gradient(135deg, #10b981, #059669);
             color: white;
-            padding: 0.75rem;
+            padding: 0.75rem 1rem;
             text-align: center;
             font-weight: 600;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
         }
 
-        .network-status {
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem 1rem;
+        }
+
+        /* Dashboard Grid */
+        .dashboard {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1.5rem;
-            margin: 2rem 0;
+            margin-bottom: 2rem;
         }
 
         .stat-card {
             background: var(--card-bg);
             padding: 1.5rem;
-            border-radius: 12px;
+            border-radius: 16px;
             border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
         }
 
         .stat-label {
             color: var(--text-secondary);
             font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             margin-bottom: 0.5rem;
         }
 
         .stat-value {
-            font-size: 1.8rem;
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
             font-weight: 700;
             color: var(--primary);
+            margin-bottom: 0.5rem;
         }
 
+        .stat-info {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        /* Recent Blocks */
         .section {
             background: var(--card-bg);
-            border-radius: 12px;
-            padding: 2rem;
-            margin: 2rem 0;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
             border: 1px solid var(--border);
         }
 
         .section-title {
-            font-size: 1.5rem;
+            font-size: clamp(1.3rem, 3vw, 1.8rem);
+            font-weight: 700;
             margin-bottom: 1.5rem;
             color: var(--text);
-            border-bottom: 2px solid var(--primary);
-            padding-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .api-endpoint {
-            background: #0a0f1e;
+        .block-list {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .block-item {
+            background: rgba(99, 102, 241, 0.05);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin: 1rem 0;
+            border-radius: 12px;
+            padding: 1rem;
+            transition: all 0.3s;
         }
 
-        .endpoint-method {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 4px;
-            font-weight: 600;
+        .block-item:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .block-index {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .block-time {
+            color: var(--text-secondary);
             font-size: 0.85rem;
-            margin-right: 0.75rem;
+        }
+
+        .block-hash {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            word-break: break-all;
+            margin-top: 0.5rem;
+        }
+
+        .block-tx-count {
+            color: var(--success);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        /* API Documentation */
+        .api-endpoint {
+            background: rgba(99, 102, 241, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .method {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
         }
 
         .method-get {
@@ -149,103 +237,30 @@
         }
 
         .method-post {
-            background: #3b82f6;
+            background: #6366f1;
             color: white;
         }
 
         .endpoint-path {
             font-family: 'Courier New', monospace;
-            color: #a5b4fc;
-            font-size: 0.95rem;
+            color: var(--text);
+            font-weight: 600;
+            font-size: clamp(0.85rem, 2vw, 1rem);
         }
 
         .endpoint-desc {
             color: var(--text-secondary);
-            margin-top: 0.75rem;
-            font-size: 0.9rem;
-        }
-
-        .code-block {
-            background: #0a0f1e;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1.25rem;
-            overflow-x: auto;
-            margin: 1rem 0;
-        }
-
-        code {
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            color: #a5b4fc;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 0.5rem;
             margin-bottom: 1rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .tab {
-            padding: 0.75rem 1.5rem;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
-        }
-
-        .tab.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .warning-box {
-            background: rgba(239, 68, 68, 0.1);
-            border-left: 4px solid #ef4444;
-            padding: 1rem;
-            border-radius: 4px;
-            margin: 1rem 0;
-        }
-
-        .info-box {
-            background: rgba(59, 130, 246, 0.1);
-            border-left: 4px solid #3b82f6;
-            padding: 1rem;
-            border-radius: 4px;
-            margin: 1rem 0;
-        }
-
-        .success-box {
-            background: rgba(16, 185, 129, 0.1);
-            border-left: 4px solid #10b981;
-            padding: 1rem;
-            border-radius: 4px;
-            margin: 1rem 0;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 2rem;
-            color: var(--text-secondary);
-            border-top: 1px solid var(--border);
-            margin-top: 4rem;
+            font-size: 0.95rem;
         }
 
         .param-table {
             width: 100%;
-            margin: 1rem 0;
             border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            display: block;
         }
 
         .param-table th,
@@ -257,97 +272,213 @@
 
         .param-table th {
             background: rgba(99, 102, 241, 0.1);
-            color: var(--primary);
             font-weight: 600;
+            color: var(--text);
         }
 
         .param-name {
             font-family: 'Courier New', monospace;
-            color: #a5b4fc;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .code-block {
+            background: #0a0f1e;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin-top: 1rem;
+        }
+
+        .code-block code {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: #10b981;
+            white-space: pre;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid;
+        }
+
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-color: var(--warning);
+            color: #fbbf24;
+        }
+
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+            color: #fca5a5;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--primary);
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--card-bg);
+            border-top: 2px solid var(--border);
+            padding: 2rem 1rem;
+            text-align: center;
+            margin-top: 3rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                padding: 1rem 0.75rem;
+            }
+
+            .container {
+                padding: 1rem 0.75rem;
+            }
+
+            .section {
+                padding: 1rem;
+            }
+
+            .api-endpoint {
+                padding: 1rem;
+            }
+
+            .param-table {
+                font-size: 0.8rem;
+            }
+
+            .param-table th,
+            .param-table td {
+                padding: 0.5rem;
+            }
+        }
+
+        /* Loading Animation */
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .loading {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
     </style>
 </head>
 
 <body>
-    <!-- Status Bar -->
-    <div class="status-bar" id="statusBar">
-        🔗 TraceNet Blockchain Node Aktif
-    </div>
-
     <!-- Header -->
     <div class="header">
-        <div class="container">
-            <div class="brand-section">
-                <div class="brand-title">TraceNet Blockchain</div>
-                <div class="brand-subtitle">LockTrace Network</div>
-                <div class="brand-tagline">Sosyal Medya Blockchain - Kapsamlı API Dokümantasyonu</div>
-            </div>
+        <div class="brand-section">
+            <h1 class="brand-title">TraceNet Blockchain</h1>
+            <p class="brand-subtitle">LockTrace Network</p>
+            <p class="brand-tagline">Sosyal Medya Blockchain Platformu - API Dokümantasyonu & Canlı Monitoring</p>
         </div>
     </div>
 
-    <!-- Main Content -->
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+        🔴 Bağlanıyor...
+    </div>
+
+    <!-- Dashboard -->
     <div class="container">
+        <!-- Network Statistics -->
+        <div class="dashboard">
+            <div class="stat-card">
+                <div class="stat-label">📦 Toplam Blok</div>
+                <div class="stat-value loading" id="blockCount">-</div>
+                <div class="stat-info">Genesis blok dahil</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">💸 Toplam İşlem</div>
+                <div class="stat-value loading" id="txCount">-</div>
+                <div class="stat-info">Tüm zamanlarda</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">👥 Aktif Validator</div>
+                <div class="stat-value loading" id="validatorCount">-</div>
+                <div class="stat-info">Online durum</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">💎 Token Arzı</div>
+                <div class="stat-value" style="font-size: 1.5rem;">100M</div>
+                <div class="stat-info">LT (Sabit)</div>
+            </div>
+        </div>
 
-        <!-- Network Status -->
+        <!-- Recent Blocks -->
         <div class="section">
-            <h2 class="section-title">📊 Canlı Network Durumu</h2>
-            <div class="network-status">
-                <div class="stat-card">
-                    <div class="stat-label">Son Blok</div>
-                    <div class="stat-value" id="latestBlock">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Toplam İşlem</div>
-                    <div class="stat-value" id="totalTx">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Aktif Validatör</div>
-                    <div class="stat-value" id="activeValidators">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Toplam Arz</div>
-                    <div class="stat-value">100M LT</div>
+            <h2 class="section-title">⛓️ Son Bloklar</h2>
+            <div class="block-list" id="recentBlocks">
+                <div class="block-item">
+                    <div class="stat-info">Bloklar yükleniyor...</div>
                 </div>
             </div>
         </div>
 
-        <!-- Important Notice -->
-        <div class="warning-box">
-            <strong>⚠️ Güvenlik Bildirimi:</strong> Bu sayfa sadece network monitoring ve API dokümantasyonudur.
-            Cüzdan oluşturma ve private key işlemleri güvenli uygulamalar üzerinden yapılmalıdır.
-        </div>
-
-        <!-- Overview -->
+        <!-- API Documentation -->
         <div class="section">
-            <h2 class="section-title">📖 TraceNet Blockchain Hakkında</h2>
-            <div class="success-box">
-                <strong>TraceNet Nedir?</strong><br>
-                TraceNet, LockTrace Network tarafından geliştirilen sosyal medya odaklı bir blockchain altyapısıdır.
-                Kullanıcılar içerik paylaşabilir, beğeni ve yorum yaparak etkileşimde bulunabilir ve bu etkileşimlerden
-                token kazanabilir.
-            </div>
-            <div class="info-box">
-                <strong>🎯 Temel Özellikler:</strong><br>
-                • Kullanıcı profilleri (nickname tabanlı)<br>
-                • İçerik paylaşımı (Video, Foto, Text, Tweet)<br>
-                • Sosyal etkileşimler (Beğeni, Yorum, Takip)<br>
-                • %50 ücret paylaşımı (içerik sahibine kazanç)<br>
-                • 100M LT sabit arz (deflasyonist model)
-            </div>
-        </div>
+            <h2 class="section-title">📚 API Dokümantasyonu</h2>
 
-        <!-- User API -->
-        <div class="section">
-            <h2 class="section-title">👤 Kullanıcı API'leri</h2>
+            <!-- User APIs -->
+            <h3 style="color: var(--primary); margin: 2rem 0 1rem; font-size: 1.4rem;">👤 Kullanıcı API'leri</h3>
 
             <div class="api-endpoint">
-                <div>
-                    <span class="endpoint-method method-post">POST</span>
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
                     <span class="endpoint-path">/api/user/create</span>
                 </div>
-                <div class="endpoint-desc">Yeni kullanıcı profili oluştur ve otomatik airdrop al</div>
-
-                <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">İstek Parametreleri:</h4>
+                <div class="endpoint-desc">Yeni kullanıcı oluştur (otomatik cüzdan ve airdrop ile)</div>
                 <table class="param-table">
                     <tr>
                         <th>Parametre</th>
@@ -359,520 +490,474 @@
                         <td><span class="param-name">nickname</span></td>
                         <td>string</td>
                         <td>✅ Evet</td>
-                        <td>3-20 karakter, alfanümerik + alt çizgi</td>
+                        <td>Benzersiz kullanıcı adı (3-20 karakter)</td>
                     </tr>
                     <tr>
                         <td><span class="param-name">name</span></td>
                         <td>string</td>
-                        <td>❌ Hayır</td>
-                        <td>Kullanıcının adı</td>
+                        <td>✅ Evet</td>
+                        <td>Ad</td>
                     </tr>
                     <tr>
                         <td><span class="param-name">surname</span></td>
                         <td>string</td>
                         <td>❌ Hayır</td>
-                        <td>Kullanıcının soyadı</td>
+                        <td>Soyad</td>
                     </tr>
                     <tr>
-                        <td><span class="param-name">birth_date</span></td>
-                        <td>number</td>
+                        <td><span class="param-name">birthdate</span></td>
+                        <td>string</td>
                         <td>❌ Hayır</td>
-                        <td>Unix timestamp (13+ yaş kontrolü)</td>
+                        <td>Doğum tarihi (YYYY-MM-DD)</td>
                     </tr>
                 </table>
-
-                <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">Örnek İstek:</h4>
-                <div class="code-block">
-                    <code>{
-  "nickname": "alice",
-  "name": "Alice",
-  "surname": "Johnson"
-}</code>
-                </div>
-
-                <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">Örnek Yanıt:</h4>
-                <div class="code-block">
-                    <code>{
-  "success": true,
-  "user": {
-    "user_id": "uuid",
-    "nickname": "alice",
-    "wallet_id": "LT_alice_001"
-  },
-  "wallet": {...},
+                <div class="code-block"><code>{
+  "user": { "user_id": "...", "nickname": "alice", "name": "Alice" },
+  "wallet": { "wallet_id": "TRN...", "public_key": "..." },
+  "mnemonic": "word1 word2 ... word24",
   "airdrop_amount": "0.00625 LT"
-}</code>
-                </div>
+}</code></div>
             </div>
 
             <div class="api-endpoint">
-                <div>
-                    <span class="endpoint-method method-get">GET</span>
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
                     <span class="endpoint-path">/api/user/nickname/:nickname</span>
                 </div>
-                <div class="endpoint-desc">Nickname ile kullanıcı bilgisi ve istatistikleri getir</div>
-                <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">Örnek Kullanım:</h4>
-                <div class="code-block">
-                    <code>GET /api/user/nickname/alice</code>
-                </div>
+                <div class="endpoint-desc">Nickname ile kullanıcı bilgilerini getir</div>
             </div>
 
             <div class="api-endpoint">
-                <div>
-                    <span class="endpoint-method method-get">GET</span>
-                    <span class="endpoint-path">/api/user/search?q=query&limit=20</span>
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/user/search?query=...</span>
                 </div>
-                <div class="endpoint-desc">Nickname ile kullanıcı ara</div>
+                <div class="endpoint-desc">Kullanıcı ara (nickname veya isimde arama)</div>
+            </div>
+
+            <!-- Content APIs -->
+            <h3 style="color: var(--primary); margin: 2rem 0 1rem; font-size: 1.4rem;">📝 İçerik API'leri</h3>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/content/create</span>
+                </div>
+                <div class="endpoint-desc">Yeni içerik paylaş (ÜCRETSİZ)</div>
+                <table class="param-table">
+                    <tr>
+                        <th>Parametre</th>
+                        <th>Tip</th>
+                        <th>Zorunlu</th>
+                        <th>Açıklama</th>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">wallet_id</span></td>
+                        <td>string</td>
+                        <td>✅ Evet</td>
+                        <td>İçerik sahibinin cüzdan ID'si</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">content_type</span></td>
+                        <td>string</td>
+                        <td>✅ Evet</td>
+                        <td>TEXT, VIDEO, PHOTO, TWEET</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">description</span></td>
+                        <td>string</td>
+                        <td>❌ Hayır</td>
+                        <td>İçerik açıklaması</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">content_url</span></td>
+                        <td>string</td>
+                        <td>❌ Hayır</td>
+                        <td>Medya URL'si (VIDEO/PHOTO için)</td>
+                    </tr>
+                </table>
             </div>
 
             <div class="api-endpoint">
-                <div>
-                    <span class="endpoint-method method-get">GET</span>
-                    <span class="endpoint-path">/api/user/check-nickname/:nickname</span>
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/content/feed?limit=20</span>
                 </div>
-                <div class="endpoint-desc">Nickname kullanılabilirliğini kontrol et</div>
+                <div class="endpoint-desc">İçerik feed'i getir (en yeni içerikler)</div>
             </div>
 
             <div class="api-endpoint">
-                <div>
-                    <div>
-                        <span class="endpoint-method method-post">POST</span>
-                        <span class="endpoint-path">/api/content/create</span>
-                    </div>
-                    <div class="endpoint-desc">Yeni içerik paylaş (VIDEO, PHOTO, TEXT, TWEET)</div>
-
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">İstek Parametreleri:</h4>
-                    <table class="param-table">
-                        <tr>
-                            <th>Parametre</th>
-                            <th>Tip</th>
-                            <th>Zorunlu</th>
-                            <th>Açıklama</th>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">wallet_id</span></td>
-                            <td>string</td>
-                            <td>✅ Evet</td>
-                            <td>İçerik sahibinin cüzdan ID'si</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">content_type</span></td>
-                            <td>enum</td>
-                            <td>✅ Evet</td>
-                            <td>VIDEO | PHOTO | TEXT | TWEET</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">title</span></td>
-                            <td>string</td>
-                            <td>❌ Hayır</td>
-                            <td>İçerik başlığı (max 200 karakter)</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">description</span></td>
-                            <td>string</td>
-                            <td>❌ Hayır</td>
-                            <td>İçerik açıklaması (max 5000 karakter)</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">content_url</span></td>
-                            <td>string</td>
-                            <td>❌ Hayır</td>
-                            <td>Medya URL'i (IPFS veya harici)</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">tags</span></td>
-                            <td>array</td>
-                            <td>❌ Hayır</td>
-                            <td>İçerik etiketleri</td>
-                        </tr>
-                    </table>
-
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">Örnek İstek:</h4>
-                    <div class="code-block">
-                        <code>{
-  "wallet_id": "LT_alice_001",
-  "content_type": "TEXT",
-  "description": "İlk blockchain postum!",
-  "tags": ["ilk", "post", "blockchain"]
-}</code>
-                    </div>
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/content/:contentId</span>
                 </div>
-
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-get">GET</span>
-                        <span class="endpoint-path">/api/content/:contentId</span>
-                    </div>
-                    <div class="endpoint-desc">İçerik detayını getir (beğeni, yorum, paylaşım sayısı ile)</div>
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">Yanıt İçeriği:</h4>
-                    <div class="code-block">
-                        <code>{
-  "content": {...},
-  "likes_count": 42,
-  "comments_count": 15,
-  "shares_count": 8
-}</code>
-                    </div>
-                </div>
-
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-get">GET</span>
-                        <span class="endpoint-path">/api/content/user/:walletId?limit=50</span>
-                    </div>
-                    <div class="endpoint-desc">Kullanıcının paylaştığı içerikleri listele</div>
-                </div>
-
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-get">GET</span>
-                        <span class="endpoint-path">/api/content/feed?limit=20&offset=0</span>
-                    </div>
-                    <div class="endpoint-desc">Ana içerik akışını getir (en yeni içerikler önce)</div>
-                </div>
+                <div class="endpoint-desc">Belirli bir içeriği getir (beğeni/yorum sayıları ile)</div>
             </div>
 
-            <!-- Social API -->
-            <div class="section">
-                <h2 class="section-title">❤️ Sosyal Etkileşim API'leri</h2>
-
-                <div class="info-box">
-                    <strong>💰 Ücret Yapısı ve Kazanç Modeli:</strong><br>
-                    • <strong>Beğeni:</strong> 0.00001 LT → %50 içerik sahibine (0.000005 LT kazanç!), %50
-                    blockchain'e<br>
-                    • <strong>Yorum:</strong> 0.00001 LT → %50 içerik sahibine (0.000005 LT kazanç!), %50
-                    blockchain'e<br>
-                    • <strong>Mesaj:</strong> 0.0000005 LT → %50 alıcıya, %50 blockchain'e<br>
-                    • <strong>Takip:</strong> ÜCRETSİZ ✅
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/content/user/:walletId</span>
                 </div>
+                <div class="endpoint-desc">Kullanıcının tüm içeriklerini getir</div>
+            </div>
 
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-post">POST</span>
-                        <span class="endpoint-path">/api/social/like</span>
-                    </div>
-                    <div class="endpoint-desc">İçeriği beğen (0.00001 LT ücretli - içerik sahibi kazanır)</div>
+            <!-- Social APIs -->
+            <h3 style="color: var(--primary); margin: 2rem 0 1rem; font-size: 1.4rem;">❤️ Sosyal Etkileşim API'leri</h3>
 
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">İstek Parametreleri:</h4>
-                    <table class="param-table">
-                        <tr>
-                            <th>Parametre</th>
-                            <th>Tip</th>
-                            <th>Zorunlu</th>
-                            <th>Açıklama</th>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">wallet_id</span></td>
-                            <td>string</td>
-                            <td>✅ Evet</td>
-                            <td>Beğenen kullanıcının cüzdan ID'si</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">content_id</span></td>
-                            <td>string</td>
-                            <td>✅ Evet</td>
-                            <td>Beğenilecek içeriğin hash ID'si</td>
-                        </tr>
-                    </table>
-
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">Örnek İstek:</h4>
-                    <div class="code-block">
-                        <code>{
-  "wallet_id": "LT_bob_001",
-  "content_id": "content_hash_123"
-}</code>
-                    </div>
-
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">Örnek Yanıt:</h4>
-                    <div class="code-block">
-                        <code>{
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/social/like</span>
+                </div>
+                <div class="endpoint-desc">İçeriği beğen</div>
+                <div class="alert alert-warning">
+                    <strong>💰 Ücret:</strong> 0.00001 LT (50% içerik sahibine, 50% blockchain hazinesine)
+                </div>
+                <table class="param-table">
+                    <tr>
+                        <th>Parametre</th>
+                        <th>Tip</th>
+                        <th>Zorunlu</th>
+                        <th>Açıklama</th>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">wallet_id</span></td>
+                        <td>string</td>
+                        <td>✅ Evet</td>
+                        <td>Beğenen kullanıcının cüzdan ID'si</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">content_id</span></td>
+                        <td>string</td>
+                        <td>✅ Evet</td>
+                        <td>Beğenilen içeriğin ID'si</td>
+                    </tr>
+                </table>
+                <div class="code-block"><code>{
   "success": true,
-  "tx_id": "transaction_hash",
+  "tx_id": "...",
   "fee_breakdown": {
     "total_fee": 1000,
     "creator_received": 500,
-    "treasury_received": 500,
-    "fee_split": "50% creator / 50% treasury"
+    "treasury_received": 500
   }
-}</code>
-                    </div>
+}</code></div>
+            </div>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/social/comment</span>
                 </div>
-
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-post">POST</span>
-                        <span class="endpoint-path">/api/social/comment</span>
-                    </div>
-                    <div class="endpoint-desc">İçeriğe yorum yap (0.00001 LT ücretli - içerik sahibi kazanır)</div>
-
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">İstek Parametreleri:</h4>
-                    <table class="param-table">
-                        <tr>
-                            <th>Parametre</th>
-                            <th>Tip</th>
-                            <th>Zorunlu</th>
-                            <th>Açıklama</th>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">wallet_id</span></td>
-                            <td>string</td>
-                            <td>✅ Evet</td>
-                            <td>Yorum yapan kullanıcının cüzdan ID'si</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">content_id</span></td>
-                            <td>string</td>
-                            <td>✅ Evet</td>
-                            <td>Yorum yapılacak içeriğin hash ID'si</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">comment_text</span></td>
-                            <td>string</td>
-                            <td>✅ Evet</td>
-                            <td>Yorum metni (max 1000 karakter)</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">parent_comment_id</span></td>
-                            <td>string</td>
-                            <td>❌ Hayır</td>
-                            <td>Yanıt için üst yorum ID'si</td>
-                        </tr>
-                    </table>
-
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">Örnek İstek:</h4>
-                    <div class="code-block">
-                        <code>{
-  "wallet_id": "LT_bob_001",
-  "content_id": "content_hash_123",
-  "comment_text": "Harika içerik, çok beğendim!"
-}</code>
-                    </div>
+                <div class="endpoint-desc">İçeriğe yorum yap</div>
+                <div class="alert alert-warning">
+                    <strong>💰 Ücret:</strong> 0.00001 LT (50% içerik sahibine, 50% blockchain hazinesine)
                 </div>
+                <table class="param-table">
+                    <tr>
+                        <th>Parametre</th>
+                        <th>Tip</th>
+                        <th>Zorunlu</th>
+                        <th>Açıklama</th>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">wallet_id</span></td>
+                        <td>string</td>
+                        <td>✅ Evet</td>
+                        <td>Yorum yapan kullanıcının cüzdan ID'si</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">content_id</span></td>
+                        <td>string</td>
+                        <td>✅ Evet</td>
+                        <td>Yorum yapılan içeriğin ID'si</td>
+                    </tr>
+                    <tr>
+                        <td><span class="param-name">comment_text</span></td>
+                        <td>string</td>
+                        <td>✅ Evet</td>
+                        <td>Yorum metni (max 500 karakter)</td>
+                    </tr>
+                </table>
+            </div>
 
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-post">POST</span>
-                        <span class="endpoint-path">/api/social/follow</span>
-                    </div>
-                    <div class="endpoint-desc">Kullanıcıyı takip et (ÜCRETSİZ)</div>
-
-                    <h4 style="margin-top: 1rem; color: var(--text); font-size: 0.95rem;">İstek Parametreleri:</h4>
-                    <table class="param-table">
-                        <tr>
-                            <th>Parametre</th>
-                            <th>Tip</th>
-                            <th>Zorunlu</th>
-                            <th>Açıklama</th>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">wallet_id</span></td>
-                            <td>string</td>
-                            <td>✅ Evet</td>
-                            <td>Takip eden kullanıcının cüzdan ID'si</td>
-                        </tr>
-                        <tr>
-                            <td><span class="param-name">target_wallet_id</span></td>
-                            <td>string</td>
-                            <td>✅ Evet</td>
-                            <td>Takip edilecek kullanıcının cüzdan ID'si</td>
-                        </tr>
-                    </table>
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/social/follow</span>
                 </div>
+                <div class="endpoint-desc">Kullanıcıyı takip et (ÜCRETSİZ)</div>
+            </div>
 
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-post">POST</span>
-                        <span class="endpoint-path">/api/social/unfollow</span>
-                    </div>
-                    <div class="endpoint-desc">Kullanıcıyı takipten çık (ÜCRETSİZ)</div>
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/social/unfollow</span>
                 </div>
+                <div class="endpoint-desc">Kullanıcıyı takipten çık (ÜCRETSİZ)</div>
+            </div>
 
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-get">GET</span>
-                        <span class="endpoint-path">/api/social/likes/:contentId</span>
-                    </div>
-                    <div class="endpoint-desc">İçeriğin tüm beğenilerini listele</div>
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/social/likes/:contentId</span>
                 </div>
+                <div class="endpoint-desc">İçeriğin tüm beğenilerini listele</div>
+            </div>
 
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-get">GET</span>
-                        <span class="endpoint-path">/api/social/comments/:contentId</span>
-                    </div>
-                    <div class="endpoint-desc">İçeriğin tüm yorumlarını listele</div>
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/social/comments/:contentId</span>
                 </div>
+                <div class="endpoint-desc">İçeriğin tüm yorumlarını listele</div>
+            </div>
 
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-get">GET</span>
-                        <span class="endpoint-path">/api/social/followers/:walletId</span>
-                    </div>
-                    <div class="endpoint-desc">Kullanıcının takipçilerini listele</div>
+            <!-- Wallet APIs -->
+            <h3 style="color: var(--primary); margin: 2rem 0 1rem; font-size: 1.4rem;">💼 Cüzdan API'leri</h3>
+
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-post">POST</span>
+                    <span class="endpoint-path">/api/wallet/create</span>
                 </div>
-
-                <div class="api-endpoint">
-                    <div>
-                        <span class="endpoint-method method-get">GET</span>
-                        <span class="endpoint-path">/api/social/following/:walletId</span>
-                    </div>
-                    <div class="endpoint-desc">Kullanıcının takip ettiklerini listele</div>
+                <div class="endpoint-desc">Yeni cüzdan oluştur</div>
+                <div class="alert alert-danger">
+                    <strong>⚠️ GÜVENLİK UYARISI:</strong> Bu endpoint yalnızca güvenli, client-side uygulamalarda
+                    kullanılmalıdır.
+                    Mnemonic ve private key'i ASLA paylaşmayın veya sunucu tarafında saklamayın!
                 </div>
             </div>
 
-            <!-- Code Examples -->
-            <div class="section">
-                <h2 class="section-title">💻 Kod Örnekleri</h2>
-
-                <div class="tabs">
-                    <button class="tab active" onclick="showTab('curl')">cURL</button>
-                    <button class="tab" onclick="showTab('javascript')">JavaScript</button>
-                    <button class="tab" onclick="showTab('python')">Python</button>
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/wallet/:walletId</span>
                 </div>
+                <div class="endpoint-desc">Cüzdan bakiyesi ve bilgilerini getir</div>
+            </div>
 
-                <div id="curl" class="tab-content active">
-                    <h3 style="margin-bottom: 1rem; color: var(--text);">cURL Örnekleri</h3>
-                    <div class="code-block">
-                        <code># Kullanıcı oluştur
+            <div class="api-endpoint">
+                <div class="endpoint-header">
+                    <span class="method method-get">GET</span>
+                    <span class="endpoint-path">/api/wallet/list/:userId</span>
+                </div>
+                <div class="endpoint-desc">Kullanıcının tüm cüzdanlarını listele</div>
+            </div>
+        </div>
+
+        <!-- Token Economics -->
+        <div class="section">
+            <h2 class="section-title">💎 Token Ekonomisi</h2>
+            <div style="display: grid; gap: 1rem; margin-top: 1rem;">
+                <div
+                    style="background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+                    <strong style="color: var(--primary);">Toplam Arz:</strong> 100,000,000 LT (Sabit, artırılamaz)
+                </div>
+                <div
+                    style="background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+                    <strong style="color: var(--primary);">Başlangıç Fiyat:</strong> $0.00001 per LT
+                </div>
+                <div
+                    style="background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+                    <strong style="color: var(--primary);">Airdrop:</strong> 0.00625 LT (Yeni kullanıcılara otomatik)
+                </div>
+                <div
+                    style="background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+                    <strong style="color: var(--primary);">Beğeni/Yorum Ücreti:</strong> 0.00001 LT (50% içerik
+                    sahibine, 50% hazineye)
+                </div>
+                <div
+                    style="background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+                    <strong style="color: var(--primary);">Takip/Takipten Çık:</strong> ÜCRETSİZ
+                </div>
+            </div>
+        </div>
+
+        <!-- Code Examples -->
+        <div class="section">
+            <h2 class="section-title">💻 Kod Örnekleri</h2>
+
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('curl')">cURL</button>
+                <button class="tab" onclick="showTab('javascript')">JavaScript</button>
+                <button class="tab" onclick="showTab('python')">Python</button>
+            </div>
+
+            <div id="curl" class="tab-content active">
+                <h3 style="margin-bottom: 1rem; color: var(--text);">cURL Örnekleri</h3>
+                <div class="code-block"><code># Kullanıcı oluştur
 curl -X POST http://localhost:3000/api/user/create \
   -H "Content-Type: application/json" \
-  -d '{"nickname":"alice","name":"Alice"}'
+  -d '{"nickname":"alice","name":"Alice","surname":"Smith"}'
 
 # İçerik paylaş
 curl -X POST http://localhost:3000/api/content/create \
   -H "Content-Type: application/json" \
-  -d '{
-    "wallet_id": "LT_alice_001",
-    "content_type": "TEXT",
-    "description": "İlk blockchain postum!"
-  }'
-
-# İçeriği beğen (içerik sahibi kazanır!)
-curl -X POST http://localhost:3000/api/social/like \
-  -H "Content-Type: application/json" \
-  -d '{
-    "wallet_id": "LT_bob_001",
-    "content_id": "content_hash_123"
-  }'
-
-# Feed getir
-curl http://localhost:3000/api/content/feed?limit=20</code>
-                    </div>
-                </div>
-
-                <div id="javascript" class="tab-content">
-                    <h3 style="margin-bottom: 1rem; color: var(--text);">JavaScript Örnekleri</h3>
-                    <div class="code-block">
-                        <code>// İçerik paylaş
-const response = await fetch('http://localhost:3000/api/content/create', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    wallet_id: 'LT_alice_001',
-    content_type: 'TEXT',
-    description: 'İlk blockchain postum!'
-  })
-});
-const data = await response.json();
-console.log(data);
-
-// İçeriği beğen
-const likeResponse = await fetch('http://localhost:3000/api/social/like', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    wallet_id: 'LT_bob_001',
-    content_id: 'content_hash_123'
-  })
-});
-const likeData = await likeResponse.json();
-console.log('Fee breakdown:', likeData.fee_breakdown);</code>
-                    </div>
-                </div>
-
-                <div id="python" class="tab-content">
-                    <h3 style="margin-bottom: 1rem; color: var(--text);">Python Örnekleri</h3>
-                    <div class="code-block">
-                        <code>import requests
-
-# İçerik paylaş
-response = requests.post('http://localhost:3000/api/content/create', json={
-    'wallet_id': 'LT_alice_001',
-    'content_type': 'TEXT',
-    'description': 'İlk blockchain postum!'
-})
-print(response.json())
+  -d '{"wallet_id":"TRN...","content_type":"TEXT","description":"Hello world!"}'
 
 # İçeriği beğen
-like_response = requests.post('http://localhost:3000/api/social/like', json={
-    'wallet_id': 'LT_bob_001',
-    'content_id': 'content_hash_123'
-})
-print('Fee breakdown:', like_response.json()['fee_breakdown'])</code>
-                    </div>
-                </div>
+curl -X POST http://localhost:3000/api/social/like \
+  -H "Content-Type: application/json" \
+  -d '{"wallet_id":"TRN...","content_id":"..."}'
+
+# Feed getir
+curl http://localhost:3000/api/content/feed?limit=20</code></div>
             </div>
 
-            <!-- Token Economics -->
-            <div class="section">
-                <h2 class="section-title">💎 Token Ekonomisi</h2>
-                <div class="info-box">
-                    <strong>LT Token Detayları:</strong><br>
-                    • <strong>Toplam Arz:</strong> 100,000,000 LT (sabit, artırılamaz - deflasyonist model)<br>
-                    • <strong>Başlangıç Fiyat:</strong> $0.00001<br>
-                    • <strong>Başlangıç Market Cap:</strong> $1,000<br>
-                    • <strong>Airdrop:</strong> 0.00625 LT (yeni kullanıcılara otomatik)<br>
-                    • <strong>Mesaj Ücreti:</strong> 0.0000005 LT<br>
-                    • <strong>Beğeni/Yorum:</strong> 0.00001 LT (50% içerik sahibine, 50% blockchain'e)
-                </div>
+            <div id="javascript" class="tab-content">
+                <h3 style="margin-bottom: 1rem; color: var(--text);">JavaScript Örnekleri</h3>
+                <div class="code-block"><code>// Kullanıcı oluştur
+const user = await fetch('http://localhost:3000/api/user/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    nickname: 'alice',
+    name: 'Alice',
+    surname: 'Smith'
+  })
+}).then(r => r.json());
 
-                <div class="success-box">
-                    <strong>💰 Kazanç Modeli:</strong><br>
-                    1. İçerik oluştur (ücretsiz)<br>
-                    2. Beğeni al → 0.000005 LT kazan (her beğeni için)<br>
-                    3. Yorum al → 0.000005 LT kazan (her yorum için)<br>
-                    4. Pasif gelir: Ne kadar çok etkileşim, o kadar çok kazanç!
-                </div>
+// İçerik paylaş
+const content = await fetch('http://localhost:3000/api/content/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: user.wallet.wallet_id,
+    content_type: 'TEXT',
+    description: 'Hello from blockchain!'
+  })
+}).then(r => r.json());
+
+// Feed getir
+const feed = await fetch('http://localhost:3000/api/content/feed?limit=20')
+  .then(r => r.json());</code></div>
             </div>
 
+            <div id="python" class="tab-content">
+                <h3 style="margin-bottom: 1rem; color: var(--text);">Python Örnekleri</h3>
+                <div class="code-block"><code>import requests
+
+# Kullanıcı oluştur
+user = requests.post('http://localhost:3000/api/user/create', json={
+    'nickname': 'alice',
+    'name': 'Alice',
+    'surname': 'Smith'
+}).json()
+
+# İçerik paylaş
+content = requests.post('http://localhost:3000/api/content/create', json={
+    'wallet_id': user['wallet']['wallet_id'],
+    'content_type': 'TEXT',
+    'description': 'Hello from blockchain!'
+}).json()
+
+# Feed getir
+feed = requests.get('http://localhost:3000/api/content/feed?limit=20').json()</code></div>
+            </div>
         </div>
+    </div>
 
-        <!-- Footer -->
-        <div class="footer">
-            <div class="container">
-                <p><strong>TraceNet Blockchain</strong> © 2025</p>
-                <p style="margin-top: 0.5rem; font-size: 0.85rem;">
-                    document.getElementById(tabName).classList.add('active');
-                    }
+    <!-- Footer -->
+    <div class="footer">
+        <p><strong>TraceNet Blockchain</strong> © 2025</p>
+        <p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
+            LockTrace Network - Sosyal Medya Blockchain Platformu
+        </p>
+    </div>
 
-                    // Fetch network status
-                    async function updateNetworkStatus() {
+    <script>
+        // Use same protocol as the page (HTTP or HTTPS)
+        const API_URL = `${window.location.protocol}//${window.location.hostname}:${window.location.port || 3000}`;
+
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        // Fetch network status
+        async function updateNetworkStatus() {
+            try {
+                const response = await fetch(`${API_URL}/rpc/status`);
+                const data = await response.json();
+
+                // Update stats
+                document.getElementById('blockCount').textContent = data.blockchain?.blockCount || '0';
+                document.getElementById('txCount').textContent = data.blockchain?.totalTransactions || '0';
+                document.getElementById('validatorCount').textContent = data.validators?.activeCount || '0';
+
+                // Remove loading animation
+                document.querySelectorAll('.loading').forEach(el => el.classList.remove('loading'));
+
+                // Update status bar
+                document.getElementById('statusBar').innerHTML =
+                    '✅ TraceNet Node Aktif - Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
+
+                // Update recent blocks
+                await updateRecentBlocks();
+            } catch (error) {
+                console.error('Network status error:', error);
+                document.getElementById('statusBar').innerHTML = '❌ Node bağlantısı kurulamadı';
+                document.getElementById('statusBar').style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+            }
+        }
+
+        // Fetch recent blocks
+        async function updateRecentBlocks() {
+            try {
+                const response = await fetch(`${API_URL}/rpc/status`);
+                const data = await response.json();
+                const blockCount = data.blockchain?.blockCount || 0;
+
+                if (blockCount === 0) return;
+
+                // Fetch last 5 blocks
+                const blocks = [];
+                const startIndex = Math.max(0, blockCount - 5);
+
+                for (let i = blockCount - 1; i >= startIndex && i >= 0; i--) {
                     try {
-                    const response = await fetch(`${API_URL}/rpc/status`);
-                    const data = await response.json();
-
-                    document.getElementById('latestBlock').textContent =
-                    data.blockchain?.blockCount || '-';
-                    document.getElementById('totalTx').textContent =
-                    data.blockchain?.transactionCount || '-';
-                    document.getElementById('activeValidators').textContent =
-                    data.validators?.activeCount || '-';
-
-                    document.getElementById('statusBar').innerHTML =
-                    '✅ TraceNet Blockchain Node Aktif - Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
-                    } catch (error) {
-                    console.error('Network status error:', error);
-                    document.getElementById('statusBar').innerHTML =
-                    '❌ Node bağlantısı kurulamadı';
-                    document.getElementById('statusBar').style.background =
-                    'linear-gradient(135deg, #ef4444, #dc2626)';
+                        const blockResponse = await fetch(`${API_URL}/rpc/block/${i}`);
+                        const blockData = await blockResponse.json();
+                        if (blockData.block) {
+                            blocks.push(blockData.block);
+                        }
+                    } catch (e) {
+                        console.error(`Error fetching block ${i}:`, e);
                     }
-                    }
+                }
 
-                    // Update network status every 10 seconds
-                    updateNetworkStatus();
-                    setInterval(updateNetworkStatus, 10000);
-                    </script>
+                // Render blocks
+                const blocksHTML = blocks.map(block => {
+                    const date = new Date(block.timestamp);
+                    const txCount = block.transactions?.length || 0;
+                    return `
+                        <div class="block-item">
+                            <div class="block-header">
+                                <span class="block-index">Blok #${block.index}</span>
+                                <span class="block-time">${date.toLocaleString('tr-TR')}</span>
+                            </div>
+                            <div class="block-tx-count">💳 ${txCount} işlem</div>
+                            <div class="block-hash">Hash: ${block.hash || 'N/A'}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                document.getElementById('recentBlocks').innerHTML = blocksHTML ||
+                    '<div class="block-item"><div class="stat-info">Blok bulunamadı</div></div>';
+            } catch (error) {
+                console.error('Error fetching blocks:', error);
+            }
+        }
+
+        // Update network status every 10 seconds
+        updateNetworkStatus();
+        setInterval(updateNetworkStatus, 10000);
+    </script>
 </body>
 
 </html>
