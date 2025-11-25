@@ -7,16 +7,15 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:$COMMIT_SHA'
-      - '-t'
       - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
       - '.'
+
 
   # Push Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -31,7 +30,7 @@ steps:
       - 'deploy'
       - 'tracenet-blockchain'
       - '--image'
-      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:$COMMIT_SHA'
+      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
       - '--region'
       - 'us-central1'
       - '--platform'
@@ -45,19 +44,4 @@ steps:
       - '2'
       - '--max-instances'
       - '10'
-      - '--set-env-vars'
-      - 'NODE_ENV=production,SUPABASE_URL=$$SUPABASE_URL,SUPABASE_ANON_KEY=$$SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY=$$SUPABASE_SERVICE_ROLE_KEY'
-      - '--set-secrets'
-      - 'JWT_SECRET=jwt-secret:latest,ENCRYPTION_KEY=encryption-key:latest'
 
-images:
-  - 'gcr.io/$PROJECT_ID/tracenet-blockchain:$COMMIT_SHA'
-  - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
-
-options:
-  machineType: 'E2_HIGHCPU_8'
-  logging: CLOUD_LOGGING_ONLY
-
-# Trigger configuration
-# This file will be used by Cloud Build trigger
-timeout: '1200s'
