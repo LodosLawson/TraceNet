@@ -18,6 +18,7 @@ import { TREASURY_ADDRESSES } from './economy/TokenConfig';
 import { UserService } from './services/UserService';
 import { ContentService } from './services/ContentService';
 import { SocialService } from './services/SocialService';
+import { KeyManager } from './blockchain/crypto/KeyManager';
 
 // Load environment variables
 dotenv.config();
@@ -63,6 +64,21 @@ class BlockchainNode {
 
         const validatorOfflineTimeout = parseInt(process.env.VALIDATOR_OFFLINE_TIMEOUT || '60000', 10);
         this.validatorPool = new ValidatorPool(validatorOfflineTimeout);
+
+        // Register and activate system validator for single-node setup
+        const systemValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
+        // In a real setup, we would load keys from secure storage. For dev/test, we generate a deterministic one or random.
+        // For now, let's generate a random one to ensure it works.
+        const sysKeyPair = KeyManager.generateKeyPair();
+        const sysUserId = 'system_user';
+        this.validatorPool.registerValidator(systemValidatorId, sysUserId, sysKeyPair.publicKey);
+        this.validatorPool.setOnline(systemValidatorId);
+        console.log(`System Validator registered and online: ${systemValidatorId}`);
+
+        // Keep system validator online
+        setInterval(() => {
+            this.validatorPool.updateHeartbeat(systemValidatorId);
+        }, 10000);
 
         const thresholdPercent = parseInt(process.env.VALIDATOR_THRESHOLD_PERCENT || '66', 10);
         const validatorsPerTx = parseInt(process.env.VALIDATORS_PER_TRANSACTION || '7', 10);

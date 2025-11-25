@@ -321,6 +321,10 @@ export class Blockchain extends EventEmitter {
             case 'PROFILE_UPDATE':
             case 'LIKE':
             case 'FOLLOW':
+            case 'POST_CONTENT':
+            case 'COMMENT':
+            case 'SHARE':
+            case 'UNFOLLOW':
                 // These may have fees or rewards
                 if (tx.fee > 0) {
                     if (fromAccount.balance < tx.fee) {

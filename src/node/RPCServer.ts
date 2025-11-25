@@ -121,9 +121,9 @@ export class RPCServer {
 
         // Content API endpoints
         this.app.post('/api/content/create', this.createContent.bind(this));
-        this.app.get('/api/content/:contentId', this.getContentById.bind(this));
-        this.app.get('/api/content/user/:walletId', this.getUserContent.bind(this));
         this.app.get('/api/content/feed', this.getContentFeed.bind(this));
+        this.app.get('/api/content/user/:walletId', this.getUserContent.bind(this));
+        this.app.get('/api/content/:contentId', this.getContentById.bind(this));
 
         // Social API endpoints
         this.app.post('/api/social/like', this.likeContent.bind(this));
