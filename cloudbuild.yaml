@@ -1,3 +1,6 @@
+# Cloud Build Trigger Configuration
+# Otomatik deployment için GitHub ile entegrasyon
+
 steps:
   # Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
@@ -43,7 +46,9 @@ steps:
       - '--max-instances'
       - '10'
       - '--set-env-vars'
-      - 'NODE_ENV=production,PORT=3000'
+      - 'NODE_ENV=production,SUPABASE_URL=$$SUPABASE_URL,SUPABASE_ANON_KEY=$$SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY=$$SUPABASE_SERVICE_ROLE_KEY'
+      - '--set-secrets'
+      - 'JWT_SECRET=jwt-secret:latest,ENCRYPTION_KEY=encryption-key:latest'
 
 images:
   - 'gcr.io/$PROJECT_ID/tracenet-blockchain:$COMMIT_SHA'
@@ -52,3 +57,7 @@ images:
 options:
   machineType: 'N1_HIGHCPU_8'
   logging: CLOUD_LOGGING_ONLY
+
+# Trigger configuration
+# This file will be used by Cloud Build trigger
+timeout: '1200s'
