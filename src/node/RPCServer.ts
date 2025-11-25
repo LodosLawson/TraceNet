@@ -80,6 +80,19 @@ export class RPCServer {
             res.json({ status: 'ok', timestamp: Date.now() });
         });
 
+        // Chain endpoint (full chain)
+        this.app.get('/chain', (req: Request, res: Response) => {
+            try {
+                const chain = this.blockchain.getChain();
+                res.json({
+                    length: chain.length,
+                    chain: chain.map(block => block.toJSON())
+                });
+            } catch (error) {
+                res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+            }
+        });
+
         // RPC endpoints
         this.app.post('/rpc/sendRawTx', this.sendRawTransaction.bind(this));
         this.app.get('/rpc/status', this.getStatus.bind(this));
