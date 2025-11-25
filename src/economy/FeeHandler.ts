@@ -80,7 +80,7 @@ export class FeeHandler extends EventEmitter {
             };
         }
 
-        const contentOwnerAmount = Math.floor(totalCost * config.contentOwnerShare);
+        const contentOwnerAmount = Math.floor(totalCost * (config as any).contentOwnerShare);
         const treasuryAmount = totalCost - contentOwnerAmount;
 
         return {

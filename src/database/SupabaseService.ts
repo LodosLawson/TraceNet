@@ -98,7 +98,7 @@ export class SupabaseService {
     async saveUser(user: Database['public']['Tables']['users']['Insert']): Promise<void> {
         const { error } = await this.client
             .from('users')
-            .upsert(user);
+            .upsert(user as any);
 
         if (error) {
             throw new Error(`Failed to save user: ${error.message}`);
@@ -131,7 +131,7 @@ export class SupabaseService {
     async savePost(post: Database['public']['Tables']['posts']['Insert']): Promise<void> {
         const { error } = await this.client
             .from('posts')
-            .insert(post);
+            .insert(post as any);
 
         if (error) {
             throw new Error(`Failed to save post: ${error.message}`);
@@ -174,7 +174,7 @@ export class SupabaseService {
                 block_height: blockHeight,
                 block_hash: blockHash,
                 backup_data: backupData,
-            });
+            } as any);
 
         if (error) {
             throw new Error(`Failed to save backup: ${error.message}`);
@@ -255,7 +255,7 @@ export class SupabaseService {
         const { error } = await this.serviceClient
             .from('blockchain_backups')
             .delete()
-            .lt('block_height', cutoffBackup.block_height);
+            .lt('block_height', (cutoffBackup as any).block_height);
 
         if (error) {
             throw new Error(`Failed to cleanup backups: ${error.message}`);

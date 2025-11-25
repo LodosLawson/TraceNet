@@ -40,7 +40,48 @@ export class Blockchain extends EventEmitter {
         this.initializeGenesis();
     }
 
-    // ... (existing methods)
+    /**
+     * Initialize genesis block
+     */
+    private initializeGenesis(): void {
+        const genesisBlock = Block.createGenesis(this.genesisValidatorId);
+        this.chain.push(genesisBlock);
+    }
+
+    /**
+     * Get the latest block
+     */
+    getLatestBlock(): Block {
+        return this.chain[this.chain.length - 1];
+    }
+
+    /**
+     * Get block by index
+     */
+    getBlockByIndex(index: number): Block | undefined {
+        return this.chain[index];
+    }
+
+    /**
+     * Get block by hash
+     */
+    getBlockByHash(hash: string): Block | undefined {
+        return this.chain.find((block) => block.hash === hash);
+    }
+
+    /**
+     * Get entire chain
+     */
+    getChain(): Block[] {
+        return [...this.chain];
+    }
+
+    /**
+     * Get chain length
+     */
+    getChainLength(): number {
+        return this.chain.length;
+    }
 
     /**
      * Add a new block to the chain

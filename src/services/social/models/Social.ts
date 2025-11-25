@@ -102,7 +102,7 @@ export interface Share {
 export interface CreatePostInput {
     author_id: string;
     content_text: string;
-    media_files?: Express.Multer.File[];
+    media_files?: any[];
     visibility?: PostVisibility;
 }
 
