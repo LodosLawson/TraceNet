@@ -10,6 +10,11 @@ import { BlockProducer } from './consensus/BlockProducer';
 import { RewardDistributor, RewardConfig } from './consensus/RewardDistributor';
 import { RPCServer } from './node/RPCServer';
 import { WebSocketServer } from './node/WebSocketServer';
+import { TreasuryManager } from './economy/TreasuryManager';
+import { TokenPriceCalculator } from './economy/PriceCalculator';
+import { FeeHandler } from './economy/FeeHandler';
+import { EconomyAPI } from './economy/EconomyAPI';
+import { TREASURY_ADDRESSES } from './economy/TokenConfig';
 
 // Load environment variables
 dotenv.config();
@@ -29,6 +34,10 @@ class BlockchainNode {
     private rpcServer: RPCServer;
     private wsServer: WebSocketServer;
     private httpServer: http.Server;
+    private treasuryManager: TreasuryManager;
+    private priceCalculator: TokenPriceCalculator;
+    private feeHandler: FeeHandler;
+    private economyAPI: EconomyAPI;
 
     constructor() {
         console.log('Initializing Blockchain Node...');
@@ -76,6 +85,16 @@ class BlockchainNode {
         };
         this.rewardDistributor = new RewardDistributor(this.blockchain, rewardConfig);
 
+        // Initialize economy modules
+        this.treasuryManager = new TreasuryManager(TREASURY_ADDRESSES.main);
+        this.priceCalculator = new TokenPriceCalculator();
+        this.feeHandler = new FeeHandler(this.treasuryManager);
+        this.economyAPI = new EconomyAPI(
+            this.priceCalculator,
+            this.treasuryManager,
+            this.feeHandler
+        );
+
         const port = parseInt(process.env.PORT || '3000', 10);
         this.rpcServer = new RPCServer(
             this.blockchain,
@@ -87,6 +106,9 @@ class BlockchainNode {
 
         // Create HTTP server for WebSocket
         this.httpServer = http.createServer(this.rpcServer.getApp());
+
+        // Add economy API routes
+        this.rpcServer.getApp().use('/economy', this.economyAPI.getRouter());
 
         this.wsServer = new WebSocketServer(
             this.httpServer,
