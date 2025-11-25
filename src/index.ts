@@ -101,8 +101,8 @@ class BlockchainNode {
         );
 
         const rewardConfig: RewardConfig = {
-            blockReward: parseInt(process.env.BLOCK_REWARD || '50000000', 10), // 0.5 LT (was 50 LT)
-            signatureReward: parseInt(process.env.SIGNATURE_REWARD || '1000000', 10), // 0.01 LT (was 1 LT)
+            blockReward: parseInt(process.env.BLOCK_REWARD || '0', 10), // Disabled - only airdrops count
+            signatureReward: parseInt(process.env.SIGNATURE_REWARD || '0', 10), // Disabled
             feeDistributionPercent: parseInt(process.env.FEE_DISTRIBUTION_PERCENT || '80', 10),
         };
         this.rewardDistributor = new RewardDistributor(this.blockchain, rewardConfig);
