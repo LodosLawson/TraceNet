@@ -880,30 +880,15 @@ feed = requests.get('http://localhost:3000/api/content/feed?limit=20').json()</c
         }
 
         // Fetch network status
-        async function updateNetworkStatus() {
-            try {
-                const response = await fetch(`${API_URL}/rpc/status`);
-                const data = await response.json();
+        '✅ TraceNet Node Aktif - Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
 
-                // Update stats
-                document.getElementById('blockCount').textContent = data.blockchain?.blockCount || '0';
-                document.getElementById('txCount').textContent = data.blockchain?.totalTransactions || '0';
-                document.getElementById('validatorCount').textContent = data.validators?.activeCount || '0';
-
-                // Remove loading animation
-                document.querySelectorAll('.loading').forEach(el => el.classList.remove('loading'));
-
-                // Update status bar
-                document.getElementById('statusBar').innerHTML =
-                    '✅ TraceNet Node Aktif - Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
-
-                // Update recent blocks
-                await updateRecentBlocks();
+        // Update recent blocks
+        await updateRecentBlocks();
             } catch (error) {
-                console.error('Network status error:', error);
-                document.getElementById('statusBar').innerHTML = '❌ Node bağlantısı kurulamadı';
-                document.getElementById('statusBar').style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
-            }
+            console.error('Network status error:', error);
+            document.getElementById('statusBar').innerHTML = '❌ Node bağlantısı kurulamadı';
+            document.getElementById('statusBar').style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+        }
         }
 
         // Fetch recent blocks
