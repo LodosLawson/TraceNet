@@ -192,8 +192,22 @@ export class RPCServer {
             const mempoolStats = this.mempool.getStats();
             const validatorStats = this.validatorPool.getStats();
 
+            // Calculate total distributed coins (airdrops + rewards)
+            const chain = this.blockchain.getChain();
+            let totalDistributed = 0;
+            for (const block of chain) {
+                for (const tx of block.transactions) {
+                    if (tx.type === 'REWARD') {
+                        totalDistributed += tx.amount;
+                    }
+                }
+            }
+
             res.json({
-                blockchain: blockchainStats,
+                blockchain: {
+                    ...blockchainStats,
+                    totalDistributedCoins: totalDistributed
+                },
                 mempool: mempoolStats,
                 validators: validatorStats,
                 timestamp: Date.now(),
