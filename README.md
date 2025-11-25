@@ -112,6 +112,7 @@ GET /economy/distribution    # Token distribution
 
 | Document | Description |
 |----------|-------------|
+| [TRANSACTION_GUIDE.md](TRANSACTION_GUIDE.md) | **→ Blockchain'e işlem gönderme rehberi** |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Complete deployment guide |
 | [GCP-DEPLOYMENT.md](GCP-DEPLOYMENT.md) | Google Cloud Platform setup |
 | [docs/architecture.md](docs/architecture.md) | System architecture |
