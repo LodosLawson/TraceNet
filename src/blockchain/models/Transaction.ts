@@ -9,6 +9,10 @@ export enum TransactionType {
     LIKE = 'LIKE',
     FOLLOW = 'FOLLOW',
     MESSAGE_PAYMENT = 'MESSAGE_PAYMENT',
+    POST_CONTENT = 'POST_CONTENT',      // New: Content posting
+    COMMENT = 'COMMENT',                // New: Comment on content
+    SHARE = 'SHARE',                    // New: Share content
+    UNFOLLOW = 'UNFOLLOW',              // New: Unfollow user
 }
 
 /**

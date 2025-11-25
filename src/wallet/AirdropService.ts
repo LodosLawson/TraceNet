@@ -20,7 +20,7 @@ export class AirdropService {
     private airdropAmount: number;
     private systemWalletId: string;
 
-    constructor(airdropAmount: number, systemWalletId: string = 'SYSTEM') {
+    constructor(airdropAmount: number = 625000, systemWalletId: string = 'SYSTEM') {
         this.airdrops = new Map();
         this.airdropAmount = airdropAmount;
         this.systemWalletId = systemWalletId;

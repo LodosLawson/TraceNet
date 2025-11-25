@@ -7,6 +7,7 @@ import { WalletService } from '../wallet/WalletService';
 import { ValidatorPool } from '../consensus/ValidatorPool';
 import { TransactionModel, Transaction } from '../blockchain/models/Transaction';
 import { KeyManager } from '../blockchain/crypto/KeyManager';
+import { UserService } from '../services/UserService';
 
 /**
  * RPC Server for blockchain node
@@ -17,6 +18,7 @@ export class RPCServer {
     private mempool: Mempool;
     private walletService: WalletService;
     private validatorPool: ValidatorPool;
+    private userService?: UserService;
     private port: number;
 
     constructor(
@@ -105,6 +107,13 @@ export class RPCServer {
         this.app.get('/api/wallet/list/:userId', this.listWallets.bind(this));
         this.app.get('/api/wallet/:walletId', this.getWallet.bind(this));
         this.app.post('/api/wallet/sign', this.signTransaction.bind(this));
+
+        // User API endpoints
+        this.app.post('/api/user/create', this.createUser.bind(this));
+        this.app.get('/api/user/nickname/:nickname', this.getUserByNickname.bind(this));
+        this.app.get('/api/user/:userId', this.getUserById.bind(this));
+        this.app.get('/api/user/search', this.searchUsers.bind(this));
+        this.app.get('/api/user/check-nickname/:nickname', this.checkNickname.bind(this));
 
         // Validator endpoints
         this.app.post('/api/validator/register', this.registerValidator.bind(this));
@@ -464,6 +473,202 @@ export class RPCServer {
                     last_active: v.last_active,
                 })),
                 count: validators.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Set user service (to be called after construction)
+     */
+    setUserService(userService: UserService): void {
+        this.userService = userService;
+    }
+
+    /**
+     * Create user with profile
+     */
+    private async createUser(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.userService) {
+                res.status(503).json({ error: 'User service not available' });
+                return;
+            }
+
+            const { nickname, name, surname, birth_date } = req.body;
+
+            if (!nickname) {
+                res.status(400).json({ error: 'Nickname is required' });
+                return;
+            }
+
+            const result = this.userService.createUser({
+                nickname,
+                name,
+                surname,
+                birth_date,
+            });
+
+            res.json({
+                user: {
+                    user_id: result.user.user_id,
+                    nickname: result.user.nickname,
+                    name: result.user.name,
+                    surname: result.user.surname,
+                    created_at: result.user.created_at,
+                },
+                wallet: {
+                    wallet_id: result.wallet.wallet_id,
+                    public_key: result.wallet.public_key,
+                    created_at: result.wallet.created_at,
+                },
+                mnemonic: result.mnemonic,
+                airdrop_tx_id: result.airdrop_tx_id,
+                airdrop_amount: '0.00625 LT',
+            });
+        } catch (error) {
+            res.status(400).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get user by nickname
+     */
+    private async getUserByNickname(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.userService) {
+                res.status(503).json({ error: 'User service not available' });
+                return;
+            }
+
+            const { nickname } = req.params;
+            const user = this.userService.getUserByNickname(nickname);
+
+            if (!user) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+
+            const wallets = this.walletService.listWallets(user.user_id);
+            const balance = this.blockchain.getBalance(user.wallet_id);
+
+            res.json({
+                user: {
+                    user_id: user.user_id,
+                    nickname: user.nickname,
+                    name: user.name,
+                    surname: user.surname,
+                    created_at: user.created_at,
+                },
+                wallet_id: user.wallet_id,
+                balance,
+                total_wallets: wallets.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get user by ID
+     */
+    private async getUserById(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.userService) {
+                res.status(503).json({ error: 'User service not available' });
+                return;
+            }
+
+            const { userId } = req.params;
+            const user = this.userService.getUser(userId);
+
+            if (!user) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+
+            const wallets = this.walletService.listWallets(user.user_id);
+            const balance = this.blockchain.getBalance(user.wallet_id);
+
+            res.json({
+                user: {
+                    user_id: user.user_id,
+                    nickname: user.nickname,
+                    name: user.name,
+                    surname: user.surname,
+                    created_at: user.created_at,
+                },
+                wallet_id: user.wallet_id,
+                balance,
+                total_wallets: wallets.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Search users
+     */
+    private async searchUsers(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.userService) {
+                res.status(503).json({ error: 'User service not available' });
+                return;
+            }
+
+            const query = req.query.q as string;
+            const limit = parseInt(req.query.limit as string) || 20;
+
+            if (!query) {
+                res.status(400).json({ error: 'Query parameter "q" is required' });
+                return;
+            }
+
+            const users = this.userService.searchUsers(query, limit);
+
+            res.json({
+                users: users.map((u) => ({
+                    user_id: u.user_id,
+                    nickname: u.nickname,
+                    name: u.name,
+                    surname: u.surname,
+                    created_at: u.created_at,
+                })),
+                count: users.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Check nickname availability
+     */
+    private async checkNickname(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.userService) {
+                res.status(503).json({ error: 'User service not available' });
+                return;
+            }
+
+            const { nickname } = req.params;
+            const available = this.userService.isNicknameAvailable(nickname);
+
+            res.json({
+                nickname,
+                available,
             });
         } catch (error) {
             res.status(500).json({

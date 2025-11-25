@@ -1,92 +1,122 @@
 /**
- * Token Configuration Constants
+ * Token configuration for TraceNet blockchain
  */
 export const TOKEN_CONFIG = {
-    name: 'LT Token',
-    symbol: 'LT',
-    decimals: 8,
-    totalSupply: 100_000_000,      // 100 million tokens
-    initialMarketCap: 1000,        // $1,000 USD
-    initialPrice: 0.00001,         // $0.00001 per token
+    SYMBOL: 'LT',
+    NAME: 'TraceNet Token',
+    DECIMALS: 8,
+    TOTAL_SUPPLY: 10000000000000000, // 100,000,000 LT (in smallest unit)
+    INITIAL_MARKET_CAP_USD: 1000,
+    INITIAL_PRICE_USD: 0.00001, // $1000 / 100M
+
+    // Fees (50% goes to recipient/creator, 50% to blockchain treasury)
+    MESSAGE_FEE: 50, // 0.0000005 LT (total, split 50/50)
+    LIKE_FEE: 1000, // 0.00001 LT (total, split 50/50)
+    COMMENT_FEE: 1000, // 0.00001 LT (total, split 50/50)
+    SHARE_FEE: 1000, // 0.00001 LT
+    TRANSFER_FEE: 1000000, // 0.01 LT (default)
+
+    // Airdrop
+    INITIAL_AIRDROP: 625000, // 0.00625 LT
+
+    // Fee split percentages
+    FEE_TO_CREATOR_PERCENT: 50, // 50% to content creator/recipient
+    FEE_TO_TREASURY_PERCENT: 50, // 50% to blockchain treasury
 };
 
 /**
- * Airdrop Configuration
+ * Treasury wallet addresses
  */
-export const AIRDROP_CONFIG = {
-    amount: 5 * 100_000_000,       // 5 LT with 8 decimals
-    maxRecipients: 2_000_000,      // 2 million users
-    poolAddress: 'LT_AIRDROP_POOL',
-    isFirstWalletOnly: true,
+export const TREASURY_ADDRESSES = {
+    main: 'TREASURY_MAIN',
+    reserve: 'TREASURY_RESERVE',
+    development: 'TREASURY_DEV',
 };
 
 /**
- * Transfer Fee Configuration
+ * Convert LT to smallest unit
+ */
+export function toSmallestUnit(amount: number): number {
+    return Math.floor(amount * Math.pow(10, TOKEN_CONFIG.DECIMALS));
+}
+
+/**
+ * Convert smallest unit to LT
+ */
+export function fromSmallestUnit(amount: number): number {
+    return amount / Math.pow(10, TOKEN_CONFIG.DECIMALS);
+}
+
+/**
+ * Format amount for display
+ */
+export function formatAmount(amount: number): string {
+    return `${fromSmallestUnit(amount).toFixed(8)} ${TOKEN_CONFIG.SYMBOL}`;
+}
+
+// ===== Backward Compatibility Exports =====
+
+/**
+ * Transfer fee configuration (backward compatibility)
  */
 export const TRANSFER_FEE_CONFIG = {
-    feeRate: 0.0002,               // 0.02%
-    treasuryShare: 1.0,            // 100% to treasury
+    feeRate: 0.01, // 1%
+    minFee: 1000, // 0.00001 LT
 };
 
 /**
- * Social Interaction Fees
+ * Social fees configuration (backward compatibility)
  */
 export const SOCIAL_FEES = {
     like: {
-        cost: 0.10 * 100_000_000,    // 10,000,000 smallest units
-        contentOwnerShare: 0.70,     // 70%
-        treasuryShare: 0.30,         // 30%
+        cost: TOKEN_CONFIG.LIKE_FEE,
+        contentOwnerShare: TOKEN_CONFIG.FEE_TO_CREATOR_PERCENT / 100,
     },
     comment: {
-        cost: 0.10 * 100_000_000,    // 10,000,000 smallest units
-        contentOwnerShare: 0.70,
-        treasuryShare: 0.30,
+        cost: TOKEN_CONFIG.COMMENT_FEE,
+        contentOwnerShare: TOKEN_CONFIG.FEE_TO_CREATOR_PERCENT / 100,
     },
     message: {
-        cost: 0.001 * 100_000_000,   // 100,000 smallest units
-        treasuryShare: 1.0,          // 100%
+        cost: TOKEN_CONFIG.MESSAGE_FEE,
     },
 };
 
 /**
- * Token Distribution Allocation
+ * Token distribution (backward compatibility)
  */
 export const TOKEN_DISTRIBUTION = {
+    initialSupply: TOKEN_CONFIG.TOTAL_SUPPLY,
+    airdropAmount: TOKEN_CONFIG.INITIAL_AIRDROP,
     airdropPool: {
-        allocated: 10_000_000 * 100_000_000,
-        percentage: 10,
+        allocated: Math.floor(TOKEN_CONFIG.TOTAL_SUPPLY * 0.35), // 35% for airdrops
+        distributed: 0,
+        percentage: 35,
     },
     treasury: {
-        allocated: 30_000_000 * 100_000_000,
-        percentage: 30,
+        allocated: Math.floor(TOKEN_CONFIG.TOTAL_SUPPLY * 0.25), // 25% for treasury
+        percentage: 25,
     },
     validatorRewards: {
-        allocated: 20_000_000 * 100_000_000,
+        allocated: Math.floor(TOKEN_CONFIG.TOTAL_SUPPLY * 0.20), // 20% for validators
         percentage: 20,
     },
     communityRewards: {
-        allocated: 15_000_000 * 100_000_000,
-        percentage: 15,
+        allocated: Math.floor(TOKEN_CONFIG.TOTAL_SUPPLY * 0.10), // 10% for community
+        percentage: 10,
     },
     liquidityPool: {
-        allocated: 15_000_000 * 100_000_000,
-        percentage: 15,
+        allocated: Math.floor(TOKEN_CONFIG.TOTAL_SUPPLY * 0.05), // 5% for liquidity
+        percentage: 5,
     },
     team: {
-        allocated: 10_000_000 * 100_000_000,
-        percentage: 10,
-        vestingPeriodMonths: 48,
+        allocated: Math.floor(TOKEN_CONFIG.TOTAL_SUPPLY * 0.05), // 5% for team
+        percentage: 5,
+        vestingPeriodMonths: 24,
     },
 };
 
-/**
- * Treasury Wallet Addresses
- */
-export const TREASURY_ADDRESSES = {
-    main: 'LT_TREASURY_RESERVE',
-    airdrop: 'LT_AIRDROP_POOL',
-    validators: 'LT_VALIDATOR_POOL',
-    community: 'LT_COMMUNITY_POOL',
-    liquidity: 'LT_LIQUIDITY_POOL',
-    team: 'LT_TEAM_VESTING',
-};
+// Alias exports for backward compatibility
+export const initialMarketCap = TOKEN_CONFIG.INITIAL_MARKET_CAP_USD;
+export const totalSupply = TOKEN_CONFIG.TOTAL_SUPPLY;
+export const initialPrice = TOKEN_CONFIG.INITIAL_PRICE_USD;
+

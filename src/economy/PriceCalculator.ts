@@ -33,9 +33,9 @@ export class TokenPriceCalculator extends EventEmitter {
     constructor() {
         super();
         this.marketData = {
-            marketCap: TOKEN_CONFIG.initialMarketCap,
-            totalSupply: TOKEN_CONFIG.totalSupply,
-            tokenPrice: TOKEN_CONFIG.initialPrice,
+            marketCap: TOKEN_CONFIG.INITIAL_MARKET_CAP_USD,
+            totalSupply: TOKEN_CONFIG.TOTAL_SUPPLY,
+            tokenPrice: TOKEN_CONFIG.INITIAL_PRICE_USD,
             priceChange24h: 0,
             volume24h: 0,
             lastUpdated: Date.now(),
@@ -43,8 +43,8 @@ export class TokenPriceCalculator extends EventEmitter {
         this.priceHistory = [
             {
                 timestamp: Date.now(),
-                price: TOKEN_CONFIG.initialPrice,
-                marketCap: TOKEN_CONFIG.initialMarketCap,
+                price: TOKEN_CONFIG.INITIAL_PRICE_USD,
+                marketCap: TOKEN_CONFIG.INITIAL_MARKET_CAP_USD,
             },
         ];
     }

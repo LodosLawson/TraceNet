@@ -15,6 +15,7 @@ import { TokenPriceCalculator } from './economy/PriceCalculator';
 import { FeeHandler } from './economy/FeeHandler';
 import { EconomyAPI } from './economy/EconomyAPI';
 import { TREASURY_ADDRESSES } from './economy/TokenConfig';
+import { UserService } from './services/UserService';
 
 // Load environment variables
 dotenv.config();
@@ -38,6 +39,7 @@ class BlockchainNode {
     private priceCalculator: TokenPriceCalculator;
     private feeHandler: FeeHandler;
     private economyAPI: EconomyAPI;
+    private userService: UserService;
 
     constructor() {
         console.log('Initializing Blockchain Node...');
@@ -52,7 +54,7 @@ class BlockchainNode {
         const encryptionKey = process.env.ENCRYPTION_KEY || 'default_encryption_key_change_in_production';
         this.walletService = new WalletService(encryptionKey);
 
-        const airdropAmount = parseInt(process.env.INITIAL_AIRDROP_AMOUNT || '10000000000', 10);
+        const airdropAmount = parseInt(process.env.INITIAL_AIRDROP_AMOUNT || '625000', 10);
         this.airdropService = new AirdropService(airdropAmount);
 
         const validatorOfflineTimeout = parseInt(process.env.VALIDATOR_OFFLINE_TIMEOUT || '60000', 10);
@@ -106,6 +108,11 @@ class BlockchainNode {
 
         // Create HTTP server for WebSocket
         this.httpServer = http.createServer(this.rpcServer.getApp());
+
+        // Initialize user service
+        this.userService = new UserService(this.walletService, this.airdropService);
+        this.userService.setMempool(this.mempool);
+        this.rpcServer.setUserService(this.userService);
 
         // Add economy API routes
         this.rpcServer.getApp().use('/economy', this.economyAPI.getRouter());

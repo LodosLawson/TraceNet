@@ -161,7 +161,7 @@ export class EconomyAPI {
             res.json({
                 success: true,
                 data: {
-                    totalSupply: TOKEN_CONFIG.totalSupply,
+                    totalSupply: TOKEN_CONFIG.TOTAL_SUPPLY,
                     circulating: 10_000_000, // TODO: Calculate from actual data
                     locked: 90_000_000,
                     distribution: {
