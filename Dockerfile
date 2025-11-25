@@ -26,18 +26,21 @@ WORKDIR /app
 # Install production dependencies only
 COPY package*.json ./
 RUN npm ci --only=production && \
-    npm cache clean --force
+  npm cache clean --force
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
+
+# Copy public directory for static files
+COPY public ./public
 
 # Create data directory for blockchain storage
 RUN mkdir -p /app/data
 
 # Create non-root user
 RUN addgroup -g 1001 -S blockchain && \
-    adduser -S -u 1001 -G blockchain blockchain && \
-    chown -R blockchain:blockchain /app
+  adduser -S -u 1001 -G blockchain blockchain && \
+  chown -R blockchain:blockchain /app
 
 # Switch to non-root user
 USER blockchain
