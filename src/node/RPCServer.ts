@@ -56,6 +56,38 @@ export class RPCServer {
      * Setup routes
      */
     private setupRoutes(): void {
+        // Root route - API info
+        this.app.get('/', (req: Request, res: Response) => {
+            res.json({
+                name: 'TraceNet Blockchain API',
+                version: '1.0.0',
+                status: 'running',
+                endpoints: {
+                    health: '/health',
+                    rpc: {
+                        sendTransaction: 'POST /rpc/sendRawTx',
+                        status: 'GET /rpc/status',
+                        block: 'GET /rpc/block/:indexOrHash',
+                        transaction: 'GET /rpc/transaction/:txId',
+                        balance: 'GET /rpc/balance/:walletId'
+                    },
+                    wallet: {
+                        create: 'POST /api/wallet/create',
+                        list: 'GET /api/wallet/list/:userId',
+                        get: 'GET /api/wallet/:walletId',
+                        sign: 'POST /api/wallet/sign'
+                    },
+                    validator: {
+                        register: 'POST /api/validator/register',
+                        heartbeat: 'POST /api/validator/heartbeat',
+                        list: 'GET /api/validator/list'
+                    },
+                    economy: 'GET /economy/*'
+                },
+                timestamp: Date.now()
+            });
+        });
+
         // Health check
         this.app.get('/health', (req: Request, res: Response) => {
             res.json({ status: 'ok', timestamp: Date.now() });
