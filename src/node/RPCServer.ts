@@ -41,13 +41,24 @@ export class RPCServer {
      * Setup middleware
      */
     private setupMiddleware(): void {
-        this.app.use(helmet());
-        this.app.use(cors());
+        // Disable CSP for now to allow inline scripts in index.html
+        this.app.use(helmet({
+            contentSecurityPolicy: false,
+            crossOriginEmbedderPolicy: false
+        }));
+
+        // Allow all CORS
+        this.app.use(cors({
+            origin: '*',
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+        }));
+
         this.app.use(express.json());
 
-        // Request logging
+        // Detailed Request logging
         this.app.use((req: Request, res: Response, next: NextFunction) => {
-            console.log(`${req.method} ${req.path}`);
+            console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - IP: ${req.ip}`);
             next();
         });
     }
