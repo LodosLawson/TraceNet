@@ -382,7 +382,7 @@ export class Blockchain extends EventEmitter {
             totalTransactions,
             accountCount: this.state.size,
             latestBlockHash: latestBlock.hash || '',
-            state_root: latestBlock.stateRoot || '',
+            state_root: latestBlock.state_root || '',
         };
     }
 
