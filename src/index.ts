@@ -17,6 +17,7 @@ import { EconomyAPI } from './economy/EconomyAPI';
 import { TREASURY_ADDRESSES } from './economy/TokenConfig';
 import { UserService } from './services/UserService';
 import { ContentService } from './services/ContentService';
+import { SocialService } from './services/SocialService';
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +43,7 @@ class BlockchainNode {
     private economyAPI: EconomyAPI;
     private userService: UserService;
     private contentService: ContentService;
+    private socialService: SocialService;
 
     constructor() {
         console.log('Initializing Blockchain Node...');
@@ -120,6 +122,11 @@ class BlockchainNode {
         this.contentService = new ContentService(this.blockchain, this.mempool);
         this.contentService.setUserService(this.userService);
         this.rpcServer.setContentService(this.contentService);
+
+        // Initialize social service
+        this.socialService = new SocialService(this.blockchain, this.mempool);
+        this.socialService.setContentService(this.contentService);
+        this.rpcServer.setSocialService(this.socialService);
 
         // Add economy API routes
         this.rpcServer.getApp().use('/economy', this.economyAPI.getRouter());

@@ -9,6 +9,7 @@ import { TransactionModel, Transaction } from '../blockchain/models/Transaction'
 import { KeyManager } from '../blockchain/crypto/KeyManager';
 import { UserService } from '../services/UserService';
 import { ContentService } from '../services/ContentService';
+import { SocialService } from '../services/SocialService';
 
 /**
  * RPC Server for blockchain node
@@ -21,6 +22,7 @@ export class RPCServer {
     private validatorPool: ValidatorPool;
     private userService?: UserService;
     private contentService?: ContentService;
+    private socialService?: SocialService;
     private port: number;
 
     constructor(
@@ -122,6 +124,16 @@ export class RPCServer {
         this.app.get('/api/content/:contentId', this.getContentById.bind(this));
         this.app.get('/api/content/user/:walletId', this.getUserContent.bind(this));
         this.app.get('/api/content/feed', this.getContentFeed.bind(this));
+
+        // Social API endpoints
+        this.app.post('/api/social/like', this.likeContent.bind(this));
+        this.app.post('/api/social/comment', this.commentContent.bind(this));
+        this.app.post('/api/social/follow', this.followUser.bind(this));
+        this.app.post('/api/social/unfollow', this.unfollowUser.bind(this));
+        this.app.get('/api/social/likes/:contentId', this.getContentLikes.bind(this));
+        this.app.get('/api/social/comments/:contentId', this.getContentComments.bind(this));
+        this.app.get('/api/social/followers/:walletId', this.getUserFollowers.bind(this));
+        this.app.get('/api/social/following/:walletId', this.getUserFollowing.bind(this));
 
         // Validator endpoints
         this.app.post('/api/validator/register', this.registerValidator.bind(this));
@@ -812,6 +824,265 @@ export class RPCServer {
                 total: result.total,
                 limit,
                 offset,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Set social service (to be called after construction)
+     */
+    setSocialService(socialService: SocialService): void {
+        this.socialService = socialService;
+    }
+
+    /**
+     * Like content (0.00001 LT - 50% to creator, 50% to treasury)
+     */
+    private async likeContent(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.socialService) {
+                res.status(503).json({ error: 'Social service not available' });
+                return;
+            }
+
+            const { wallet_id, content_id } = req.body;
+
+            if (!wallet_id || !content_id) {
+                res.status(400).json({ error: 'wallet_id and content_id are required' });
+                return;
+            }
+
+            const result = this.socialService.likeContent({
+                wallet_id,
+                content_id,
+            });
+
+            res.json({
+                success: true,
+                tx_id: result.tx_id,
+                fee_breakdown: {
+                    total_fee: result.fee_paid,
+                    creator_received: result.creator_received,
+                    treasury_received: result.treasury_received,
+                    fee_split: '50% creator / 50% treasury',
+                },
+            });
+        } catch (error) {
+            res.status(400).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Comment on content (0.00001 LT - 50% to creator, 50% to treasury)
+     */
+    private async commentContent(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.socialService) {
+                res.status(503).json({ error: 'Social service not available' });
+                return;
+            }
+
+            const { wallet_id, content_id, comment_text, parent_comment_id } = req.body;
+
+            if (!wallet_id || !content_id || !comment_text) {
+                res.status(400).json({ error: 'wallet_id, content_id, and comment_text are required' });
+                return;
+            }
+
+            const result = this.socialService.commentOnContent({
+                wallet_id,
+                content_id,
+                comment_text,
+                parent_comment_id,
+            });
+
+            res.json({
+                success: true,
+                tx_id: result.tx_id,
+                fee_breakdown: {
+                    total_fee: result.fee_paid,
+                    creator_received: result.creator_received,
+                    treasury_received: result.treasury_received,
+                    fee_split: '50% creator / 50% treasury',
+                },
+            });
+        } catch (error) {
+            res.status(400).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Follow user (FREE - no fee)
+     */
+    private async followUser(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.socialService) {
+                res.status(503).json({ error: 'Social service not available' });
+                return;
+            }
+
+            const { wallet_id, target_wallet_id } = req.body;
+
+            if (!wallet_id || !target_wallet_id) {
+                res.status(400).json({ error: 'wallet_id and target_wallet_id are required' });
+                return;
+            }
+
+            const result = this.socialService.followUser({
+                wallet_id,
+                target_wallet_id,
+            });
+
+            res.json({
+                success: true,
+                tx_id: result.tx_id,
+                message: 'Following user (FREE - no fee)',
+            });
+        } catch (error) {
+            res.status(400).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Unfollow user (FREE - no fee)
+     */
+    private async unfollowUser(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.socialService) {
+                res.status(503).json({ error: 'Social service not available' });
+                return;
+            }
+
+            const { wallet_id, target_wallet_id } = req.body;
+
+            if (!wallet_id || !target_wallet_id) {
+                res.status(400).json({ error: 'wallet_id and target_wallet_id are required' });
+                return;
+            }
+
+            const result = this.socialService.unfollowUser({
+                wallet_id,
+                target_wallet_id,
+            });
+
+            res.json({
+                success: true,
+                tx_id: result.tx_id,
+                message: 'Unfollowed user',
+            });
+        } catch (error) {
+            res.status(400).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get content likes
+     */
+    private async getContentLikes(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.socialService) {
+                res.status(503).json({ error: 'Social service not available' });
+                return;
+            }
+
+            const { contentId } = req.params;
+            const likes = this.socialService.getContentLikes(contentId);
+
+            res.json({
+                success: true,
+                content_id: contentId,
+                likes,
+                count: likes.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get content comments
+     */
+    private async getContentComments(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.socialService) {
+                res.status(503).json({ error: 'Social service not available' });
+                return;
+            }
+
+            const { contentId } = req.params;
+            const comments = this.socialService.getContentComments(contentId);
+
+            res.json({
+                success: true,
+                content_id: contentId,
+                comments,
+                count: comments.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get user followers
+     */
+    private async getUserFollowers(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.socialService) {
+                res.status(503).json({ error: 'Social service not available' });
+                return;
+            }
+
+            const { walletId } = req.params;
+            const followers = this.socialService.getUserFollowers(walletId);
+
+            res.json({
+                success: true,
+                wallet_id: walletId,
+                followers,
+                count: followers.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get who user is following
+     */
+    private async getUserFollowing(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.socialService) {
+                res.status(503).json({ error: 'Social service not available' });
+                return;
+            }
+
+            const { walletId } = req.params;
+            const following = this.socialService.getUserFollowing(walletId);
+
+            res.json({
+                success: true,
+                wallet_id: walletId,
+                following,
+                count: following.length,
             });
         } catch (error) {
             res.status(500).json({
