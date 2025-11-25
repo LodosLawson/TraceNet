@@ -886,41 +886,12 @@ feed = requests.get('http://localhost:3000/api/content/feed?limit=20').json()</c
         await updateRecentBlocks();
             } catch (error) {
             console.error('Network status error:', error);
-            document.getElementById('statusBar').innerHTML = '❌ Node bağlantısı kurulamadı';
-            document.getElementById('statusBar').style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
-        }
-        }
 
-        // Fetch recent blocks
-        async function updateRecentBlocks() {
-            try {
-                const response = await fetch(`${API_URL}/rpc/status`);
-                const data = await response.json();
-                const blockCount = data.blockchain?.blockCount || 0;
-
-                if (blockCount === 0) return;
-
-                // Fetch last 5 blocks
-                const blocks = [];
-                const startIndex = Math.max(0, blockCount - 5);
-
-                for (let i = blockCount - 1; i >= startIndex && i >= 0; i--) {
-                    try {
-                        const blockResponse = await fetch(`${API_URL}/rpc/block/${i}`);
-                        const blockData = await blockResponse.json();
-                        if (blockData.block) {
-                            blocks.push(blockData.block);
-                        }
-                    } catch (e) {
-                        console.error(`Error fetching block ${i}:`, e);
-                    }
-                }
-
-                // Render blocks
-                const blocksHTML = blocks.map(block => {
-                    const date = new Date(block.timestamp);
-                    const txCount = block.transactions?.length || 0;
-                    return `
+            // Render blocks
+            const blocksHTML = blocks.map(block => {
+                const date = new Date(block.timestamp);
+                const txCount = block.transactions?.length || 0;
+                return `
                         <div class="block-item">
                             <div class="block-header">
                                 <span class="block-index">Blok #${block.index}</span>
@@ -930,13 +901,13 @@ feed = requests.get('http://localhost:3000/api/content/feed?limit=20').json()</c
                             <div class="block-hash">Hash: ${block.hash || 'N/A'}</div>
                         </div>
                     `;
-                }).join('');
+            }).join('');
 
-                document.getElementById('recentBlocks').innerHTML = blocksHTML ||
-                    '<div class="block-item"><div class="stat-info">Blok bulunamadı</div></div>';
-            } catch (error) {
-                console.error('Error fetching blocks:', error);
-            }
+            document.getElementById('recentBlocks').innerHTML = blocksHTML ||
+                '<div class="block-item"><div class="stat-info">Blok bulunamadı</div></div>';
+        } catch (error) {
+            console.error('Error fetching blocks:', error);
+        }
         }
 
         // Update network status every 10 seconds
