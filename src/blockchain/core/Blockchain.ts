@@ -368,17 +368,21 @@ export class Blockchain extends EventEmitter {
         totalTransactions: number;
         accountCount: number;
         latestBlockHash: string;
+        state_root: string;
     } {
         let totalTransactions = 0;
         for (const block of this.chain) {
             totalTransactions += block.transactions.length;
         }
 
+        const latestBlock = this.getLatestBlock();
+
         return {
             blockCount: this.chain.length,
             totalTransactions,
             accountCount: this.state.size,
-            latestBlockHash: this.getLatestBlock().hash || '',
+            latestBlockHash: latestBlock.hash || '',
+            state_root: latestBlock.stateRoot || '',
         };
     }
 
