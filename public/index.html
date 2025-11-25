@@ -842,50 +842,37 @@ print('Fee breakdown:', like_response.json()['fee_breakdown'])</code>
             <div class="container">
                 <p><strong>TraceNet Blockchain</strong> © 2025</p>
                 <p style="margin-top: 0.5rem; font-size: 0.85rem;">
-                    LockTrace Network - Güvenli Sosyal Medya Blockchain
-                </p>
-            </div>
-        </div>
+                    document.getElementById(tabName).classList.add('active');
+                    }
 
-        <script>
-            const API_URL = `http://${window.location.hostname}:${window.location.port || 3000}`;
-
-            // Tab switching
-            function showTab(tabName) {
-                document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-                event.target.classList.add('active');
-                document.getElementById(tabName).classList.add('active');
-            }
-
-            // Fetch network status
-            async function updateNetworkStatus() {
-                try {
+                    // Fetch network status
+                    async function updateNetworkStatus() {
+                    try {
                     const response = await fetch(`${API_URL}/rpc/status`);
                     const data = await response.json();
 
                     document.getElementById('latestBlock').textContent =
-                        data.blockchain?.blockCount || '-';
+                    data.blockchain?.blockCount || '-';
                     document.getElementById('totalTx').textContent =
-                        data.blockchain?.transactionCount || '-';
+                    data.blockchain?.transactionCount || '-';
                     document.getElementById('activeValidators').textContent =
-                        data.validators?.activeCount || '-';
+                    data.validators?.activeCount || '-';
 
                     document.getElementById('statusBar').innerHTML =
-                        '✅ TraceNet Blockchain Node Aktif - Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
-                } catch (error) {
+                    '✅ TraceNet Blockchain Node Aktif - Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
+                    } catch (error) {
                     console.error('Network status error:', error);
                     document.getElementById('statusBar').innerHTML =
-                        '❌ Node bağlantısı kurulamadı';
+                    '❌ Node bağlantısı kurulamadı';
                     document.getElementById('statusBar').style.background =
-                        'linear-gradient(135deg, #ef4444, #dc2626)';
-                }
-            }
+                    'linear-gradient(135deg, #ef4444, #dc2626)';
+                    }
+                    }
 
-            // Update network status every 10 seconds
-            updateNetworkStatus();
-            setInterval(updateNetworkStatus, 10000);
-        </script>
+                    // Update network status every 10 seconds
+                    updateNetworkStatus();
+                    setInterval(updateNetworkStatus, 10000);
+                    </script>
 </body>
 
 </html>
