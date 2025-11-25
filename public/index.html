@@ -361,53 +361,254 @@ curl -X POST https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/api/wallet/crea
         <div>
             <a href="https://github.com/LodosLawson/TraceNet"
                 style="color: #667eea; text-decoration: none; margin: 0 15px;">GitHub</a>
-            <a href="https://console.cloud.google.com/cloud-build/builds?project=blockchain-message-economy"
-                style="color: #667eea; text-decoration: none; margin: 0 15px;">Cloud Build</a>
-        </div>
-        <p style="margin-top: 15px; opacity: 0.7;">&copy; 2025 TraceNet Blockchain</p>
-    </footer>
+            <a href="https://console.cloud.google.com/cloud-build/builds?project=blockchain-message-economy" 50% {
+                opacity: 0.5; } } @media (max-width: 768px) { .hero h1 { font-size: 28px; } .section, .section-dark {
+                padding: 40px 15px; } .stats-grid { grid-template-columns: 1fr; } } footer { background: #0a0a0a; color:
+                white; padding: 30px 20px; text-align: center; } </style>
+                </head>
 
-    <script>
-        const API_URL = window.location.origin;
+                <body>
+                    <div class="server-banner">
+                        🟢 Live API Server
+                        <div class="server-url">https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app</div>
+                    </div>
 
-        async function fetchBlockchainStatus() {
-            try {
-                const response = await fetch(`${API_URL}/rpc/status`);
-                const data = await response.json();
+                    <header>
+                        <div class="container">
+                            <div class="logo">⛓️ TraceNet Blockchain</div>
+                        </div>
+                    </header>
 
-                document.getElementById('server-status').innerHTML = '<span class="pulse" style="color: #4ade80;">●</span> Online';
-                document.getElementById('latest-block').textContent = '#' + data.blockchain.blockCount;
-                document.getElementById('total-tx').textContent = data.blockchain.totalTransactions.toLocaleString();
-                document.getElementById('total-accounts').textContent = data.blockchain.accountCount.toLocaleString();
-                document.getElementById('active-validators').textContent = data.validators.onlineValidators || 0;
-                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+                    <section class="hero">
+                        <h1>Live Blockchain Explorer</h1>
+                        <p>Real-time monitoring & comprehensive API documentation</p>
+                    </section>
 
-                await fetchRecentBlocks(data.blockchain.blockCount);
-            } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('server-status').innerHTML = '<span style="color: #ef4444;">●</span> Offline';
-            }
-        }
+                    <section class="section-dark">
+                        <div class="container">
+                            <h2 class="section-title">🔴 Live Status</h2>
 
-        async function fetchRecentBlocks(latestBlockIndex) {
-            const container = document.getElementById('recent-blocks');
-            container.innerHTML = '';
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-label">Server Status</div>
+                                    <div id="server-status" class="stat-value">
+                                        <span class="pulse">●</span> Loading...
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">Latest Block</div>
+                                    <div id="latest-block" class="stat-value">#0</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">Total TX</div>
+                                    <div id="total-tx" class="stat-value">0</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">Active Validators</div>
+                                    <div id="active-validators" class="stat-value">0</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">Accounts</div>
+                                    <div id="total-accounts" class="stat-value">0</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-label">Last Update</div>
+                                    <div id="last-update" class="stat-value">--:--:--</div>
+                                </div>
+                            </div>
 
-            const blockCount = Math.min(5, latestBlockIndex);
+                            <h3 style="margin-bottom: 20px;">📦 Recent Blocks</h3>
+                            <div id="recent-blocks">
+                                <div style="text-align: center; opacity: 0.6; padding: 30px;">
+                                    Loading blockchain data...
+                                </div>
+                            </div>
 
-            for (let i = latestBlockIndex - 1; i >= Math.max(0, latestBlockIndex - blockCount); i--) {
-                try {
-                    const response = await fetch(`${API_URL}/rpc/block/${i}`);
-                    const block = await response.json();
+                            <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: 14px;">
+                                Auto-refresh every 10 seconds
+                            </div>
+                        </div>
+                    </section>
 
-                    const card = document.createElement('div');
-                    card.className = 'block-card';
-                    card.innerHTML = `
+                    <section class="section">
+                        <div class="container">
+                            <h2 class="section-title">📡 API Endpoints</h2>
+
+                            <div
+                                style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; text-align: center;">
+                                <h3 style="margin: 0 0 10px 0;">🌐 Base URL</h3>
+                                <div style="font-family: monospace; font-size: 16px; word-break: break-all;">
+                                    https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app
+                                </div>
+                            </div>
+
+                            <h3>🔗 Blockchain RPC</h3>
+                            <div class="api-endpoint"><strong>GET</strong> /health - Server health check</div>
+                            <div class="api-endpoint"><strong>GET</strong> /rpc/status - Blockchain status</div>
+                            <div class="api-endpoint"><strong>GET</strong> /rpc/block/:index - Block details</div>
+                            <div class="api-endpoint"><strong>GET</strong> /rpc/transaction/:txId - TX info</div>
+                            <div class="api-endpoint"><strong>GET</strong> /rpc/balance/:walletId - Wallet balance</div>
+                            <div class="api-endpoint"><strong>POST</strong> /rpc/sendRawTx - Submit transaction</div>
+
+                            <h3 style="margin-top: 30px;">💰 Economy API</h3>
+                            <div class="api-endpoint"><strong>GET</strong> /economy/tokenPrice - Token price & market
+                                data</div>
+                            <div class="api-endpoint"><strong>GET</strong> /economy/treasury - Treasury stats</div>
+                            <div class="api-endpoint"><strong>GET</strong> /economy/distribution - Token distribution
+                            </div>
+
+                            <h3 style="margin-top: 30px;">💼 Wallet API</h3>
+                            <div class="api-endpoint"><strong>POST</strong> /api/wallet/create - Create new wallet</div>
+                            <div class="api-endpoint"><strong>GET</strong> /api/wallet/list/:userId - List user wallets
+                            </div>
+                            <div class="api-endpoint"><strong>GET</strong> /api/wallet/:walletId - Wallet details</div>
+
+                            <h3 style="margin-top: 40px;">📘 JavaScript Example</h3>
+                            <div class="code-block">
+                                <pre>const API = 'https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app';
+
+// Get blockchain status
+fetch(`${API}/rpc/status`)
+  .then(r => r.json())
+  .then(data => {
+    console.log('Blocks:', data.blockchain.blockCount);
+    console.log('Transactions:', data.blockchain.totalTransactions);
+  });
+
+// Get specific block
+fetch(`${API}/rpc/block/0`)
+  .then(r => r.json())
+  .then(block => console.log('Block:', block));
+
+// Create wallet
+fetch(`${API}/api/wallet/create`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ user_id: 'user123' })
+})
+  .then(r => r.json())
+  .then(wallet => console.log('New Wallet:', wallet));</pre>
+                            </div>
+
+                            <h3 style="margin-top: 30px;">🐍 Python Example</h3>
+                            <div class="code-block">
+                                <pre>import requests
+
+API = 'https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app'
+
+# Get blockchain status
+status = requests.get(f'{API}/rpc/status').json()
+print(f"Blocks: {status['blockchain']['blockCount']}")
+
+# Get block
+block = requests.get(f'{API}/rpc/block/0').json()
+print(f"Genesis Hash: {block['hash']}")
+
+# Create wallet
+wallet = requests.post(
+    f'{API}/api/wallet/create',
+    json={'user_id': 'user123'}
+).json()
+print(f"Wallet: {wallet['wallet']['wallet_id']}")</pre>
+                            </div>
+
+                            <h3 style="margin-top: 30px;">📱 cURL Example</h3>
+                            <div class="code-block">
+                                <pre># Health check
+curl https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/health
+
+# Blockchain status
+curl https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/rpc/status
+
+# Get block
+curl https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/rpc/block/0
+
+# Create wallet
+curl -X POST https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/api/wallet/create \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"user123"}'</pre>
+                            </div>
+                        </div>
+                    </section>
+
+                    <footer>
+                        <div>
+                            <a href="https://github.com/LodosLawson/TraceNet"
+                                style="color: #667eea; text-decoration: none; margin: 0 15px;">GitHub</a>
+                            <a href="https://console.cloud.google.com/cloud-build/builds?project=blockchain-message-economy"
+                                style="color: #667eea; text-decoration: none; margin: 0 15px;">Cloud Build</a>
+                        </div>
+                        <p style="margin-top: 15px; opacity: 0.7;">&copy; 2025 TraceNet Blockchain</p>
+                    </footer>
+
+                    <script>
+                        const API_URL = window.location.origin;
+                        console.log('🚀 TraceNet Explorer initialized, API:', API_URL);
+
+                        async function fetchBlockchainStatus() {
+                            console.log('📡 Fetching blockchain status...');
+                            try {
+                                const response = await fetch(`${API_URL}/rpc/status`);
+                                if (!response.ok) {
+                                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                                }
+
+                                const data = await response.json();
+                                console.log('✅ Status received:', data);
+
+                                // Update UI
+                                document.getElementById('server-status').innerHTML = '<span class="pulse" style="color: #4ade80;">●</span> Online';
+                                document.getElementById('latest-block').textContent = '#' + data.blockchain.blockCount;
+                                document.getElementById('total-tx').textContent = data.blockchain.totalTransactions.toLocaleString();
+                                document.getElementById('total-accounts').textContent = data.blockchain.accountCount.toLocaleString();
+                                document.getElementById('active-validators').textContent = data.validators.onlineValidators || 0;
+                                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+
+                                // Fetch blocks
+                                await fetchRecentBlocks(data.blockchain.blockCount);
+                            } catch (error) {
+                                console.error('❌ Error fetching status:', error);
+                                document.getElementById('server-status').innerHTML = '<span style="color: #ef4444;">●</span> Error: ' + error.message;
+                                document.getElementById('recent-blocks').innerHTML =
+                                    '<div style="text-align: center; padding: 30px; color: #ef4444;">⚠️ Connection failed. Check console for details.</div>';
+                            }
+                        }
+
+                        async function fetchRecentBlocks(blockCount) {
+                            console.log('📦 Fetching recent blocks, total:', blockCount);
+                            const container = document.getElementById('recent-blocks');
+                            container.innerHTML = '';
+
+                            if (blockCount === 0) {
+                                container.innerHTML = '<div style="text-align: center; opacity: 0.6; padding: 30px;">No blocks yet</div>';
+                                return;
+                            }
+
+                            // Fetch blocks from 0 to blockCount-1
+                            const blocksToFetch = Math.min(5, blockCount);
+                            const startIndex = Math.max(0, blockCount - blocksToFetch);
+
+                            console.log(`Fetching blocks from ${startIndex} to ${blockCount - 1}`);
+
+                            for (let i = blockCount - 1; i >= startIndex; i--) {
+                                try {
+                                    console.log(`Fetching block #${i}...`);
+                                    const response = await fetch(`${API_URL}/rpc/block/${i}`);
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP ${response.status}`);
+                                    }
+
+                                    const block = await response.json();
+                                    console.log(`✅ Block #${i}:`, block);
+
+                                    const card = document.createElement('div');
+                                    card.className = 'block-card';
+                                    card.innerHTML = `
                         <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
                             <div>
                                 <div style="font-weight: bold; font-size: 18px;">Block #${block.index}</div>
                                 <div style="font-family: monospace; font-size: 11px; opacity: 0.7; margin-top: 5px;">
-                                    ${block.hash.substring(0, 32)}...
+                                    ${block.hash ? block.hash.substring(0, 32) + '...' : 'N/A'}
                                 </div>
                             </div>
                             <div style="text-align: right;">
@@ -422,20 +623,24 @@ curl -X POST https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/api/wallet/crea
                             </div>
                         </div>
                     `;
-                    container.appendChild(card);
-                } catch (error) {
-                    console.error(`Error fetching block ${i}:`, error);
-                }
-            }
+                                    container.appendChild(card);
+                                } catch (error) {
+                                    console.error(`❌ Error fetching block ${i}:`, error);
+                                    container.innerHTML += `<div style="padding: 10px; opacity: 0.6;">⚠️ Error loading block #${i}</div>`;
+                                }
+                            }
+                        }
 
-            if (latestBlockIndex === 0) {
-                container.innerHTML = '<div style="text-align: center; opacity: 0.6; padding: 30px;">Genesis block only</div>';
-            }
-        }
+                        // Initial fetch
+                        console.log('Starting initial fetch...');
+                        fetchBlockchainStatus();
 
-        fetchBlockchainStatus();
-        setInterval(fetchBlockchainStatus, 10000);
-    </script>
-</body>
+                        // Auto-refresh every 10 seconds
+                        setInterval(() => {
+                            console.log('🔄 Auto-refresh triggered');
+                            fetchBlockchainStatus();
+                        }, 10000);
+                    </script>
+                </body>
 
 </html>
