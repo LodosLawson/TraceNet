@@ -170,16 +170,14 @@ class BlockchainNode {
             // Broadcast via WebSocket
             this.wsServer.broadcastNewBlock(data.block, data.producer, data.transaction_count);
 
-            // Distribute rewards
+            // Distribute rewards (system transactions, not added to mempool)
             const blockRewards = this.rewardDistributor.distributeBlockReward(
                 data.block.index,
                 data.producer
             );
 
-            // Add reward transactions to mempool
-            for (const rewardTx of blockRewards) {
-                this.mempool.addTransaction(rewardTx.toJSON());
-            }
+            // Note: Reward transactions are NOT added to mempool
+            // They are system-generated and should not trigger new blocks
 
             // Broadcast transaction confirmations
             for (const tx of data.block.transactions) {
@@ -196,23 +194,15 @@ class BlockchainNode {
         this.signatureCoordinator.on('signatureComplete', (data: any) => {
             console.log(`Signatures collected for tx ${data.tx_id}: ${data.signature_count}`);
 
-            // Distribute signature rewards
+            // Distribute signature rewards (system transactions, not added to mempool)
             const validators = data.transaction.signatures.map((s: any) => s.validator_id);
             const signatureRewards = this.rewardDistributor.distributeSignatureRewards(
                 this.blockchain.getLatestBlock().index + 1,
                 validators
             );
 
-            // Add reward transactions to mempool
-            for (const rewardTx of signatureRewards) {
-                this.mempool.addTransaction(rewardTx.toJSON());
-                this.wsServer.broadcastRewardPaid(
-                    rewardTx.to_wallet,
-                    rewardTx.amount,
-                    'signature',
-                    rewardTx.tx_id
-                );
-            }
+            // Note: Signature reward transactions are NOT added to mempool
+            // They are system-generated and should not trigger new blocks
         });
 
         // Handle signature timeout
