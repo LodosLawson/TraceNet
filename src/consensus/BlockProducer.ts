@@ -36,7 +36,7 @@ export class BlockProducer extends EventEmitter {
     }
 
     /**
-     * Start block production
+     * Start block production (event-driven)
      */
     start(): void {
         if (this.isProducing) {
@@ -45,11 +45,19 @@ export class BlockProducer extends EventEmitter {
 
         this.isProducing = true;
 
-        this.productionInterval = setInterval(() => {
-            this.produceBlock();
-        }, this.blockTime);
+        // Listen for new transactions in mempool
+        this.mempool.on('transactionAdded', () => {
+            // Use a small delay to batch multiple transactions into one block
+            if (this.productionInterval) {
+                clearTimeout(this.productionInterval);
+            }
 
-        console.log(`Block production started (interval: ${this.blockTime}ms)`);
+            this.productionInterval = setTimeout(() => {
+                this.produceBlock();
+            }, 2000); // 2 second delay to batch transactions
+        });
+
+        console.log('Block production started (event-driven mode)');
     }
 
     /**
@@ -62,8 +70,11 @@ export class BlockProducer extends EventEmitter {
 
         this.isProducing = false;
 
+        // Remove event listener
+        this.mempool.removeAllListeners('transactionAdded');
+
         if (this.productionInterval) {
-            clearInterval(this.productionInterval);
+            clearTimeout(this.productionInterval);
             this.productionInterval = null;
         }
 

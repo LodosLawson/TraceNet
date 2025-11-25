@@ -1,4 +1,5 @@
 import { Transaction, TransactionModel } from '../blockchain/models/Transaction';
+import EventEmitter from 'events';
 
 /**
  * Mempool entry with priority
@@ -12,12 +13,13 @@ interface MempoolEntry {
 /**
  * Transaction mempool for pending transactions
  */
-export class Mempool {
+export class Mempool extends EventEmitter {
     private pool: Map<string, MempoolEntry>;
     private maxSize: number;
     private expirationTime: number; // milliseconds
 
     constructor(maxSize: number = 10000, expirationTime: number = 3600000) {
+        super();
         this.pool = new Map();
         this.maxSize = maxSize;
         this.expirationTime = expirationTime;
@@ -49,6 +51,9 @@ export class Mempool {
         };
 
         this.pool.set(transaction.tx_id, entry);
+
+        // Emit event for block production
+        this.emit('transactionAdded', transaction);
 
         return { success: true };
     }
