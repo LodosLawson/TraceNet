@@ -1,3 +1,20 @@
+import { v4 as uuidv4 } from 'uuid';
+import {
+    Post,
+    CreatePostInput,
+    PostStatus,
+    PostVisibility,
+    Like,
+    Comment,
+    Follow,
+    Share,
+    MediaHash,
+} from './models/Social';
+import { TransactionModel, TransactionType } from '../../blockchain/models/Transaction';
+import { UserService } from '../user/UserService';
+
+/**
+ * Social Service for managing posts, likes, follows, etc.
  */
 export class SocialService {
     private posts: Map<string, Post>;
