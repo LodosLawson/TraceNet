@@ -56,6 +56,44 @@ const myWallet = await createWallet('user_123');
 
 > ⚠️ **ÖNEMLİ:** Mnemonic (12 kelime) ve private key'i GÜVENLİ bir yerde saklayın! Kaybederseniz wallet'a erişemezsiniz.
 
+### Wallet İşlemleri
+
+#### Wallet Listesi Getirme
+```javascript
+// Kullanıcının tüm wallet'larını listele
+const getWallets = async (userId) => {
+  const response = await fetch(`https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/api/wallet/list/${userId}`);
+  const data = await response.json();
+  console.log('Wallets:', data.wallets);
+  return data.wallets;
+};
+```
+
+#### Wallet Detayları ve Bakiye
+```javascript
+// Wallet detaylarını ve bakiyesini getir
+const getWalletDetails = async (walletId) => {
+  const response = await fetch(`https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/api/wallet/${walletId}`);
+  const data = await response.json();
+  
+  console.log('Wallet ID:', data.wallet_id);
+  console.log('Balance:', data.balance / 100000000, 'LT');
+  console.log('Public Key:', data.public_key);
+  
+  return data;
+};
+```
+
+#### Sadece Bakiye Kontrolü
+```javascript
+const checkBalance = async (walletId) => {
+  const response = await fetch(`https://tracenet-blockchain-bbzxtm72vq-uc.a.run.app/rpc/balance/${walletId}`);
+  const data = await response.json();
+  console.log('Balance:', data.balance / 100000000, 'LT');
+  return data.balance;
+};
+```
+
 ---
 
 ## 💸 Adım 2: Transaction Oluşturma

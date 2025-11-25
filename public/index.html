@@ -227,45 +227,33 @@
         <div class="container">
             <h2 class="section-title">🔴 Live Status</h2>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-label">Server Status</div>
-                    <div id="server-status" class="stat-value">
-                        <span class="pulse">●</span> Loading...
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Latest Block</div>
-                    <div id="latest-block" class="stat-value">#0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Total TX</div>
-                    <div id="total-tx" class="stat-value">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Active Validators</div>
-                    <div id="active-validators" class="stat-value">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Accounts</div>
-                    <div id="total-accounts" class="stat-value">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Last Update</div>
-                    <div id="last-update" class="stat-value">--:--:--</div>
-                </div>
-            </div>
+            <div class="stat-label">Total TX</div>
+            <div id="total-tx" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Validators</div>
+            <div id="active-validators" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Accounts</div>
+            <div id="total-accounts" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Last Update</div>
+            <div id="last-update" class="stat-value">--:--:--</div>
+        </div>
+        </div>
 
-            <h3 style="margin-bottom: 20px;">📦 Recent Blocks</h3>
-            <div id="recent-blocks">
-                <div style="text-align: center; opacity: 0.6; padding: 30px;">
-                    Loading blockchain data...
-                </div>
+        <h3 style="margin-bottom: 20px;">📦 Recent Blocks</h3>
+        <div id="recent-blocks">
+            <div style="text-align: center; opacity: 0.6; padding: 30px;">
+                Loading blockchain data...
             </div>
+        </div>
 
-            <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: 14px;">
-                Auto-refresh every 10 seconds
-            </div>
+        <div style="margin-top: 20px; text-align: center; opacity: 0.6; font-size: 14px;">
+            Auto-refresh every 10 seconds
+        </div>
         </div>
     </section>
 
@@ -331,25 +319,6 @@ curl YOUR_API_URL/rpc/status
 
 # Get block
                 style="color: #667eea; text-decoration: none; margin: 0 15px;">Cloud Build</a>
-        </div>
-        <p style="margin-top: 15px; opacity: 0.7;">&copy; 2025 TraceNet Blockchain</p>
-    </footer>
-
-    <script>
-        // Detect API URL - use current origin (works for both local and Cloud Run)
-        const API_URL = window.location.origin;
-        console.log('🚀 TraceNet Explorer initialized');
-        console.log('📍 Current URL:', window.location.href);
-        console.log('🌐 API URL:', API_URL);
-
-        // Update displays
-        document.getElementById('api-url-display').textContent = API_URL;
-        document.getElementById('base-url-display').textContent = API_URL;
-        document.getElementById('js-example').textContent = document.getElementById('js-example').textContent.replace(/YOUR_API_URL/g, API_URL);
-        document.getElementById('py-example').textContent = document.getElementById('py-example').textContent.replace(/YOUR_API_URL/g, API_URL);
-        document.getElementById('curl-example').textContent = document.getElementById('curl-example').textContent.replace(/YOUR_API_URL/g, API_URL);
-
-        async function fetchBlockchainStatus() {
             console.log('📡 Fetching blockchain status from:', `${API_URL}/rpc/status`);
             try {
                 const response = await fetch(`${API_URL}/rpc/status`, {
