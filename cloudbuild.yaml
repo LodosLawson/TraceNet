@@ -10,13 +10,7 @@ steps:
       - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
       - '.'
 
-
   # Push Docker image
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
-
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
@@ -44,4 +38,11 @@ steps:
       - '2'
       - '--max-instances'
       - '10'
+      - '--set-env-vars'
+      - 'NODE_ENV=production'
 
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1200s'
