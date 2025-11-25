@@ -1,271 +1,242 @@
-<!DOCTYPE html>
-<html lang="tr">
+* {
+margin: 0;
+padding: 0;
+box-sizing: border-box;
+}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TraceNet Blockchain - DPoA Consensus & Social Economy</title>
-    <meta name="description"
-        content="TraceNet: Delegated Proof of Activity blockchain with social features and LT token economy">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+body {
+font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+line-height: 1.6;
+color: #333;
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
+.container {
+max-width: 1200px;
+margin: 0 auto;
+padding: 0 20px;
+}
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
+header {
+background: rgba(255, 255, 255, 0.95);
+backdrop-filter: blur(10px);
+padding: 20px 0;
+position: sticky;
+top: 0;
+z-index: 100;
+box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
 
-        header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 20px 0;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
+nav {
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
 
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+.logo {
+font-size: 24px;
+font-weight: bold;
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+}
 
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+.nav-links {
+display: flex;
+gap: 30px;
+list-style: none;
+}
 
-        .nav-links {
-            display: flex;
-            gap: 30px;
-            list-style: none;
-        }
+.nav-links a {
+text-decoration: none;
+color: #333;
+font-weight: 500;
+transition: color 0.3s;
+}
 
-        .nav-links a {
-            text-decoration: none;
-            color: #333;
-            font-weight: 500;
-            transition: color 0.3s;
-        }
+.nav-links a:hover {
+color: #667eea;
+}
 
-        .nav-links a:hover {
-            color: #667eea;
-        }
+.hero {
+text-align: center;
+padding: 100px 20px;
+color: white;
+}
 
-        .hero {
-            text-align: center;
-            padding: 100px 20px;
-            color: white;
-        }
+.hero h1 {
+font-size: 48px;
+margin-bottom: 20px;
+text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
 
-        .hero h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-        }
+.hero p {
+font-size: 20px;
+margin-bottom: 40px;
+opacity: 0.95;
+}
 
-        .hero p {
-            font-size: 20px;
-            margin-bottom: 40px;
-            opacity: 0.95;
-        }
+.cta-buttons {
+display: flex;
+gap: 20px;
+justify-content: center;
+flex-wrap: wrap;
+}
 
-        .cta-buttons {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
+.btn {
+padding: 15px 30px;
+border-radius: 8px;
+text-decoration: none;
+font-weight: 600;
+transition: transform 0.3s, box-shadow 0.3s;
+display: inline-block;
+}
 
-        .btn {
-            padding: 15px 30px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: transform 0.3s, box-shadow 0.3s;
-            display: inline-block;
-        }
+.btn-primary {
+background: white;
+color: #667eea;
+}
 
-        .btn-primary {
-            background: white;
-            color: #667eea;
-        }
+.btn-secondary {
+background: rgba(255, 255, 255, 0.2);
+color: white;
+border: 2px solid white;
+}
 
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 2px solid white;
-        }
+.btn:hover {
+transform: translateY(-2px);
+box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-        }
+.section {
+background: white;
+padding: 80px 20px;
+}
 
-        .section {
-            background: white;
-            padding: 80px 20px;
-        }
+.section:nth-child(even) {
+background: #f8f9fa;
+}
 
-        .section:nth-child(even) {
-            background: #f8f9fa;
-        }
+.section-title {
+text-align: center;
+font-size: 36px;
+margin-bottom: 50px;
+color: #333;
+}
 
-        .section-title {
-            text-align: center;
-            font-size: 36px;
-            margin-bottom: 50px;
-            color: #333;
-        }
+.features {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+gap: 30px;
+}
 
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-        }
+.feature-card {
+background: white;
+padding: 30px;
+border-radius: 12px;
+box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+transition: transform 0.3s;
+}
 
-        .feature-card {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s;
-        }
+.feature-card:hover {
+transform: translateY(-5px);
+box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
 
-        .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
-        }
+.feature-icon {
+font-size: 48px;
+margin-bottom: 20px;
+}
 
-        .feature-icon {
-            font-size: 48px;
-            margin-bottom: 20px;
-        }
+.feature-card h3 {
+margin-bottom: 15px;
+color: #667eea;
+}
 
-        .feature-card h3 {
-            margin-bottom: 15px;
-            color: #667eea;
-        }
+.stats {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+gap: 30px;
+text-align: center;
+}
 
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 30px;
-            text-align: center;
-        }
+.stat-card {
+background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+color: white;
+padding: 40px 20px;
+border-radius: 12px;
+}
 
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 20px;
-            border-radius: 12px;
-        }
+.stat-number {
+font-size: 48px;
+font-weight: bold;
+margin-bottom: 10px;
+}
 
-        .stat-number {
-            font-size: 48px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
+.api-endpoint {
+background: #f8f9fa;
+padding: 15px;
+border-radius: 8px;
+margin: 10px 0;
+font-family: 'Courier New', monospace;
+border-left: 4px solid #667eea;
+}
 
-        .api-endpoint {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-family: 'Courier New', monospace;
-            border-left: 4px solid #667eea;
-        }
+.code-block {
+background: #1e1e1e;
+color: #d4d4d4;
+padding: 20px;
+border-radius: 8px;
+overflow-x: auto;
+margin: 20px 0;
+}
 
-        .code-block {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            padding: 20px;
-            border-radius: 8px;
-            overflow-x: auto;
-            margin: 20px 0;
-        }
+footer {
+background: #1a1a1a;
+color: white;
+padding: 40px 20px;
+text-align: center;
+}
 
-        footer {
-            background: #1a1a1a;
-            color: white;
-            padding: 40px 20px;
-            text-align: center;
-        }
+.footer-links {
+display: flex;
+justify-content: center;
+gap: 30px;
+margin-bottom: 20px;
+flex-wrap: wrap;
+}
 
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .footer-links a {
-            color: white;
-            text-decoration: none;
-        }
-
-        .footer-links a:hover {
-            color: #667eea;
-        }
-    </style>
-</head>
-
-<body>
-    <header>
-        <nav class="container">
-            <div class="logo">⛓️ TraceNet</div>
-            <ul class="nav-links">
-                <li><a href="#features">Özellikler</a></li>
-                <li><a href="#api">API</a></li>
-                <li><a href="#node">Node Kurulum</a></li>
-                <li><a href="#mining">Validator</a></li>
-                <li><a href="#docs">Dokümantasyon</a></li>
-            </ul>
-        </nav>
-    </header>
-
-    <section class="hero">
-        <div class="container">
-            <h1>TraceNet Blockchain</h1>
-            <p>Delegated Proof of Activity Consensus ile Sosyal Ekonomi</p>
-            <div class="cta-buttons">
-                <a href="#api" class="btn btn-primary">API Dokümantasyonu</a>
-                <a href="#node" class="btn btn-secondary">Node Başlat</a>
-                <a href="https://github.com/LodosLawson/TraceNet" class="btn btn-secondary">GitHub</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Live Blockchain Status -->
+<nav class="container">
+    <div class="logo">⛓️ TraceNet</div>
+    <ul class="nav-links">
+        <li><a href="#features">Özellikler</a></li>
+        <li><a href="#api">API</a></li>
+        <li><a href="#node">Node Kurulum</a></li>
+        <li><a href="#mining">Validator</a></li>
+        <li><a href="#docs">Dokümantasyon</a></li>
+    </ul>
+</nav>
+</header>
+<section class="hero">
+    <div class="container">
+        <h1>TraceNet Blockchain</h1>
+        <p>Delegated Proof of Activity Consensus ile Sosyal Ekonomi</p>
+        <div class="cta-buttons"><a href="#api" class="btn btn-primary">API Dokümantasyonu</a><a href="#node"
+                class="btn btn-secondary">Node Başlat</a><a href="https://github.com/LodosLawson/TraceNet"
+                class="btn btn-secondary">GitHub</a></div>
+    </div>
+</section>
+< !-- Live Blockchain Status -->
     <section class="section" style="background: #1a1a1a; color: white;">
         <div class="container">
             <h2 class="section-title" style="color: white;">🔴 Live Blockchain Status</h2>
-
             <div
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 40px;">
                 <div
                     style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; backdrop-filter: blur(10px);">
                     <div style="font-size: 14px; opacity: 0.8; margin-bottom: 5px;">Server Status</div>
-                    <div id="server-status" style="font-size: 24px; font-weight: bold; color: #4ade80;">
-                        <span class="pulse">●</span> Loading...
-                    </div>
+                    <div id="server-status" style="font-size: 24px; font-weight: bold; color: #4ade80;"><span
+                            class="pulse">●</span>Loading... </div>
                 </div>
                 <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px;">
                     <div style="font-size: 14px; opacity: 0.8; margin-bottom: 5px;">Latest Block</div>
@@ -288,20 +259,16 @@
                     <div id="last-update" style="font-size: 16px; font-weight: bold;">--:--:--</div>
                 </div>
             </div>
-
             <h3 style="margin-bottom: 20px; color: white;">📦 Recent Blocks</h3>
             <div id="recent-blocks" style="display: grid; gap: 15px;">
                 <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 8px; text-align: center;">
                     <p style="opacity: 0.6;">Loading blockchain data...</p>
                 </div>
             </div>
-
-            <div style="margin-top: 30px; text-align: center; opacity: 0.6; font-size: 14px;">
-                Auto-refresh every 10 seconds
-            </div>
+            <div style="margin-top: 30px; text-align: center; opacity: 0.6; font-size: 14px;">Auto-refresh every 10
+                seconds </div>
         </div>
     </section>
-
     <style>
         .pulse {
             animation: pulse 2s ease-in-out infinite;
@@ -354,7 +321,7 @@
                 document.getElementById('latest-block').textContent = '#' + data.blockchain.blockCount;
                 document.getElementById('total-tx').textContent = data.blockchain.totalTransactions.toLocaleString();
                 document.getElementById('total-accounts').textContent = data.blockchain.accountCount.toLocaleString();
-                document.getElementById('active-validators').textContent = data.validators.online_count || 0;
+                document.getElementById('active-validators').textContent = data.validators.onlineValidators || 0;
 
                 const now = new Date();
                 document.getElementById('last-update').textContent = now.toLocaleTimeString();
@@ -485,76 +452,17 @@
                     <div class="feature-icon">🚀</div>
                     <h3>Auto Deploy</h3>
                     <p>GitHub push → Google Cloud otomatik deployment. CI/CD pipeline ile sürekli entegrasyon.</p>
-                </div>
-            </div>
-        </div>
-    </section>
+                    <h3>Gereksinimler</h3>
+                    <ul style="margin: 20px 0; line-height: 2;">
+                        <li>Node.js 18+</li>
+                        <li>npm veya yarn</li>
+                        <li>4GB RAM minimum</li>
+                        <li>10GB disk alanı</li>
+                    </ul>
 
-    <section id="api" class="section">
-        <div class="container">
-            <h2 class="section-title">API Endpoints</h2>
-
-            <h3>Blockchain RPC</h3>
-            <div class="api-endpoint">
-                <strong>GET</strong> /rpc/status - Node durumu
-            </div>
-            <div class="api-endpoint">
-                <strong>POST</strong> /rpc/sendRawTx - Transaction gönder
-            </div>
-            <div class="api-endpoint">
-                <strong>GET</strong> /rpc/block/:id - Block bilgisi
-            </div>
-            <div class="api-endpoint">
-                <strong>GET</strong> /rpc/transaction/:txId - Transaction bilgisi
-            </div>
-            <div class="api-endpoint">
-                <strong>GET</strong> /rpc/balance/:walletId - Wallet bakiyesi
-            </div>
-
-            <h3>Token Economy</h3>
-            <div class="api-endpoint">
-                <strong>GET</strong> /economy/tokenPrice - Token fiyatı ve market data
-            </div>
-            <div class="api-endpoint">
-                <strong>GET</strong> /economy/userValue/:userId - Kullanıcı token değeri (USD)
-            </div>
-            <div class="api-endpoint">
-                <strong>GET</strong> /economy/treasury - Treasury istatistikleri
-            </div>
-            <div class="api-endpoint">
-                <strong>GET</strong> /economy/distribution - Token dağılımı
-            </div>
-
-            <h3>Örnek Kullanım</h3>
-            <div class="code-block">
-                <pre>// Node status
-fetch('https://your-node.run.app/rpc/status')
-  .then(r => r.json())
-  .then(data => console.log(data));
-
-// Token price
-fetch('https://your-node.run.app/economy/tokenPrice')
-  .then(r => r.json())
-  .then(data => console.log(data.price_usd));</pre>
-            </div>
-        </div>
-    </section>
-
-    <section id="node" class="section">
-        <div class="container">
-            <h2 class="section-title">Node Kurulumu</h2>
-
-            <h3>Gereksinimler</h3>
-            <ul style="margin: 20px 0; line-height: 2;">
-                <li>Node.js 18+</li>
-                <li>npm veya yarn</li>
-                <li>4GB RAM minimum</li>
-                <li>10GB disk alanı</li>
-            </ul>
-
-            <h3>Kurulum Adımları</h3>
-            <div class="code-block">
-                <pre># Repository'yi clone et
+                    <h3>Kurulum Adımları</h3>
+                    <div class="code-block">
+                        <pre># Repository'yi clone et
 git clone https://github.com/LodosLawson/TraceNet.git
 cd TraceNet
 
@@ -570,18 +478,18 @@ npm run build
 
 # Node'u başlat
 npm run dev</pre>
-            </div>
+                    </div>
 
-            <h3>Environment Variables</h3>
-            <div class="code-block">
-                <pre>NODE_ENV=production
+                    <h3>Environment Variables</h3>
+                    <div class="code-block">
+                        <pre>NODE_ENV=production
 PORT=3000
 GENESIS_VALIDATOR_ID=your-validator-id
 BLOCK_TIME_MS=5000
 SUPABASE_URL=your-supabase-url
 SUPABASE_SERVICE_ROLE_KEY=your-key</pre>
-            </div>
-        </div>
+                    </div>
+                </div>
     </section>
 
     <section id="mining" class="section">
@@ -705,6 +613,6 @@ tracenet send --to ADDRESS --amount 100</pre>
             <p style="margin-top: 10px; opacity: 0.7;">Built with ❤️ using TypeScript, Supabase & Google Cloud</p>
         </div>
     </footer>
-</body>
+    </body>
 
-</html>
+    </html>
