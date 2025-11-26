@@ -149,6 +149,22 @@ class BlockchainNode {
         // Add economy API routes
         this.rpcServer.getApp().use('/economy', this.economyAPI.getRouter());
 
+        // Setup Express app for static files and clean URLs
+        const app = this.rpcServer.getApp();
+        const path = require('path');
+
+        // Serve static files from public directory
+        app.use(express.static(path.join(__dirname, '../public')));
+
+        // Clean URL routes (without .html extension)
+        app.get('/explorer', (req: any, res: any) => {
+            res.sendFile(path.join(__dirname, '../public/explorer.html'));
+        });
+
+        app.get('/examples', (req: any, res: any) => {
+            res.sendFile(path.join(__dirname, '../public/examples.html'));
+        });
+
         this.wsServer = new WebSocketServer(
             this.httpServer,
             this.blockchain,
