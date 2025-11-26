@@ -217,6 +217,21 @@ class BlockchainNode {
     }
 
     /**
+     * Start the blockchain node
+     */
+    start(): void {
+        console.log('Starting Blockchain Node...');
+
+        // Start block production
+        this.blockProducer.start();
+
+        // Start HTTP server (includes RPC and WebSocket)
+        const port = parseInt(process.env.PORT || '3000', 10);
+        const host = '0.0.0.0'; // Bind to all interfaces for Cloud Run
+
+        this.httpServer.listen(port, host, () => {
+            console.log(`\n${'='.repeat(60)}`);
+            console.log(`🚀 TraceNet Blockchain Node Started`);
             console.log(`${'='.repeat(60)}`);
             console.log(`📡 RPC Server: http://${host}:${port}`);
             console.log(`🔌 WebSocket: ws://${host}:${port}`);
