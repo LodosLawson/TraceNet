@@ -299,7 +299,7 @@ function renderTransactions(transactions = allTransactions.slice(0, 20)) {
                 
                 <div class="tx-info">
                     <div>ID: ${shortenHash(tx.tx_id)}</div>
-                    <div>From: ${shortenHash(tx.from || 'N/A')} → To: ${shortenHash(tx.to || 'N/A')}</div>
+                    <div>From: ${shortenHash(tx.from_wallet || 'N/A')} → To: ${shortenHash(tx.to_wallet || 'N/A')}</div>
                     <div>Blok: #${tx.blockIndex} • ${formatTimestamp(tx.blockTime)}</div>
                 </div>
             </div>
@@ -408,7 +408,7 @@ async function handleSearch() {
     }
 
     // Check if it's a wallet address
-    const txsForWallet = allTransactions.filter(t => t.from === query || t.to === query);
+    const txsForWallet = allTransactions.filter(t => t.from_wallet === query || t.to_wallet === query);
     if (txsForWallet.length > 0) {
         renderTransactions(txsForWallet);
         document.getElementById('transactions').scrollIntoView({ behavior: 'smooth' });
@@ -535,12 +535,12 @@ async function showTransactionDetails(txId) {
             
             <div class="detail-item">
                 <div class="detail-label">Gönderen (From)</div>
-                <div class="detail-value">${tx.from || 'N/A'}</div>
+                <div class="detail-value">${tx.from_wallet || 'N/A'}</div>
             </div>
             
             <div class="detail-item">
                 <div class="detail-label">Alıcı (To)</div>
-                <div class="detail-value">${tx.to || 'N/A'}</div>
+                <div class="detail-value">${tx.to_wallet || 'N/A'}</div>
             </div>
             
             <div class="detail-item">
