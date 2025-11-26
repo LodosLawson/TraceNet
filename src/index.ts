@@ -19,6 +19,7 @@ import { UserService } from './services/UserService';
 import { ContentService } from './services/ContentService';
 import { SocialService } from './services/SocialService';
 import { KeyManager } from './blockchain/crypto/KeyManager';
+import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
@@ -49,8 +50,24 @@ class BlockchainNode {
     constructor() {
         console.log('Initializing Blockchain Node...');
 
-        // Initialize core components
+        // Initialize core components IN ORDER with correct parameters
         const genesisValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
+        this.blockchain = new Blockchain(genesisValidatorId);
+
+        const maxMempoolSize = parseInt(process.env.MAX_MEMPOOL_SIZE || '10000', 10);
+        const mempoolExpiration = parseInt(process.env.MEMPOOL_EXPIRATION_MS || '3600000', 10);
+        this.mempool = new Mempool(maxMempoolSize, mempoolExpiration);
+
+        const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+        this.walletService = new WalletService(encryptionKey);
+
+        const airdropAmount = parseInt(process.env.AIRDROP_AMOUNT || '625000', 10);
+        const systemWalletId = 'SYSTEM';
+        this.airdropService = new AirdropService(airdropAmount, systemWalletId);
+
+        this.validatorPool = new ValidatorPool();
+
+        // Register system validator
         const systemValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
         // In a real setup, we would load keys from secure storage. For dev/test, we generate a deterministic one or random.
         // For now, let's generate a random one to ensure it works.
@@ -210,18 +227,30 @@ class BlockchainNode {
 
         // Start HTTP server (includes RPC and WebSocket)
         const port = parseInt(process.env.PORT || '3000', 10);
-        this.httpServer.listen(port, () => {
+        const host = '0.0.0.0'; // Bind to all interfaces for Cloud Run
+
+        this.httpServer.listen(port, host, () => {
             console.log(`\n${'='.repeat(60)}`);
             console.log(`🚀 TraceNet Blockchain Node Started`);
             console.log(`${'='.repeat(60)}`);
-            console.log(`📡 RPC Server: http://localhost:${port}`);
-            console.log(`🔌 WebSocket: ws://localhost:${port}`);
+            console.log(`📡 RPC Server: http://${host}:${port}`);
+            console.log(`🔌 WebSocket: ws://${host}:${port}`);
             console.log(`⛓️  Genesis Block: ${this.blockchain.getLatestBlock().hash}`);
             console.log(`🔐 Token: ${process.env.TOKEN_SYMBOL || 'TRN'}`);
             console.log(`💰 Airdrop Amount: ${this.airdropService['airdropAmount']} (${process.env.TOKEN_DECIMALS || 8} decimals)`);
             console.log(`⏱️  Block Time: ${process.env.BLOCK_TIME_MS || 5000}ms`);
             console.log(`👥 Validator Threshold: ${process.env.VALIDATOR_THRESHOLD_PERCENT || 66}%`);
             console.log(`${'='.repeat(60)}\n`);
+            console.log(`✅ Server is ready to accept connections on port ${port}`);
+        });
+
+        // Handle server errors
+        this.httpServer.on('error', (error: any) => {
+            console.error('❌ Server error:', error);
+            if (error.code === 'EADDRINUSE') {
+                console.error(`Port ${port} is already in use`);
+                process.exit(1);
+            }
         });
 
         // Periodic cleanup
