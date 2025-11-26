@@ -1,5 +1,8 @@
 // Dashboard functionality
-const API_BASE = 'http://localhost:3000';
+// Use current host if deployed, otherwise localhost
+const API_BASE = window.location.hostname === 'localhost'
+    ? 'http://localhost:3000'
+    : window.location.origin;
 
 async function fetchStatus() {
     try {
