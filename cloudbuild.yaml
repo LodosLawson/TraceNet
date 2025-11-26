@@ -55,7 +55,7 @@ steps:
       - '--concurrency'
       - '80'
       - '--set-env-vars'
-      - 'NODE_ENV=production,LOG_LEVEL=info,PORT=3000'
+      - 'NODE_ENV=production,LOG_LEVEL=info'
       - '--update-secrets'
       - 'SUPABASE_URL=supabase-url:latest,SUPABASE_ANON_KEY=supabase-anon-key:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-role-key:latest,JWT_SECRET=jwt-secret:latest,ENCRYPTION_KEY=encryption-key:latest'
       - '--no-cpu-throttling'
