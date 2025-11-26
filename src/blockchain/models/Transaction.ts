@@ -13,6 +13,7 @@ export enum TransactionType {
     COMMENT = 'COMMENT',                // New: Comment on content
     SHARE = 'SHARE',                    // New: Share content
     UNFOLLOW = 'UNFOLLOW',              // New: Unfollow user
+    PRIVATE_MESSAGE = 'PRIVATE_MESSAGE', // New: Encrypted private message
 }
 
 /**
@@ -37,6 +38,8 @@ export interface Transaction {
     fee: number;
     timestamp: number;
     signatures: Signature[];
+    sender_public_key?: string;
+    sender_signature?: string;
 }
 
 /**
@@ -52,6 +55,8 @@ export class TransactionModel {
     fee: number;
     timestamp: number;
     signatures: Signature[];
+    sender_public_key?: string;
+    sender_signature?: string;
 
     constructor(data: Transaction) {
         this.tx_id = data.tx_id;
@@ -63,6 +68,8 @@ export class TransactionModel {
         this.fee = data.fee;
         this.timestamp = data.timestamp;
         this.signatures = data.signatures || [];
+        this.sender_public_key = data.sender_public_key;
+        this.sender_signature = data.sender_signature;
     }
 
     /**
@@ -74,7 +81,9 @@ export class TransactionModel {
         type: TransactionType,
         amount: number,
         fee: number,
-        payload: any = {}
+        payload: any = {},
+        sender_public_key?: string,
+        sender_signature?: string
     ): TransactionModel {
         const timestamp = Date.now();
         const tx_id = this.generateTxId(from_wallet, to_wallet, amount, timestamp);
@@ -89,6 +98,8 @@ export class TransactionModel {
             fee,
             timestamp,
             signatures: [],
+            sender_public_key,
+            sender_signature
         });
     }
 
@@ -137,6 +148,7 @@ export class TransactionModel {
             amount: this.amount,
             fee: this.fee,
             timestamp: this.timestamp,
+            sender_public_key: this.sender_public_key // Include public key in signable data if present
         });
     }
 
@@ -192,6 +204,8 @@ export class TransactionModel {
             fee: this.fee,
             timestamp: this.timestamp,
             signatures: this.signatures,
+            sender_public_key: this.sender_public_key,
+            sender_signature: this.sender_signature
         };
     }
 }

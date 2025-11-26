@@ -113,10 +113,10 @@ async function fetchNetworkStats() {
         document.getElementById('totalTransactions').textContent = data.blockchain.totalTransactions || 0;
         document.getElementById('activeValidators').textContent = data.validators.onlineCount || 0;
 
-        // Calculate and display distributed tokens
-        const distributed = (data.blockchain.totalDistributedCoins || 0) / 100000;
+        // Calculate and display distributed tokens (8 decimal places = 100000000)
+        const distributed = (data.blockchain.totalDistributedCoins || 0) / 100000000;
         document.getElementById('distributedTokens').textContent =
-            `${distributed.toFixed(5)} LT`;
+            `${distributed.toFixed(8).replace(/\.?0+$/, '')} TNN`;
 
         updateStatus('online');
         return data;

@@ -679,44 +679,31 @@
     </div>
 
     <div class="api-endpoint">
-        <div class="endpoint-header">
-            <span class="method method-get">GET</span>
-            <span class="endpoint-path">/api/social/comments/:contentId</span>
-        </div>
-        <div class="endpoint-desc">İçeriğin tüm yorumlarını listele</div>
+        <span class="endpoint-path">/api/wallet/create</span>
     </div>
-
-    <!-- Wallet APIs -->
-    <h3 style="color: var(--primary); margin: 2rem 0 1rem; font-size: 1.4rem;">💼 Cüzdan API'leri</h3>
-
-    <div class="api-endpoint">
-        <div class="endpoint-header">
-            <span class="method method-post">POST</span>
-            <span class="endpoint-path">/api/wallet/create</span>
-        </div>
-        <div class="endpoint-desc">Yeni cüzdan oluştur</div>
-        <div class="alert alert-danger">
-            <strong>⚠️ GÜVENLİK UYARISI:</strong> Bu endpoint yalnızca güvenli, client-side uygulamalarda
-            kullanılmalıdır.
-            Mnemonic ve private key'i ASLA paylaşmayın veya sunucu tarafında saklamayın!
-        </div>
+    <div class="endpoint-desc">Yeni cüzdan oluştur</div>
+    <div class="alert alert-danger">
+        <strong>⚠️ GÜVENLİK UYARISI:</strong> Bu endpoint yalnızca güvenli, client-side uygulamalarda
+        kullanılmalıdır.
+        Mnemonic ve private key'i ASLA paylaşmayın veya sunucu tarafında saklamayın!
     </div>
+</div>
 
-    <div class="api-endpoint">
-        <div class="endpoint-header">
-            <span class="method method-get">GET</span>
-            <span class="endpoint-path">/api/wallet/:walletId</span>
-        </div>
-        <div class="endpoint-desc">Cüzdan bakiyesi ve bilgilerini getir</div>
+<div class="api-endpoint">
+    <div class="endpoint-header">
+        <span class="method method-get">GET</span>
+        <span class="endpoint-path">/api/wallet/:walletId</span>
     </div>
+    <div class="endpoint-desc">Cüzdan bakiyesi ve bilgilerini getir</div>
+</div>
 
-    <div class="api-endpoint">
-        <div class="endpoint-header">
-            <span class="method method-get">GET</span>
-            <span class="endpoint-path">/api/wallet/list/:userId</span>
-        </div>
-        <div class="endpoint-desc">Kullanıcının tüm cüzdanlarını listele</div>
+<div class="api-endpoint">
+    <div class="endpoint-header">
+        <span class="method method-get">GET</span>
+        <span class="endpoint-path">/api/wallet/list/:userId</span>
     </div>
+    <div class="endpoint-desc">Kullanıcının tüm cüzdanlarını listele</div>
+</div>
 </div>
 
 <!-- Token Economics -->

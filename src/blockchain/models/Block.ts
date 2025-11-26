@@ -15,6 +15,7 @@ export interface IBlock {
     signature: string;
     nonce: number;
     hash?: string;
+    metadata?: any; // Network metadata for genesis block
 }
 
 /**
@@ -31,6 +32,7 @@ export class Block {
     signature: string;
     nonce: number;
     hash?: string;
+    metadata?: any;
 
     constructor(data: IBlock) {
         this.index = data.index;
@@ -43,12 +45,13 @@ export class Block {
         this.signature = data.signature;
         this.nonce = data.nonce;
         this.hash = data.hash;
+        this.metadata = data.metadata;
     }
 
     /**
      * Create genesis block
      */
-    static createGenesis(validator_id: string): Block {
+    static createGenesis(validator_id: string, networkMetadata?: any): Block {
         const genesisBlock = new Block({
             index: 0,
             previous_hash: '0'.repeat(64),
@@ -59,6 +62,7 @@ export class Block {
             validator_id,
             signature: '',
             nonce: 0,
+            metadata: networkMetadata,
         });
 
         genesisBlock.hash = genesisBlock.calculateHash();
@@ -224,6 +228,7 @@ export class Block {
             signature: this.signature,
             nonce: this.nonce,
             hash: this.hash,
+            metadata: this.metadata,
         };
     }
 }

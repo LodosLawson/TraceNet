@@ -147,6 +147,10 @@ export class RPCServer {
         this.app.post('/api/validator/heartbeat', this.validatorHeartbeat.bind(this));
         this.app.get('/api/validator/list', this.listValidators.bind(this));
 
+        // Messaging endpoints
+        this.app.post('/api/messaging/send', this.sendPrivateMessage.bind(this));
+        this.app.post('/api/messaging/decrypt', this.decryptPrivateMessage.bind(this));
+
         // Error handler
         this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
             console.error('Error:', err);
@@ -1119,6 +1123,164 @@ export class RPCServer {
                 wallet_id: walletId,
                 following,
                 count: following.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Send encrypted private message
+     */
+    private async sendPrivateMessage(req: Request, res: Response): Promise<void> {
+        try {
+            const { from_wallet, to_wallet, message, sender_private_key, recipient_public_key } = req.body;
+
+            if (!from_wallet || !to_wallet || !message || !sender_private_key || !recipient_public_key) {
+                res.status(400).json({
+                    error: 'from_wallet, to_wallet, message, sender_private_key, and recipient_public_key are required',
+                });
+                return;
+            }
+
+            // Encrypt message
+            const { MessageEncryption } = require('../blockchain/crypto/MessageEncryption');
+            const encryptedMessage = MessageEncryption.encryptMessage(
+                message,
+                recipient_public_key,
+                sender_private_key
+            );
+
+            // Create transaction
+            const { TransactionModel, TransactionType } = require('../blockchain/models/Transaction');
+            const tx = TransactionModel.create(
+                from_wallet,
+                to_wallet,
+                TransactionType.PRIVATE_MESSAGE,
+                0, // No amount transfer
+                0.00001, // Small fee
+                {
+                    encrypted_content: encryptedMessage.encrypted_content,
+                    nonce: encryptedMessage.nonce,
+                    ephemeral_public_key: encryptedMessage.ephemeral_public_key,
+                    recipient_public_key,
+                }
+            );
+
+            // Add to mempool
+            const result = this.mempool.addTransaction(tx.toJSON());
+
+            if (!result.success) {
+                res.status(400).json({ error: result.error });
+                return;
+            }
+
+            res.json({
+                success: true,
+                tx_id: tx.tx_id,
+                message: 'Private message sent (encrypted)',
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Decrypt received private message
+     */
+    private async decryptPrivateMessage(req: Request, res: Response): Promise<void> {
+        try {
+            const { encrypted_content, nonce, ephemeral_public_key, private_key } = req.body;
+
+            if (!encrypted_content || !nonce || !ephemeral_public_key || !private_key) {
+                res.status(400).json({
+                    error: 'encrypted_content, nonce, ephemeral_public_key, and private_key are required',
+                });
+                return;
+            }
+
+            // Decrypt message
+            const { MessageEncryption } = require('../blockchain/crypto/MessageEncryption');
+            const decrypted = MessageEncryption.decryptMessage(
+                {
+                    encrypted_content,
+                    nonce,
+                    ephemeral_public_key,
+                },
+                private_key
+            );
+
+            if (!decrypted) {
+                res.status(400).json({ error: 'Failed to decrypt message' });
+                return;
+            }
+
+            res.json({
+                success: true,
+                decrypted_message: decrypted,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Generate new key pair for auth
+     */
+    private async generateKeys(req: Request, res: Response): Promise<void> {
+        try {
+            const keyPair = KeyManager.generateKeyPair();
+            res.json({
+                public_key: keyPair.publicKey,
+                private_key: keyPair.privateKey
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Login with public key and signature
+     */
+    private async login(req: Request, res: Response): Promise<void> {
+        try {
+            const { public_key, signature, timestamp } = req.body;
+
+            if (!public_key || !signature || !timestamp) {
+                res.status(400).json({ error: 'public_key, signature, and timestamp are required' });
+                return;
+            }
+
+            // Verify timestamp to prevent replay attacks (allow 5 minute window)
+            const now = Date.now();
+            if (Math.abs(now - timestamp) > 300000) {
+                res.status(400).json({ error: 'Timestamp out of range' });
+                return;
+            }
+
+            // Verify signature
+            // The message signed should be the timestamp (as string)
+            const isValid = KeyManager.verify(timestamp.toString(), signature, public_key);
+
+            if (!isValid) {
+                res.status(401).json({ error: 'Invalid signature' });
+                return;
+            }
+
+            // In a real app, we would issue a JWT here.
+            // For now, we just return success.
+            res.json({
+                success: true,
+                message: 'Login successful',
+                user_id: KeyManager.deriveAddress(public_key) // Use address as user ID for now
             });
         } catch (error) {
             res.status(500).json({

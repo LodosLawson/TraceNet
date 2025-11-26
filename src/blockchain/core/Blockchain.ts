@@ -44,7 +44,11 @@ export class Blockchain extends EventEmitter {
      * Initialize genesis block
      */
     private initializeGenesis(): void {
-        const genesisBlock = Block.createGenesis(this.genesisValidatorId);
+        // Import network config
+        const { getGenesisMetadata } = require('../config/NetworkConfig');
+        const networkMetadata = getGenesisMetadata();
+
+        const genesisBlock = Block.createGenesis(this.genesisValidatorId, networkMetadata);
         this.chain.push(genesisBlock);
     }
 
@@ -330,6 +334,7 @@ export class Blockchain extends EventEmitter {
             case 'COMMENT':
             case 'SHARE':
             case 'UNFOLLOW':
+            case 'PRIVATE_MESSAGE':
                 // These may have fees or rewards
                 if (tx.fee > 0) {
                     if (fromAccount.balance < tx.fee) {
