@@ -81,6 +81,11 @@ export class RPCServer {
             res.sendFile('index.html', { root: 'public' });
         });
 
+        // Explorer route
+        this.app.get('/explorer', (req: Request, res: Response) => {
+            res.sendFile('explorer.html', { root: 'public' });
+        });
+
         // Health check
         this.app.get('/health', (req: Request, res: Response) => {
             res.json({ status: 'ok', timestamp: Date.now() });
