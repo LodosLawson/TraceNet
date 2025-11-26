@@ -4,21 +4,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TraceNet Explorer - Blockchain Gezgini</title>
+    <meta name="description"
+        content="TraceNet Blockchain Explorer - Tüm blokları, işlemleri ve ağ istatistiklerini görüntüleyin">
 
-    <!-- Search Bar -->
-    <div class="search-section">
-        <div class="container">
+    <!-- Styles -->
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/explorer.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="brand-section">
+            <h1 class="brand-title">⛓️ TraceNet Explorer</h1>
+            <div class="brand-subtitle">Blockchain Gezgini</div>
+            <div class="brand-tagline">Tüm bloklar, işlemler ve hesaplar</div>
+
+            <!-- Navigation -->
+            <div id="navigation-container" data-page="explorer"></div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+        <div class="status-indicator"></div>
+        <span id="statusText">⚡ Bağlanıyor...</span>
+        <span class="status-detail" id="lastUpdate">Son güncelleme: -</span>
+    </div>
+
+    <div class="container">
+        <!-- Search Bar -->
+        <div class="search-section">
             <div class="search-bar">
                 <input type="text" id="searchInput"
                     placeholder="🔍 Blok numarası, blok hash, işlem ID veya cüzdan adresi arayın...">
                 <button class="search-btn" id="searchBtn">Ara</button>
             </div>
         </div>
-    </div>
 
-    <!-- Main Content -->
-    <div class="container">
-        <!-- Network Statistics Overview -->
+        <!-- Network Statistics -->
         <section class="stats-grid">
             <div class="stat-card gradient-1">
                 <div class="stat-icon">📦</div>
@@ -43,21 +68,24 @@
                 <div class="stat-info">
                     <div class="stat-label">Aktif Validator</div>
                     <div class="stat-value" id="activeValidators">-</div>
-                    <h2 class="section-title">📊 Ağ Aktivitesi</h2>
-                    <div class="activity-chart">
-                        <canvas id="activityChart"></canvas>
-                    </div>
+                    <div class="stat-trend">Online</div>
+                </div>
+            </div>
+
+            <div class="stat-card gradient-4">
+                <div class="stat-icon">💎</div>
+                <div class="stat-info">
+                    <div class="stat-label">Dağıtılan Token</div>
+                    <div class="stat-value" id="distributedTokens">-</div>
+                    <div class="stat-trend">TNN</div>
+                </div>
+            </div>
         </section>
 
         <!-- Blocks Explorer -->
         <section class="section" id="blocks">
             <div class="section-header">
                 <h2 class="section-title">⛓️ Blockchain Blokları</h2>
-                <div class="filter-controls">
-                    <button class="filter-btn active" data-filter="all">Tümü</button>
-                    <button class="filter-btn" data-filter="recent">Son 10</button>
-                    <button class="filter-btn" data-filter="genesis">Genesis</button>
-                </div>
             </div>
 
             <div class="blocks-container" id="blocksContainer">
@@ -66,115 +94,12 @@
                     <p>Bloklar yükleniyor...</p>
                 </div>
             </div>
-
-            <div class="pagination" id="blocksPagination">
-                <!-- Pagination buttons will be added dynamically -->
-            </div>
-        </section>
-
-        <!-- Transactions Explorer -->
-        <section class="section" id="transactions">
-            <div class="section-header">
-                <h2 class="section-title">💸 Son İşlemler</h2>
-                <select class="tx-type-filter" id="txTypeFilter">
-                    <option value="all">Tüm İşlemler</option>
-                    <option value="TRANSFER">Transfer</option>
-                    <option value="REWARD">Ödül</option>
-                    <option value="SOCIAL">Sosyal</option>
-                    <option value="CONTENT">İçerik</option>
-                </select>
-            </div>
-
-            <div class="transactions-container" id="transactionsContainer">
-                <div class="loading-spinner">
-                    <div class="spinner"></div>
-                    <p>İşlemler yükleniyor...</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Accounts Explorer -->
-        <section class="section" id="accounts">
-            <div class="section-header">
-                <h2 class="section-title">👥 Hesaplar</h2>
-            </div>
-
-            <div class="accounts-container" id="accountsContainer">
-                <div class="loading-spinner">
-                    <div class="spinner"></div>
-                    <p>Hesaplar yükleniyor...</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Network Health -->
-        <section class="section" id="network">
-            <h2 class="section-title">🌐 Ağ Sağlığı ve Validators</h2>
-
-            <div class="network-grid">
-                <div class="network-card">
-                    <h3>⚡ Ağ Durumu</h3>
-                    <div class="network-status" id="networkHealth">
-                        <div class="health-item">
-                            <span class="health-label">Block Time:</span>
-                            <span class="health-value" id="avgBlockTime">-</span>
-                        </div>
-                        <div class="health-item">
-                            <span class="health-label">TPS (İşlem/Sn):</span>
-                            <span class="health-value" id="tps">-</span>
-                        </div>
-                        <div class="health-item">
-                            <span class="health-label">Mempool:</span>
-                            <span class="health-value" id="mempoolSize">-</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="network-card">
-                    <h3>👥 Validators Listesi</h3>
-                    <div class="validators-list" id="validatorsList">
-                        <!-- Validators will be loaded here -->
-                    </div>
-                </div>
-            </div>
         </section>
     </div>
 
-    <!-- Block Detail Modal -->
-    <div class="modal" id="blockModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>📦 Blok Detayları</h2>
-                <button class="modal-close" onclick="closeModal('blockModal')">&times;</button>
-            </div>
-            <div class="modal-body" id="blockModalBody">
-                <!-- Block details will be loaded here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Transaction Detail Modal -->
-    <div class="modal" id="transactionModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>💸 İşlem Detayları</h2>
-                <button class="modal-close" onclick="closeModal('transactionModal')">&times;</button>
-            </div>
-            <div class="modal-body" id="transactionModalBody">
-                <!-- Transaction details will be loaded here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <p>&copy; 2025 TraceNet Blockchain - LockTrace Network</p>
-            <p>Real-time Blockchain Explorer</p>
-        </div>
-    </footer>
-
-    <script src="explorer.js"></script>
-    </body>
+    <!-- Scripts -->
+    <script src="/js/navigation.js"></script>
+    <script src="/explorer.js"></script>
+</body>
 
 </html>
