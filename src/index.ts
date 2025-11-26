@@ -51,21 +51,6 @@ class BlockchainNode {
 
         // Initialize core components
         const genesisValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
-        this.blockchain = new Blockchain(genesisValidatorId);
-
-        const maxMempoolSize = parseInt(process.env.MAX_MEMPOOL_SIZE || '10000', 10);
-        this.mempool = new Mempool(maxMempoolSize);
-
-        const encryptionKey = process.env.ENCRYPTION_KEY || 'default_encryption_key_change_in_production';
-        this.walletService = new WalletService(encryptionKey);
-
-        const airdropAmount = parseInt(process.env.INITIAL_AIRDROP_AMOUNT || '625000', 10);
-        this.airdropService = new AirdropService(airdropAmount);
-
-        const validatorOfflineTimeout = parseInt(process.env.VALIDATOR_OFFLINE_TIMEOUT || '60000', 10);
-        this.validatorPool = new ValidatorPool(validatorOfflineTimeout);
-
-        // Register and activate system validator for single-node setup
         const systemValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
         // In a real setup, we would load keys from secure storage. For dev/test, we generate a deterministic one or random.
         // For now, let's generate a random one to ensure it works.
