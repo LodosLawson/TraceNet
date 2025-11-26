@@ -610,7 +610,8 @@ function formatTimestamp(timestamp) {
 
 function formatAmount(amount) {
     if (!amount) return '0';
-    return (amount / 100000).toFixed(5);
+    // 1 LT = 100,000,000 smallest units (8 decimal places)
+    return (amount / 100000000).toFixed(8).replace(/\.?0+$/, '');
 }
 
 function shortenHash(hash, length = 12) {
