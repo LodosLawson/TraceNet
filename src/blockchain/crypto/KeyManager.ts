@@ -18,10 +18,13 @@ export interface WalletKeys {
     publicKey: string;
     privateKey: string;
     address: string;
+    // Encryption keys (Curve25519)
+    encryptionPublicKey: string;
+    encryptionPrivateKey: string;
 }
 
 /**
- * Cryptographic key management using ED25519
+ * Cryptographic key management using ED25519 and Curve25519
  */
 export class KeyManager {
     /**
@@ -51,13 +54,20 @@ export class KeyManager {
         // Generate seed from mnemonic
         const seed = bip39.mnemonicToSeedSync(mnemonicPhrase);
 
-        // Use first 32 bytes as ED25519 seed
-        const keyPair = nacl.sign.keyPair.fromSeed(seed.slice(0, 32));
+        // 1. Signing Keys (Ed25519) - Use first 32 bytes
+        const signKeyPair = nacl.sign.keyPair.fromSeed(seed.slice(0, 32));
+        const publicKey = Buffer.from(signKeyPair.publicKey).toString('hex');
+        const privateKey = Buffer.from(signKeyPair.secretKey).toString('hex');
 
-        const publicKey = Buffer.from(keyPair.publicKey).toString('hex');
-        const privateKey = Buffer.from(keyPair.secretKey).toString('hex');
+        // 2. Encryption Keys (Curve25519) - Use hash of seed to get different entropy
+        // We hash the seed to get a new 32-byte seed for encryption keys
+        const encryptionSeed = crypto.createHash('sha256').update(seed).digest();
+        const boxKeyPair = nacl.box.keyPair.fromSecretKey(new Uint8Array(encryptionSeed));
 
-        // Address is derived from public key (first 40 chars of hash)
+        const encryptionPublicKey = Buffer.from(boxKeyPair.publicKey).toString('hex');
+        const encryptionPrivateKey = Buffer.from(boxKeyPair.secretKey).toString('hex');
+
+        // Address is derived from signing public key
         const address = this.deriveAddress(publicKey);
 
         return {
@@ -65,6 +75,8 @@ export class KeyManager {
             publicKey,
             privateKey,
             address,
+            encryptionPublicKey,
+            encryptionPrivateKey
         };
     }
 
@@ -109,7 +121,7 @@ export class KeyManager {
     }
 
     /**
-     * Encrypt data using AES-256-GCM
+     * Encrypt data using AES-256-GCM (Symmetric)
      */
     static encrypt(data: string, encryptionKey: string): string {
         const iv = crypto.randomBytes(16);
@@ -127,7 +139,7 @@ export class KeyManager {
     }
 
     /**
-     * Decrypt data using AES-256-GCM
+     * Decrypt data using AES-256-GCM (Symmetric)
      */
     static decrypt(encryptedData: string, encryptionKey: string): string {
         const parts = encryptedData.split(':');
@@ -162,5 +174,51 @@ export class KeyManager {
      */
     static hash(data: string): string {
         return crypto.createHash('sha256').update(data).digest('hex');
+    }
+
+    /**
+     * Encrypt message for a specific recipient using nacl.box (Authenticated Encryption)
+     * @param message Message to encrypt
+     * @param senderEncryptionPrivateKey Sender's Encryption Private Key
+     * @param recipientEncryptionPublicKey Recipient's Encryption Public Key
+     */
+    static encryptForUser(message: string, senderEncryptionPrivateKey: string, recipientEncryptionPublicKey: string): string {
+        const senderPriv = new Uint8Array(Buffer.from(senderEncryptionPrivateKey, 'hex'));
+        const recipientPub = new Uint8Array(Buffer.from(recipientEncryptionPublicKey, 'hex'));
+
+        const nonce = nacl.randomBytes(nacl.box.nonceLength);
+        const msgBuffer = Buffer.from(message, 'utf8');
+
+        const encrypted = nacl.box(msgBuffer, nonce, recipientPub, senderPriv);
+
+        // Return Nonce + EncryptedData
+        return Buffer.from(nonce).toString('hex') + ':' + Buffer.from(encrypted).toString('hex');
+    }
+
+    /**
+     * Decrypt message from a specific sender using nacl.box.open
+     * @param encryptedMessage Encrypted message (Nonce:Data)
+     * @param recipientEncryptionPrivateKey Recipient's Encryption Private Key
+     * @param senderEncryptionPublicKey Sender's Encryption Public Key
+     */
+    static decryptFromUser(encryptedMessage: string, recipientEncryptionPrivateKey: string, senderEncryptionPublicKey: string): string {
+        const parts = encryptedMessage.split(':');
+        if (parts.length !== 2) {
+            throw new Error('Invalid encrypted message format');
+        }
+
+        const nonce = new Uint8Array(Buffer.from(parts[0], 'hex'));
+        const encrypted = new Uint8Array(Buffer.from(parts[1], 'hex'));
+
+        const recipientPriv = new Uint8Array(Buffer.from(recipientEncryptionPrivateKey, 'hex'));
+        const senderPub = new Uint8Array(Buffer.from(senderEncryptionPublicKey, 'hex'));
+
+        const decrypted = nacl.box.open(encrypted, nonce, senderPub, recipientPriv);
+
+        if (!decrypted) {
+            throw new Error('Failed to decrypt message');
+        }
+
+        return Buffer.from(decrypted).toString('utf8');
     }
 }

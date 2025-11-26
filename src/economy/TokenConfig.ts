@@ -10,7 +10,7 @@ export const TOKEN_CONFIG = {
     INITIAL_PRICE_USD: 0.00001, // $1000 / 100M
 
     // Fees (50% goes to recipient/creator, 50% to blockchain treasury)
-    MESSAGE_FEE: 50, // 0.0000005 LT (total, split 50/50)
+    MESSAGE_FEE: 100, // 0.000001 LT (updated as per request)
     LIKE_FEE: 1000, // 0.00001 LT (total, split 50/50)
     COMMENT_FEE: 1000, // 0.00001 LT (total, split 50/50)
     SHARE_FEE: 1000, // 0.00001 LT

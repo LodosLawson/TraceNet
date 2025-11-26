@@ -120,7 +120,7 @@ export class Blockchain extends EventEmitter {
         }
 
         // Apply transactions to state
-        const stateUpdate = this.applyTransactions(transactions);
+        const stateUpdate = this.applyTransactions(transactions, validatorId);
         if (!stateUpdate.success) {
             return { success: false, error: stateUpdate.error };
         }
@@ -272,10 +272,11 @@ export class Blockchain extends EventEmitter {
      * Apply transactions to blockchain state
      */
     private applyTransactions(
-        transactions: Transaction[]
+        transactions: Transaction[],
+        validatorId?: string // Optional for backward compatibility or simulation
     ): { success: boolean; error?: string } {
         for (const tx of transactions) {
-            const result = this.applyTransactionToState(tx, this.state);
+            const result = this.applyTransactionToState(tx, this.state, validatorId);
             if (!result.success) {
                 return result;
             }
@@ -288,7 +289,8 @@ export class Blockchain extends EventEmitter {
      */
     private applyTransactionToState(
         tx: Transaction,
-        state: Map<string, AccountState>
+        state: Map<string, AccountState>,
+        validatorId?: string
     ): { success: boolean; error?: string } {
         const fromAccount = state.get(tx.from_wallet) || {
             address: tx.from_wallet,
@@ -356,6 +358,33 @@ export class Blockchain extends EventEmitter {
         // Update state
         state.set(tx.from_wallet, fromAccount);
         state.set(tx.to_wallet, toAccount);
+
+        // Credit fee to validator (Block Producer)
+        if (tx.fee > 0 && validatorId) {
+            // If validatorId is a wallet address (starts with TRN), credit directly
+            // If it's a node ID, we might need a mapping. For now, we assume validatorId IS the wallet address
+            // or we fallback to a system address if it's not a valid address format.
+
+            const feeRecipient = validatorId.startsWith('TRN') ? validatorId : 'TREASURY_MAIN';
+
+            const validatorAccount = state.get(feeRecipient) || {
+                address: feeRecipient,
+                balance: 0,
+                nonce: 0,
+            };
+            validatorAccount.balance += tx.fee;
+            state.set(feeRecipient, validatorAccount);
+        } else if (tx.fee > 0) {
+            // Fallback if no validator specified (e.g. simulation) -> Burn or Treasury
+            const treasuryAddress = 'TREASURY_MAIN';
+            const treasuryAccount = state.get(treasuryAddress) || {
+                address: treasuryAddress,
+                balance: 0,
+                nonce: 0,
+            };
+            treasuryAccount.balance += tx.fee;
+            state.set(treasuryAddress, treasuryAccount);
+        }
 
         return { success: true };
     }
