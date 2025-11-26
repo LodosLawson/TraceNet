@@ -14,7 +14,24 @@ export const TOKEN_CONFIG = {
     LIKE_FEE: 1000, // 0.00001 LT (total, split 50/50)
     COMMENT_FEE: 1000, // 0.00001 LT (total, split 50/50)
     SHARE_FEE: 1000, // 0.00001 LT
-    TRANSFER_FEE: 1000000, // 0.01 LT (default)
+
+    // Dynamic Transfer Fees
+    DYNAMIC_TRANSFER_FEES: {
+        // Base fee based on recipient's incoming transfer count (past year)
+        BASE: {
+            TIER_0: { threshold: 0, rate: 0.0001 },    // 0-49 transfers: 0.01%
+            TIER_1: { threshold: 50, rate: 0.00025 },  // 50-99 transfers: 0.025%
+            TIER_2: { threshold: 100, rate: 0.0005 },  // 100-199 transfers: 0.05%
+            TIER_3: { threshold: 200, rate: 0.001 }    // 200+ transfers: 0.10%
+        },
+        // Priority fee for faster processing (additive)
+        PRIORITY: {
+            STANDARD: 0,        // No priority
+            LOW: 0.002,         // +0.20%
+            MEDIUM: 0.006,      // +0.60%
+            HIGH: 0.01          // +1%
+        }
+    },
 
     // Airdrop
     INITIAL_AIRDROP: 625000, // 0.00625 LT

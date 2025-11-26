@@ -9,6 +9,9 @@ export interface AccountState {
     address: string;
     balance: number;
     nonce: number;
+    // Transfer tracking for dynamic fees
+    incomingTransferCount?: number;  // Incoming transfers in current year
+    lastYearReset?: number;          // Timestamp of last annual reset (ms)
 }
 
 /**
@@ -269,6 +272,33 @@ export class Blockchain extends EventEmitter {
     }
 
     /**
+     * Calculate transfer fee based on recipient's activity and priority
+     */
+    private calculateTransferFee(recipientAccount: AccountState, amount: number, priority: string = 'STANDARD'): number {
+        const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
+        const feeConfig = TOKEN_CONFIG.DYNAMIC_TRANSFER_FEES;
+
+        // Determine base fee tier based on recipient's incoming transfer count
+        const count = recipientAccount.incomingTransferCount || 0;
+        let baseRate = feeConfig.BASE.TIER_0.rate;
+
+        if (count >= feeConfig.BASE.TIER_3.threshold) {
+            baseRate = feeConfig.BASE.TIER_3.rate;
+        } else if (count >= feeConfig.BASE.TIER_2.threshold) {
+            baseRate = feeConfig.BASE.TIER_2.rate;
+        } else if (count >= feeConfig.BASE.TIER_1.threshold) {
+            baseRate = feeConfig.BASE.TIER_1.rate;
+        }
+
+        // Add priority fee
+        const priorityRate = feeConfig.PRIORITY[priority] || 0;
+        const totalRate = baseRate + priorityRate;
+
+        // Calculate fee
+        return Math.ceil(amount * totalRate);
+    }
+
+    /**
      * Apply transactions to blockchain state
      */
     private applyTransactions(
@@ -307,7 +337,25 @@ export class Blockchain extends EventEmitter {
         // Handle different transaction types
         switch (tx.type) {
             case 'TRANSFER':
-            case 'MESSAGE_PAYMENT':
+                // Reset recipient's year counter if needed
+                const now = Date.now();
+                if (!toAccount.lastYearReset || (now - toAccount.lastYearReset) > 365 * 24 * 60 * 60 * 1000) {
+                    toAccount.incomingTransferCount = 0;
+                    toAccount.lastYearReset = now;
+                }
+
+                // Calculate required fee based on recipient's incoming transfer count
+                const priority = tx.payload?.priority || 'STANDARD';
+                const requiredFee = this.calculateTransferFee(toAccount, tx.amount, priority);
+
+                // Validate fee
+                if (tx.fee < requiredFee) {
+                    return {
+                        success: false,
+                        error: `Insufficient fee. Required: ${requiredFee}, Provided: ${tx.fee}`
+                    };
+                }
+
                 // Check sufficient balance
                 const totalCost = tx.amount + tx.fee;
                 if (fromAccount.balance < totalCost) {
@@ -316,6 +364,25 @@ export class Blockchain extends EventEmitter {
 
                 // Deduct from sender
                 fromAccount.balance -= totalCost;
+                fromAccount.nonce++;
+
+                // Add to receiver
+                toAccount.balance += tx.amount;
+
+                // Increment recipient's incoming transfer count
+                toAccount.incomingTransferCount = (toAccount.incomingTransferCount || 0) + 1;
+
+                break;
+
+            case 'MESSAGE_PAYMENT':
+                // Check sufficient balance
+                const messageTotalCost = tx.amount + tx.fee;
+                if (fromAccount.balance < messageTotalCost) {
+                    return { success: false, error: 'Insufficient balance' };
+                }
+
+                // Deduct from sender
+                fromAccount.balance -= messageTotalCost;
                 fromAccount.nonce++;
 
                 // Add to receiver

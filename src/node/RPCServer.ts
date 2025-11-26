@@ -113,6 +113,10 @@ export class RPCServer {
         this.app.get('/rpc/balance/:walletId', this.getBalance.bind(this));
         this.app.get('/rpc/accounts', this.getAllAccounts.bind(this));
 
+        // Dynamic transfer fee endpoints
+        this.app.post('/rpc/calculateTransferFee', this.calculateTransferFee.bind(this));
+        this.app.post('/rpc/transfer', this.sendTransfer.bind(this));
+
         // Wallet API endpoints
         this.app.post('/api/wallet/create', this.createWallet.bind(this));
         this.app.get('/api/wallet/list/:userId', this.listWallets.bind(this));
@@ -329,6 +333,126 @@ export class RPCServer {
                     nonce: acc.nonce
                 })),
                 count: accounts.length
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Calculate transfer fee
+     */
+    private async calculateTransferFee(req: Request, res: Response): Promise<void> {
+        try {
+            const { recipient_address, amount, priority } = req.body;
+
+            if (!recipient_address || amount === undefined) {
+                res.status(400).json({ error: 'recipient_address and amount are required' });
+                return;
+            }
+
+            // Get recipient account state
+            const recipientAccount = (this.blockchain as any).state.get(recipient_address) || {
+                address: recipient_address,
+                balance: 0,
+                nonce: 0,
+                incomingTransferCount: 0
+            };
+
+            // Calculate fee using blockchain's method
+            const fee = (this.blockchain as any).calculateTransferFee(recipientAccount, amount, priority || 'STANDARD');
+
+            // Get fee breakdown
+            const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
+            const feeConfig = TOKEN_CONFIG.DYNAMIC_TRANSFER_FEES;
+            const count = recipientAccount.incomingTransferCount || 0;
+
+            let baseTier = 'TIER_0';
+            if (count >= feeConfig.BASE.TIER_3.threshold) baseTier = 'TIER_3';
+            else if (count >= feeConfig.BASE.TIER_2.threshold) baseTier = 'TIER_2';
+            else if (count >= feeConfig.BASE.TIER_1.threshold) baseTier = 'TIER_1';
+
+            res.json({
+                recipient_address,
+                amount,
+                priority: priority || 'STANDARD',
+                recipient_incoming_transfers: count,
+                base_tier: baseTier,
+                base_rate: feeConfig.BASE[baseTier].rate,
+                priority_rate: feeConfig.PRIORITY[priority || 'STANDARD'],
+                total_fee: fee,
+                total_fee_readable: `${fee / 100000000} LT`
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Send transfer (convenience endpoint)
+     */
+    private async sendTransfer(req: Request, res: Response): Promise<void> {
+        try {
+            const { from_wallet, to_wallet, amount, priority, sender_public_key, sender_signature } = req.body;
+
+            if (!from_wallet || !to_wallet || amount === undefined) {
+                res.status(400).json({ error: 'from_wallet, to_wallet, and amount are required' });
+                return;
+            }
+
+            // Get recipient account to calculate fee
+            const recipientAccount = (this.blockchain as any).state.get(to_wallet) || {
+                address: to_wallet,
+                balance: 0,
+                nonce: 0,
+                incomingTransferCount: 0
+            };
+
+            // Calculate fee
+            const fee = (this.blockchain as any).calculateTransferFee(recipientAccount, amount, priority || 'STANDARD');
+
+            // Create transaction
+            const tx = TransactionModel.create(
+                from_wallet,
+                to_wallet,
+                'TRANSFER' as any,
+                amount,
+                fee,
+                { priority: priority || 'STANDARD' }
+            );
+
+            if (sender_public_key) tx.sender_public_key = sender_public_key;
+            if (sender_signature) tx.sender_signature = sender_signature;
+
+            // Validate
+            const txModel = new TransactionModel(tx);
+            const validation = txModel.validate();
+
+            if (!validation.valid) {
+                res.status(400).json({ error: validation.error });
+                return;
+            }
+
+            // Add to mempool
+            const result = this.mempool.addTransaction(tx);
+
+            if (!result.success) {
+                res.status(400).json({ error: result.error });
+                return;
+            }
+
+            res.json({
+                success: true,
+                tx_id: tx.tx_id,
+                amount,
+                fee,
+                fee_readable: `${fee / 100000000} LT`,
+                priority: priority || 'STANDARD',
+                message: 'Transfer transaction added to mempool'
             });
         } catch (error) {
             res.status(500).json({
