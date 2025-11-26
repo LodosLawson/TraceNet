@@ -8,6 +8,7 @@ let currentPage = 1;
 let blocksPerPage = 10;
 let allBlocks = [];
 let allTransactions = [];
+let allAccounts = [];
 let chartInstance = null;
 
 // ===== INITIALIZATION =====
@@ -23,11 +24,13 @@ async function initializeExplorer() {
         fetchNetworkStats(),
         fetchBlocks(),
         fetchValidators(),
-        fetchNetworkHealth()
+        fetchNetworkHealth(),
+        fetchAccounts()
     ]);
 
     renderBlocks();
     renderTransactions();
+    renderAccounts();
     updateStatus('online');
 }
 
@@ -68,7 +71,9 @@ function startAutoRefresh() {
     setInterval(async () => {
         await fetchNetworkStats();
         await fetchBlocks();
+        await fetchAccounts();
         renderBlocks();
+        renderAccounts();
         updateLastUpdate();
     }, 5000);
 }
@@ -377,6 +382,48 @@ async function fetchNetworkHealth() {
     }
 }
 
+// ===== ACCOUNTS MANAGEMENT =====
+async function fetchAccounts() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/rpc/accounts`);
+        const data = await response.json();
+
+        // Handle the response structure { accounts: [...] }
+        allAccounts = data.accounts || [];
+        return allAccounts;
+    } catch (error) {
+        console.error('Error fetching accounts:', error);
+        return [];
+    }
+}
+
+function renderAccounts(accounts = allAccounts) {
+    const container = document.getElementById('accountsContainer');
+    if (!container) return;
+
+    if (accounts.length === 0) {
+        container.innerHTML = `
+            <div class="loading-spinner">
+                <p>Hesap bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = accounts.map(account => `
+        <div class="tx-card fade-in">
+            <div class="tx-card-header">
+                <span class="tx-type transfer">ACCOUNT</span>
+                <span class="tx-amount">${formatAmount(account.balance)} LT</span>
+            </div>
+            <div class="tx-info">
+                <div style="word-break: break-all;">Adres: ${account.address}</div>
+                <div>Nonce: ${account.nonce}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
 // ===== SEARCH FUNCTIONALITY =====
 async function handleSearch() {
     const query = document.getElementById('searchInput')?.value.trim();
@@ -407,7 +454,21 @@ async function handleSearch() {
         return;
     }
 
-    // Check if it's a wallet address
+    // Check if it's a wallet address (Account)
+    const account = allAccounts.find(a => a.address === query);
+    if (account) {
+        renderAccounts([account]);
+        document.getElementById('accounts').scrollIntoView({ behavior: 'smooth' });
+
+        // Also filter transactions for this account
+        const txsForWallet = allTransactions.filter(t => t.from_wallet === query || t.to_wallet === query);
+        if (txsForWallet.length > 0) {
+            renderTransactions(txsForWallet);
+        }
+        return;
+    }
+
+    // Check if it's a wallet address (but not in accounts list yet, maybe new)
     const txsForWallet = allTransactions.filter(t => t.from_wallet === query || t.to_wallet === query);
     if (txsForWallet.length > 0) {
         renderTransactions(txsForWallet);

@@ -109,7 +109,9 @@ export class RPCServer {
         this.app.get('/rpc/status', this.getStatus.bind(this));
         this.app.get('/rpc/block/:indexOrHash', this.getBlock.bind(this));
         this.app.get('/rpc/transaction/:txId', this.getTransaction.bind(this));
+        this.app.get('/rpc/transaction/:txId', this.getTransaction.bind(this));
         this.app.get('/rpc/balance/:walletId', this.getBalance.bind(this));
+        this.app.get('/rpc/accounts', this.getAllAccounts.bind(this));
 
         // Wallet API endpoints
         this.app.post('/api/wallet/create', this.createWallet.bind(this));
@@ -296,18 +298,33 @@ export class RPCServer {
     }
 
     /**
-     * Get wallet balance
+     * Get balance for wallet
      */
     private async getBalance(req: Request, res: Response): Promise<void> {
         try {
             const { walletId } = req.params;
-
             const balance = this.blockchain.getBalance(walletId);
+            res.json({ wallet_id: walletId, balance });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
 
+    /**
+     * Get all accounts
+     */
+    private async getAllAccounts(req: Request, res: Response): Promise<void> {
+        try {
+            const accounts = this.blockchain.getAllAccounts();
             res.json({
-                wallet_id: walletId,
-                balance,
-                timestamp: Date.now(),
+                accounts: accounts.map(acc => ({
+                    address: acc.address,
+                    balance: acc.balance,
+                    nonce: acc.nonce
+                })),
+                count: accounts.length
             });
         } catch (error) {
             res.status(500).json({
@@ -321,14 +338,14 @@ export class RPCServer {
      */
     private async createWallet(req: Request, res: Response): Promise<void> {
         try {
-            const { user_id } = req.body;
+            const { userId } = req.body;
 
-            if (!user_id) {
-                res.status(400).json({ error: 'user_id is required' });
+            if (!userId) {
+                res.status(400).json({ error: 'userId is required' });
                 return;
             }
 
-            const result = this.walletService.createWallet(user_id);
+            const result = this.walletService.createWallet(userId);
 
             res.json({
                 wallet: {

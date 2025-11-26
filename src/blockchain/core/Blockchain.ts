@@ -237,6 +237,13 @@ export class Blockchain extends EventEmitter {
     }
 
     /**
+     * Get all accounts
+     */
+    getAllAccounts(): AccountState[] {
+        return Array.from(this.state.values());
+    }
+
+    /**
      * Calculate state root hash
      */
     private calculateStateRoot(transactions: Transaction[]): string {
@@ -269,18 +276,16 @@ export class Blockchain extends EventEmitter {
                 return result;
             }
         }
-
         return { success: true };
     }
 
     /**
-     * Apply a single transaction to state
+     * Apply single transaction to state
      */
     private applyTransactionToState(
         tx: Transaction,
         state: Map<string, AccountState>
     ): { success: boolean; error?: string } {
-        // Get or create accounts
         const fromAccount = state.get(tx.from_wallet) || {
             address: tx.from_wallet,
             balance: 0,
