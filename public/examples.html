@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TraceNet API Examples - Kod Örnekleri</title>
+    <meta name="description" content="TraceNet Blockchain API - Detaylı kod örnekleri ve kullanım kılavuzu">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 3px solid var(--primary);
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            padding: 1rem 0;
+            z-index: 100;
+        }
+
+        .nav-tab {
+            padding: 0.75rem 1.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .nav-tab:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--primary);
+        }
+
+        .nav-tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .section {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+
+        .example-block {
+            margin-bottom: 2rem;
+        }
+
+        .example-title {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .code-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .code-tab {
+            padding: 0.5rem 1rem;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid var(--border);
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .code-tab.active {
+            background: #0a0f1e;
+            border-bottom-color: #0a0f1e;
+        }
+
+        .code-block {
+            background: #0a0f1e;
+            border: 1px solid var(--border);
+            border-radius: 0 8px 8px 8px;
+            padding: 1.5rem;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .code-block pre {
+            margin: 0;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .code-block code {
+            color: #10b981;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .copy-btn:hover {
+            background: #4f46e5;
+        }
+
+        .response-block {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid var(--success);
+            border-radius: 4px;
+        }
+
+        .response-title {
+            font-weight: 600;
+            color: var(--success);
+            margin-bottom: 0.5rem;
+        }
+
+        .endpoint-badge {
+            display: inline-block;
+            padding: 0.4rem 0.8rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .endpoint-path {
+            font-family: 'Courier New', monospace;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .section {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🚀 TraceNet API Examples</h1>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Tüm API endpoint'leri için detaylı kod örnekleri
+        </p>
+    </div>
+
+    <div class="container">
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <div class="nav-tab active" onclick="showCategory('user')">👤 Kullanıcı</div>
+            <div class="nav-tab" onclick="showCategory('auth')">🔐 Kimlik Doğrulama</div>
+            <div class="nav-tab" onclick="showCategory('messaging')">💬 Mesajlaşma</div>
+            <div class="nav-tab" onclick="showCategory('wallet')">💼 Cüzdan</div>
+            <div class="nav-tab" onclick="showCategory('content')">📝 İçerik</div>
+            <div class="nav-tab" onclick="showCategory('social')">❤️ Sosyal</div>
+            <div class="nav-tab" onclick="showCategory('blockchain')">⛓️ Blockchain</div>
+        </div>
+
+        <!-- User APIs -->
+        <div id="user" class="tab-content active">
+            <div class="section">
+                <h2 class="section-title">👤 Kullanıcı API Örnekleri</h2>
+
+                <!-- Create User -->
+                <div class="example-block">
+                    <h3 class="example-title">Yeni Kullanıcı Oluştur</h3>
+                    <span class="endpoint-badge">POST</span>
+                    <div class="endpoint-path">/api/user/create</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'user-create-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'user-create-py')">Python</div>
+                    </div>
+
+                    <div id="user-create-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Yeni kullanıcı oluştur
+const response = await fetch('http://localhost:3000/api/user/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    nickname: 'alice',
+    name: 'Alice',
+    surname: 'Smith',
+    birthdate: '1990-01-15'
+  })
+});
+
+const data = await response.json();
+console.log(data);</code></pre>
+                    </div>
+
+                    <div id="user-create-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Yeni kullanıcı oluştur
+response = requests.post('http://localhost:3000/api/user/create', json={
+    'nickname': 'alice',
+    'name': 'Alice',
+    'surname': 'Smith',
+    'birthdate': '1990-01-15'
+})
+
+data = response.json()
+print(data)</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "user": {
+    "user_id": "USR_abc123",
+    "nickname": "alice",
+    "name": "Alice",
+    "surname": "Smith"
+  },
+  "wallet": {
+    "wallet_id": "TRN4a3b2c1...",
+    "public_key": "9f8e7d..."
+  },
+  "mnemonic": "word1 word2 word3 ... word24",
+  "airdrop_amount": "0.00625 TNN"
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Search User -->
+                <div class="example-block">
+                    <h3 class="example-title">Kullanıcı Ara</h3>
+                    <span class="endpoint-badge">GET</span>
+                    <div class="endpoint-path">/api/user/search?query=alice</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'user-search-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'user-search-py')">Python</div>
+                    </div>
+
+                    <div id="user-search-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Kullanıcı ara
+const query = 'alice';
+const response = await fetch(`http://localhost:3000/api/user/search?query=${query}`);
+const data = await response.json();
+console.log(data.users);</code></pre>
+                    </div>
+
+                    <div id="user-search-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Kullanıcı ara
+query = 'alice'
+response = requests.get(f'http://localhost:3000/api/user/search?query={query}')
+data = response.json()
+print(data['users'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "users": [
+    {
+      "user_id": "USR_abc123",
+      "nickname": "alice",
+      "name": "Alice",
+      "surname": "Smith"
+    }
+  ],
+  "count": 1
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auth APIs -->
+        <div id="auth" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">🔐 Kimlik Doğrulama API Örnekleri</h2>
+
+                <!-- Generate Keys -->
+                <div class="example-block">
+                    <h3 class="example-title">Anahtar Çifti Oluştur</h3>
+                    <span class="endpoint-badge">POST</span>
+                    <div class="endpoint-path">/api/auth/generate-keys</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'auth-gen-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'auth-gen-py')">Python</div>
+                    </div>
+
+                    <div id="auth-gen-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Yeni key pair oluştur
+const response = await fetch('http://localhost:3000/api/auth/generate-keys', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' }
+});
+
+const { public_key, private_key } = await response.json();
+console.log('Public Key:', public_key);
+console.log('Private Key:', private_key);
+
+// ⚠️ Private key'i güvenli sakla!</code></pre>
+                    </div>
+
+                    <div id="auth-gen-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Yeni key pair oluştur
+response = requests.post('http://localhost:3000/api/auth/generate-keys')
+data = response.json()
+
+print('Public Key:', data['public_key'])
+print('Private Key:', data['private_key'])
+
+# ⚠️ Private key'i güvenli sakla!</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "public_key": "a1b2c3d4e5f6...",
+  "private_key": "f6e5d4c3b2a1..."
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Login -->
+                <div class="example-block">
+                    <h3 class="example-title">İmza ile Giriş</h3>
+                    <span class="endpoint-badge">POST</span>
+                    <div class="endpoint-path">/api/auth/login</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'auth-login-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'auth-login-py')">Python</div>
+                    </div>
+
+                    <div id="auth-login-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// İmza ile giriş yap
+const timestamp = Date.now();
+const signature = signTimestamp(timestamp, privateKey); // Helper fonksiyon
+
+const response = await fetch('http://localhost:3000/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    public_key: 'user_public_key',
+    signature: signature,
+    timestamp: timestamp
+  })
+});
+
+const data = await response.json();
+console.log('Login successful:', data.user_id);</code></pre>
+                    </div>
+
+                    <div id="auth-login-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+import time
+
+# İmza ile giriş yap
+timestamp = int(time.time() * 1000)
+signature = sign_timestamp(timestamp, private_key)  # Helper fonksiyon
+
+response = requests.post('http://localhost:3000/api/auth/login', json={
+    'public_key': 'user_public_key',
+    'signature': signature,
+    'timestamp': timestamp
+})
+
+data = response.json()
+print('Login successful:', data['user_id'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "success": true,
+  "message": "Login successful",
+  "user_id": "TRN4a3b2c1..."
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messaging APIs -->
+        <div id="messaging" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">💬 Mesajlaşma API Örnekleri</h2>
+
+                <!-- Send Private Message -->
+                <div class="example-block">
+                    <h3 class="example-title">Şifreli Mesaj Gönder</h3>
+                    <span class="endpoint-badge">POST</span>
+                    <div class="endpoint-path">/api/messaging/send</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'msg-send-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'msg-send-py')">Python</div>
+                    </div>
+
+                    <div id="msg-send-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Şifreli mesaj gönder
+const response = await fetch('http://localhost:3000/api/messaging/send', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    from_wallet: 'sender_wallet_id',
+    to_wallet: 'recipient_wallet_id',
+    message: 'Merhaba, bu gizli bir mesaj!',
+    sender_private_key: 'sender_private_key_hex',
+    recipient_public_key: 'recipient_public_key_hex'
+  })
+});
+
+const data = await response.json();
+console.log('Message sent! TX ID:', data.tx_id);</code></pre>
+                    </div>
+
+                    <div id="msg-send-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Şifreli mesaj gönder
+response = requests.post('http://localhost:3000/api/messaging/send', json={
+    'from_wallet': 'sender_wallet_id',
+    'to_wallet': 'recipient_wallet_id',
+    'message': 'Merhaba, bu gizli bir mesaj!',
+    'sender_private_key': 'sender_private_key_hex',
+    'recipient_public_key': 'recipient_public_key_hex'
+})
+
+data = response.json()
+print('Message sent! TX ID:', data['tx_id'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "success": true,
+  "tx_id": "TX_msg_abc123",
+  "message": "Private message sent (encrypted)"
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Decrypt Message -->
+                <div class="example-block">
+                    <h3 class="example-title">Mesajı Çöz</h3>
+                    <span class="endpoint-badge">POST</span>
+                    <div class="endpoint-path">/api/messaging/decrypt</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'msg-decrypt-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'msg-decrypt-py')">Python</div>
+                    </div>
+
+                    <div id="msg-decrypt-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Gelen mesajı çöz
+const response = await fetch('http://localhost:3000/api/messaging/decrypt', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    encrypted_content: 'a7f3b2c4...',
+    nonce: '4c8d9e2f...',
+    ephemeral_public_key: 'e9a17b3c...',
+    private_key: 'recipient_private_key'
+  })
+});
+
+const data = await response.json();
+console.log('Decrypted message:', data.decrypted_message);</code></pre>
+                    </div>
+
+                    <div id="msg-decrypt-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Gelen mesajı çöz
+response = requests.post('http://localhost:3000/api/messaging/decrypt', json={
+    'encrypted_content': 'a7f3b2c4...',
+    'nonce': '4c8d9e2f...',
+    'ephemeral_public_key': 'e9a17b3c...',
+    'private_key': 'recipient_private_key'
+})
+
+data = response.json()
+print('Decrypted message:', data['decrypted_message'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "success": true,
+  "decrypted_message": "Merhaba, bu gizli bir mesaj!"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wallet, Content, Social, Blockchain sections would continue similarly... -->
+        <!-- For brevity, I'll add a few more key examples -->
+
+        <!-- Wallet APIs -->
+        <div id="wallet" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">💼 Cüzdan API Örnekleri</h2>
+
+                <div class="example-block">
+                    <h3 class="example-title">Cüzdan Bakiyesi Sorgula</h3>
+                    <span class="endpoint-badge">GET</span>
+                    <div class="endpoint-path">/api/wallet/:walletId</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'wallet-balance-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'wallet-balance-py')">Python</div>
+                    </div>
+
+                    <div id="wallet-balance-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Cüzdan bakiyesi sorgula
+const walletId = 'TRN4a3b2c1...';
+const response = await fetch(`http://localhost:3000/api/wallet/${walletId}`);
+const data = await response.json();
+
+console.log('Balance:', data.balance, 'TNN');
+console.log('Address:', data.wallet_id);</code></pre>
+                    </div>
+
+                    <div id="wallet-balance-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Cüzdan bakiyesi sorgula
+wallet_id = 'TRN4a3b2c1...'
+response = requests.get(f'http://localhost:3000/api/wallet/{wallet_id}')
+data = response.json()
+
+print(f"Balance: {data['balance']} TNN")
+print(f"Address: {data['wallet_id']}")</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "wallet_id": "TRN4a3b2c1...",
+  "balance": "0.00625",
+  "public_key": "9f8e7d..."
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content APIs -->
+        <div id="content" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">📝 İçerik API Örnekleri</h2>
+
+                <div class="example-block">
+                    <h3 class="example-title">İçerik Paylaş (Tweet/Post)</h3>
+                    <span class="endpoint-badge">POST</span>
+                    <div class="endpoint-path">/api/content/create</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'content-create-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'content-create-py')">Python</div>
+                    </div>
+
+                    <div id="content-create-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Yeni içerik paylaş (ÜCRETSİZ)
+const response = await fetch('http://localhost:3000/api/content/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'your_wallet_id',
+    content_type: 'TWEET',
+    description: 'Merhaba blockchain dünyası! 🚀',
+    tags: ['blockchain', 'tracenet']
+  })
+});
+
+const data = await response.json();
+console.log('Content created! TX ID:', data.tx_id);</code></pre>
+                    </div>
+
+                    <div id="content-create-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Yeni içerik paylaş (ÜCRETSİZ)
+response = requests.post('http://localhost:3000/api/content/create', json={
+    'wallet_id': 'your_wallet_id',
+    'content_type': 'TWEET',
+    'description': 'Merhaba blockchain dünyası! 🚀',
+    'tags': ['blockchain', 'tracenet']
+})
+
+data = response.json()
+print('Content created! TX ID:', data['tx_id'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "success": true,
+  "content": {
+    "content_id": "CNT_abc123",
+    "wallet_id": "TRN...",
+    "content_type": "TWEET",
+    "description": "Merhaba blockchain dünyası! 🚀"
+  },
+  "tx_id": "TX_content_abc123"
+}</code></pre>
+                    </div>
+                </div>
+
+                <div class="example-block">
+                    <h3 class="example-title">İçerik Feed'i Getir</h3>
+                    <span class="endpoint-badge">GET</span>
+                    <div class="endpoint-path">/api/content/feed?limit=20</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'content-feed-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'content-feed-py')">Python</div>
+                    </div>
+
+                    <div id="content-feed-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// En yeni içerikleri getir
+const response = await fetch('http://localhost:3000/api/content/feed?limit=20&offset=0');
+const data = await response.json();
+
+console.log(`${data.total} içerikten ${data.contents.length} gösteriliyor`);
+data.contents.forEach(content => {
+  console.log(`- ${content.description}`);
+});</code></pre>
+                    </div>
+
+                    <div id="content-feed-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# En yeni içerikleri getir
+response = requests.get('http://localhost:3000/api/content/feed?limit=20&offset=0')
+data = response.json()
+
+print(f"{data['total']} içerikten {len(data['contents'])} gösteriliyor")
+for content in data['contents']:
+    print(f"- {content['description']}")</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "success": true,
+  "contents": [...],
+  "total": 42,
+  "limit": 20,
+  "offset": 0
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Social APIs -->
+        <div id="social" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">❤️ Sosyal Etkileşim API Örnekleri</h2>
+
+                <div class="example-block">
+                    <h3 class="example-title">İçerik Beğen</h3>
+                    <span class="endpoint-badge">POST</span>
+                    <div class="endpoint-path">/api/social/like</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'social-like-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'social-like-py')">Python</div>
+                    </div>
+
+                    <div id="social-like-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// İçerik beğen (0.00001 TNN ücret)
+const response = await fetch('http://localhost:3000/api/social/like', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'your_wallet_id',
+    content_id: 'CNT_abc123'
+  })
+});
+
+const data = await response.json();
+console.log('Liked! Creator received:', data.fee_breakdown.creator_received);</code></pre>
+                    </div>
+
+                    <div id="social-like-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# İçerik beğen (0.00001 TNN ücret)
+response = requests.post('http://localhost:3000/api/social/like', json={
+    'wallet_id': 'your_wallet_id',
+    'content_id': 'CNT_abc123'
+})
+
+data = response.json()
+print('Liked! Creator received:', data['fee_breakdown']['creator_received'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "success": true,
+  "tx_id": "TX_like_abc123",
+  "fee_breakdown": {
+    "total_fee": 1000,
+    "creator_received": 500,
+    "treasury_received": 500,
+    "fee_split": "50% creator / 50% treasury"
+  }
+}</code></pre>
+                    </div>
+                </div>
+
+                <div class="example-block">
+                    <h3 class="example-title">Kullanıcıyı Takip Et</h3>
+                    <span class="endpoint-badge">POST</span>
+                    <div class="endpoint-path">/api/social/follow</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'social-follow-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'social-follow-py')">Python</div>
+                    </div>
+
+                    <div id="social-follow-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Kullanıcıyı takip et (ÜCRETSİZ)
+const response = await fetch('http://localhost:3000/api/social/follow', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'your_wallet_id',
+    target_wallet_id: 'user_to_follow_wallet_id'
+  })
+});
+
+const data = await response.json();
+console.log('Now following!', data.tx_id);</code></pre>
+                    </div>
+
+                    <div id="social-follow-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Kullanıcıyı takip et (ÜCRETSİZ)
+response = requests.post('http://localhost:3000/api/social/follow', json={
+    'wallet_id': 'your_wallet_id',
+    'target_wallet_id': 'user_to_follow_wallet_id'
+})
+
+data = response.json()
+print('Now following!', data['tx_id'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "success": true,
+  "tx_id": "TX_follow_abc123",
+  "message": "Following user (FREE - no fee)"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blockchain APIs -->
+        <div id="blockchain" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">⛓️ Blockchain API Örnekleri</h2>
+
+                <div class="example-block">
+                    <h3 class="example-title">Blockchain Durumu</h3>
+                    <span class="endpoint-badge">GET</span>
+                    <div class="endpoint-path">/rpc/status</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'bc-status-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'bc-status-py')">Python</div>
+                    </div>
+
+                    <div id="bc-status-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Blockchain durumunu sorgula
+const response = await fetch('http://localhost:3000/rpc/status');
+const data = await response.json();
+
+console.log('Blok sayısı:', data.blockchain.blockCount);
+console.log('Toplam işlem:', data.blockchain.totalTransactions);
+console.log('Dağıtılan token:', data.blockchain.totalDistributedCoins);</code></pre>
+                    </div>
+
+                    <div id="bc-status-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Blockchain durumunu sorgula
+response = requests.get('http://localhost:3000/rpc/status')
+data = response.json()
+
+print('Blok sayısı:', data['blockchain']['blockCount'])
+print('Toplam işlem:', data['blockchain']['totalTransactions'])
+print('Dağıtılan token:', data['blockchain']['totalDistributedCoins'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response:</div>
+                        <pre><code>{
+  "blockchain": {
+    "blockCount": 42,
+    "totalTransactions": 128,
+    "totalDistributedCoins": 62500000,
+    "chainId": "tracenet-mainnet-1"
+  },
+  "validators": {
+    "activeCount": 3,
+    "onlineCount": 3
+  }
+}</code></pre>
+                    </div>
+                </div>
+
+                <div class="example-block">
+                    <h3 class="example-title">Blok Getir</h3>
+                    <span class="endpoint-badge">GET</span>
+                    <div class="endpoint-path">/block/:index</div>
+
+                    <div class="code-tabs">
+                        <div class="code-tab active" onclick="showCode(this, 'bc-block-js')">JavaScript</div>
+                        <div class="code-tab" onclick="showCode(this, 'bc-block-py')">Python</div>
+                    </div>
+
+                    <div id="bc-block-js" class="code-block" style="display: block;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>// Belirli bir bloğu getir
+const blockIndex = 0; // Genesis block
+const response = await fetch(`http://localhost:3000/block/${blockIndex}`);
+const block = await response.json();
+
+console.log('Block hash:', block.hash);
+console.log('Transactions:', block.transactions.length);
+if (block.metadata) {
+  console.log('Network:', block.metadata.networkName);
+  console.log('Max Supply:', block.metadata.maxSupply);
+}</code></pre>
+                    </div>
+
+                    <div id="bc-block-py" class="code-block" style="display: none;">
+                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                        <pre><code>import requests
+
+# Belirli bir bloğu getir
+block_index = 0  # Genesis block
+response = requests.get(f'http://localhost:3000/block/{block_index}')
+block = response.json()
+
+print('Block hash:', block['hash'])
+print('Transactions:', len(block['transactions']))
+if 'metadata' in block:
+    print('Network:', block['metadata']['networkName'])
+    print('Max Supply:', block['metadata']['maxSupply'])</code></pre>
+                    </div>
+
+                    <div class="response-block">
+                        <div class="response-title">✅ Response (Genesis Block):</div>
+                        <pre><code>{
+  "index": 0,
+  "hash": "0000...",
+  "previous_hash": "0000...",
+  "transactions": [],
+  "metadata": {
+    "chainId": "tracenet-mainnet-1",
+    "networkName": "TraceNet",
+    "developer": "LockTrace",
+    "maxSupply": 100000000,
+    "tokenSymbol": "TNN"
+  }
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showCategory(category) {
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active from all tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected content
+            document.getElementById(category).classList.add('active');
+
+            // Activate clicked tab
+            event.target.classList.add('active');
+        }
+
+        function showCode(tab, codeId) {
+            // Get parent example block
+            const exampleBlock = tab.closest('.example-block');
+
+            // Hide all code blocks in this example
+            exampleBlock.querySelectorAll('.code-block').forEach(block => {
+                block.style.display = 'none';
+            });
+
+            // Remove active from code tabs
+            exampleBlock.querySelectorAll('.code-tab').forEach(t => {
+                t.classList.remove('active');
+            });
+
+            // Show selected code block
+            document.getElementById(codeId).style.display = 'block';
+
+            // Activate clicked tab
+            tab.classList.add('active');
+        }
+
+        function copyCode(button) {
+            const codeBlock = button.nextElementSibling;
+            const code = codeBlock.textContent;
+
+            navigator.clipboard.writeText(code).then(() => {
+                button.textContent = '✅ Kopyalandı!';
+                setTimeout(() => {
+                    button.textContent = '📋 Kopyala';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+
+</html>
