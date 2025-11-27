@@ -1260,41 +1260,47 @@ export class RPCServer {
      */
     private async sendPrivateMessage(req: Request, res: Response): Promise<void> {
         try {
-            const { from_wallet, to_wallet, message, sender_private_key, recipient_public_key } = req.body;
+            const { from_wallet, to_wallet, encrypted_message, sender_public_key, sender_signature } = req.body;
 
-            if (!from_wallet || !to_wallet || !message || !sender_private_key || !recipient_public_key) {
+            if (!from_wallet || !to_wallet || !encrypted_message) {
                 res.status(400).json({
-                    error: 'from_wallet, to_wallet, message, sender_private_key, and recipient_public_key are required',
+                    error: 'from_wallet, to_wallet, and encrypted_message are required. Message must be encrypted client-side.',
                 });
                 return;
             }
 
-            // Encrypt message
-            const { MessageEncryption } = require('../blockchain/crypto/MessageEncryption');
-            const encryptedMessage = MessageEncryption.encryptMessage(
-                message,
-                recipient_public_key,
-                sender_private_key
-            );
+            // NO SERVER-SIDE ENCRYPTION - Message must already be encrypted by client
+            // Client should use KeyManager.encryptForUser() before sending
 
-            // Create transaction
-            const { TransactionModel, TransactionType } = require('../blockchain/models/Transaction');
+            // Create transaction with pre-encrypted message
+            const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
             const tx = TransactionModel.create(
                 from_wallet,
                 to_wallet,
-                TransactionType.PRIVATE_MESSAGE,
+                'PRIVATE_MESSAGE' as any,
                 0, // No amount transfer
-                0.00001, // Small fee
+                TOKEN_CONFIG.MESSAGE_FEE, // Use configured fee (0.000001 LT)
                 {
-                    encrypted_content: encryptedMessage.encrypted_content,
-                    nonce: encryptedMessage.nonce,
-                    ephemeral_public_key: encryptedMessage.ephemeral_public_key,
-                    recipient_public_key,
+                    message: encrypted_message,
+                    encrypted: true
                 }
             );
 
+            // Add signatures if provided
+            if (sender_public_key) tx.sender_public_key = sender_public_key;
+            if (sender_signature) tx.sender_signature = sender_signature;
+
+            // Validate transaction
+            const txModel = new TransactionModel(tx);
+            const validation = txModel.validate();
+
+            if (!validation.valid) {
+                res.status(400).json({ error: validation.error });
+                return;
+            }
+
             // Add to mempool
-            const result = this.mempool.addTransaction(tx.toJSON());
+            const result = this.mempool.addTransaction(tx);
 
             if (!result.success) {
                 res.status(400).json({ error: result.error });
@@ -1304,7 +1310,7 @@ export class RPCServer {
             res.json({
                 success: true,
                 tx_id: tx.tx_id,
-                message: 'Private message sent (encrypted)',
+                message: 'Encrypted private message sent to blockchain',
             });
         } catch (error) {
             res.status(500).json({
@@ -1315,43 +1321,16 @@ export class RPCServer {
 
     /**
      * Decrypt received private message
+     * @deprecated This endpoint is deprecated for security reasons.
+     * Decryption MUST be done client-side using KeyManager.decryptFromUser()
      */
     private async decryptPrivateMessage(req: Request, res: Response): Promise<void> {
-        try {
-            const { encrypted_content, nonce, ephemeral_public_key, private_key } = req.body;
-
-            if (!encrypted_content || !nonce || !ephemeral_public_key || !private_key) {
-                res.status(400).json({
-                    error: 'encrypted_content, nonce, ephemeral_public_key, and private_key are required',
-                });
-                return;
-            }
-
-            // Decrypt message
-            const { MessageEncryption } = require('../blockchain/crypto/MessageEncryption');
-            const decrypted = MessageEncryption.decryptMessage(
-                {
-                    encrypted_content,
-                    nonce,
-                    ephemeral_public_key,
-                },
-                private_key
-            );
-
-            if (!decrypted) {
-                res.status(400).json({ error: 'Failed to decrypt message' });
-                return;
-            }
-
-            res.json({
-                success: true,
-                decrypted_message: decrypted,
-            });
-        } catch (error) {
-            res.status(500).json({
-                error: error instanceof Error ? error.message : 'Unknown error',
-            });
-        }
+        res.status(410).json({
+            error: 'This endpoint is deprecated for security reasons.',
+            message: 'Private messages must be decrypted CLIENT-SIDE using your private key.',
+            documentation: 'Use KeyManager.decryptFromUser(encryptedMessage, recipientEncryptionPrivateKey, senderEncryptionPublicKey)',
+            reason: 'Never send your private key to the server. Client-side decryption ensures end-to-end encryption.'
+        });
     }
 
     /**
