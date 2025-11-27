@@ -153,6 +153,7 @@ export class RPCServer {
 
         // Messaging endpoints
         this.app.post('/api/messaging/send', this.sendPrivateMessage.bind(this));
+        this.app.get('/api/messaging/inbox/:walletId', this.getMessages.bind(this));
         this.app.post('/api/messaging/decrypt', this.decryptPrivateMessage.bind(this));
 
         // Error handler
@@ -1311,6 +1312,56 @@ export class RPCServer {
                 success: true,
                 tx_id: tx.tx_id,
                 message: 'Encrypted private message sent to blockchain',
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get messages for a wallet (Inbox)
+     */
+    private async getMessages(req: Request, res: Response): Promise<void> {
+        try {
+            const { walletId } = req.params;
+            const { limit = 50, offset = 0 } = req.query;
+
+            if (!walletId) {
+                res.status(400).json({ error: 'Wallet ID is required' });
+                return;
+            }
+
+            const chain = this.blockchain.getChain();
+            const messages: any[] = [];
+
+            // Iterate backwards to get latest messages first
+            for (let i = chain.length - 1; i >= 0; i--) {
+                const block = chain[i];
+                for (const tx of block.transactions) {
+                    if (tx.type === 'PRIVATE_MESSAGE' && tx.to_wallet === walletId) {
+                        messages.push({
+                            tx_id: tx.tx_id,
+                            from: tx.from_wallet,
+                            timestamp: tx.timestamp,
+                            encrypted_content: tx.payload.message || tx.payload.encrypted_content, // Support both formats
+                            sender_public_key: tx.sender_public_key
+                        });
+                    }
+                }
+            }
+
+            // Apply pagination
+            const start = Number(offset);
+            const end = start + Number(limit);
+            const paginatedMessages = messages.slice(start, end);
+
+            res.json({
+                success: true,
+                wallet_id: walletId,
+                messages: paginatedMessages,
+                total: messages.length
             });
         } catch (error) {
             res.status(500).json({

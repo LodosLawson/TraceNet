@@ -705,68 +705,23 @@ print(f"Message TX ID: {data['tx_id']}")</code></pre>
 
                     <div class="info-block">
                         <strong>💡 Şifreleme:</strong>
-                        <p>Mesajlar alıcının şifreleme public key'i ile şifrelenir. Sadece alıcının şifreleme private
-                            key'i ile çözülebilir (Curve25519).</p>
-                    </div>
-                </div>
+                        <div class="section">
+                            <h2 class="section-title">❤️ Sosyal API Örnekleri</h2>
 
-                <!-- Decrypt Message -->
-                <div class="example-block">
-                    <h3 class="example-title">Mesajı Çöz</h3>
-                    <span class="endpoint-badge">POST</span>
-                    <div class="endpoint-path">/api/messaging/decrypt</div>
+                            <!-- Like Content -->
+                            <div class="example-block">
+                                <h3 class="example-title">İçeriği Beğen</h3>
+                                <span class="endpoint-badge">POST</span>
+                                <div class="endpoint-path">/api/social/like</div>
 
-                    <div class="code-tabs">
-                        <div class="code-tab active" onclick="showCode(this, 'msg-decrypt-js')">JavaScript</div>
-                        <div class="code-tab" onclick="showCode(this, 'msg-decrypt-py')">Python</div>
-                    </div>
+                                <div class="code-tabs">
+                                    <div class="code-tab active" onclick="showCode(this, 'like-js')">JavaScript</div>
+                                    <div class="code-tab" onclick="showCode(this, 'like-py')">Python</div>
+                                </div>
 
-                    <div id="msg-decrypt-js" class="code-block" style="display: block;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>// Client-side şifre çözme (güvenli)
-const decryptedMessage = decryptFromUser(
-  encryptedMessage,
-  recipientEncryptionPrivateKey,
-  senderEncryptionPublicKey
-);
-
-console.log('Decrypted:', decryptedMessage);</code></pre>
-                    </div>
-
-                    <div id="msg-decrypt-py" class="code-block" style="display: none;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code># Client-side şifre çözme
-decrypted_message = decrypt_from_user(
-    encrypted_message,
-    recipient_encryption_private_key,
-    sender_encryption_public_key
-)
-
-print(f"Decrypted: {decrypted_message}")</code></pre>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Social APIs Tab -->
-        <div id="social" class="tab-content">
-            <div class="section">
-                <h2 class="section-title">❤️ Sosyal API Örnekleri</h2>
-
-                <!-- Like Content -->
-                <div class="example-block">
-                    <h3 class="example-title">İçeriği Beğen</h3>
-                    <span class="endpoint-badge">POST</span>
-                    <div class="endpoint-path">/api/social/like</div>
-
-                    <div class="code-tabs">
-                        <div class="code-tab active" onclick="showCode(this, 'like-js')">JavaScript</div>
-                        <div class="code-tab" onclick="showCode(this, 'like-py')">Python</div>
-                    </div>
-
-                    <div id="like-js" class="code-block" style="display: block;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>const response = await fetch('http://localhost:3000/api/social/like', {
+                                <div id="like-js" class="code-block" style="display: block;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>const response = await fetch('http://localhost:3000/api/social/like', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -777,34 +732,34 @@ print(f"Decrypted: {decrypted_message}")</code></pre>
 
 const data = await response.json();
 console.log('Like TX ID:', data.tx_id);</code></pre>
-                    </div>
+                                </div>
 
-                    <div id="like-py" class="code-block" style="display: none;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>response = requests.post('http://localhost:3000/api/social/like', json={
+                                <div id="like-py" class="code-block" style="display: none;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>response = requests.post('http://localhost:3000/api/social/like', json={
     'wallet_id': 'TRN1a2b3c...',
     'content_id': 'CONTENT_123'
 })
 
 data = response.json()
 print(f"Like TX ID: {data['tx_id']}")</code></pre>
-                    </div>
-                </div>
+                                </div>
+                            </div>
 
-                <!-- Follow User -->
-                <div class="example-block">
-                    <h3 class="example-title">Kullanıcıyı Takip Et</h3>
-                    <span class="endpoint-badge">POST</span>
-                    <div class="endpoint-path">/api/social/follow</div>
+                            <!-- Follow User -->
+                            <div class="example-block">
+                                <h3 class="example-title">Kullanıcıyı Takip Et</h3>
+                                <span class="endpoint-badge">POST</span>
+                                <div class="endpoint-path">/api/social/follow</div>
 
-                    <div class="code-tabs">
-                        <div class="code-tab active" onclick="showCode(this, 'follow-js')">JavaScript</div>
-                        <div class="code-tab" onclick="showCode(this, 'follow-py')">Python</div>
-                    </div>
+                                <div class="code-tabs">
+                                    <div class="code-tab active" onclick="showCode(this, 'follow-js')">JavaScript</div>
+                                    <div class="code-tab" onclick="showCode(this, 'follow-py')">Python</div>
+                                </div>
 
-                    <div id="follow-js" class="code-block" style="display: block;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>const response = await fetch('http://localhost:3000/api/social/follow', {
+                                <div id="follow-js" class="code-block" style="display: block;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>const response = await fetch('http://localhost:3000/api/social/follow', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -815,69 +770,71 @@ print(f"Like TX ID: {data['tx_id']}")</code></pre>
 
 const data = await response.json();
 console.log('Follow TX ID:', data.tx_id);</code></pre>
-                    </div>
+                                </div>
 
-                    <div id="follow-py" class="code-block" style="display: none;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>response = requests.post('http://localhost:3000/api/social/follow', json={
+                                <div id="follow-py" class="code-block" style="display: none;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>response = requests.post('http://localhost:3000/api/social/follow', json={
     'follower_wallet': 'TRN1a2b3c...',
     'following_wallet': 'TRN4d5e6f...'
 })
 
 data = response.json()
 print(f"Follow TX ID: {data['tx_id']}")</code></pre>
-                    </div>
-                </div>
+                                </div>
+                            </div>
 
-                <!-- Get Followers -->
-                <div class="example-block">
-                    <h3 class="example-title">Takipçileri Listele</h3>
-                    <span class="endpoint-badge get">GET</span>
-                    <div class="endpoint-path">/api/social/followers/:walletId</div>
+                            <!-- Get Followers -->
+                            <div class="example-block">
+                                <h3 class="example-title">Takipçileri Listele</h3>
+                                <span class="endpoint-badge get">GET</span>
+                                <div class="endpoint-path">/api/social/followers/:walletId</div>
 
-                    <div class="code-tabs">
-                        <div class="code-tab active" onclick="showCode(this, 'followers-js')">JavaScript</div>
-                        <div class="code-tab" onclick="showCode(this, 'followers-py')">Python</div>
-                    </div>
+                                <div class="code-tabs">
+                                    <div class="code-tab active" onclick="showCode(this, 'followers-js')">JavaScript
+                                    </div>
+                                    <div class="code-tab" onclick="showCode(this, 'followers-py')">Python</div>
+                                </div>
 
-                    <div id="followers-js" class="code-block" style="display: block;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>const walletId = 'TRN1a2b3c...';
+                                <div id="followers-js" class="code-block" style="display: block;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>const walletId = 'TRN1a2b3c...';
 const response = await fetch(`http://localhost:3000/api/social/followers/${walletId}`);
 const data = await response.json();
 console.log('Followers:', data.followers.length);</code></pre>
-                    </div>
+                                </div>
 
-                    <div id="followers-py" class="code-block" style="display: none;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>wallet_id = 'TRN1a2b3c...'
+                                <div id="followers-py" class="code-block" style="display: none;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>wallet_id = 'TRN1a2b3c...'
 response = requests.get(f'http://localhost:3000/api/social/followers/{wallet_id}')
 data = response.json()
 print(f"Followers: {len(data['followers'])}")</code></pre>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Content APIs Tab -->
-        <div id="content" class="tab-content">
-            <div class="section">
-                <h2 class="section-title">📝 İçerik API Örnekleri</h2>
-
-                <!-- Create Content -->
-                <div class="example-block">
-                    <h3 class="example-title">İçerik Oluştur</h3>
-                    <span class="endpoint-badge">POST</span>
-                    <div class="endpoint-path">/api/content/create</div>
-
-                    <div class="code-tabs">
-                        <div class="code-tab active" onclick="showCode(this, 'content-create-js')">JavaScript</div>
-                        <div class="code-tab" onclick="showCode(this, 'content-create-py')">Python</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div id="content-create-js" class="code-block" style="display: block;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>const response = await fetch('http://localhost:3000/api/content/create', {
+                    <!-- Content APIs Tab -->
+                    <div id="content" class="tab-content">
+                        <div class="section">
+                            <h2 class="section-title">📝 İçerik API Örnekleri</h2>
+
+                            <!-- Create Content -->
+                            <div class="example-block">
+                                <h3 class="example-title">İçerik Oluştur</h3>
+                                <span class="endpoint-badge">POST</span>
+                                <div class="endpoint-path">/api/content/create</div>
+
+                                <div class="code-tabs">
+                                    <div class="code-tab active" onclick="showCode(this, 'content-create-js')">
+                                        JavaScript</div>
+                                    <div class="code-tab" onclick="showCode(this, 'content-create-py')">Python</div>
+                                </div>
+
+                                <div id="content-create-js" class="code-block" style="display: block;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>const response = await fetch('http://localhost:3000/api/content/create', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -892,11 +849,11 @@ print(f"Followers: {len(data['followers'])}")</code></pre>
 
 const data = await response.json();
 console.log('Content ID:', data.content.content_id);</code></pre>
-                    </div>
+                                </div>
 
-                    <div id="content-create-py" class="code-block" style="display: none;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>response = requests.post('http://localhost:3000/api/content/create', json={
+                                <div id="content-create-py" class="code-block" style="display: none;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>response = requests.post('http://localhost:3000/api/content/create', json={
     'wallet_id': 'TRN1a2b3c...',
     'content_type': 'POST',
     'title': 'Merhaba Dünya',
@@ -907,72 +864,73 @@ console.log('Content ID:', data.content.content_id);</code></pre>
 
 data = response.json()
 print(f"Content ID: {data['content']['content_id']}")</code></pre>
-                    </div>
-                </div>
+                                </div>
+                            </div>
 
-                <!-- Get Content Feed -->
-                <div class="example-block">
-                    <h3 class="example-title">İçerik Akışı Al</h3>
-                    <span class="endpoint-badge get">GET</span>
-                    <div class="endpoint-path">/api/content/feed?limit=20</div>
+                            <!-- Get Content Feed -->
+                            <div class="example-block">
+                                <h3 class="example-title">İçerik Akışı Al</h3>
+                                <span class="endpoint-badge get">GET</span>
+                                <div class="endpoint-path">/api/content/feed?limit=20</div>
 
-                    <div class="code-tabs">
-                        <div class="code-tab active" onclick="showCode(this, 'feed-js')">JavaScript</div>
-                        <div class="code-tab" onclick="showCode(this, 'feed-py')">Python</div>
-                    </div>
+                                <div class="code-tabs">
+                                    <div class="code-tab active" onclick="showCode(this, 'feed-js')">JavaScript</div>
+                                    <div class="code-tab" onclick="showCode(this, 'feed-py')">Python</div>
+                                </div>
 
-                    <div id="feed-js" class="code-block" style="display: block;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>const response = await fetch('http://localhost:3000/api/content/feed?limit=20');
+                                <div id="feed-js" class="code-block" style="display: block;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>const response = await fetch('http://localhost:3000/api/content/feed?limit=20');
 const data = await response.json();
 data.feed.forEach(content => {
     console.log(content.title, '-', content.likes_count, 'likes');
 });</code></pre>
-                    </div>
+                                </div>
 
-                    <div id="feed-py" class="code-block" style="display: none;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>response = requests.get('http://localhost:3000/api/content/feed?limit=20')
+                                <div id="feed-py" class="code-block" style="display: none;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>response = requests.get('http://localhost:3000/api/content/feed?limit=20')
 data = response.json()
 for content in data['feed']:
     print(f"{content['title']} - {content['likes_count']} likes")</code></pre>
-                    </div>
-                </div>
+                                </div>
+                            </div>
 
-                <!-- Get User Content -->
-                <div class="example-block">
-                    <h3 class="example-title">Kullanıcının İçeriklerini Al</h3>
-                    <span class="endpoint-badge get">GET</span>
-                    <div class="endpoint-path">/api/content/user/:walletId</div>
+                            <!-- Get User Content -->
+                            <div class="example-block">
+                                <h3 class="example-title">Kullanıcının İçeriklerini Al</h3>
+                                <span class="endpoint-badge get">GET</span>
+                                <div class="endpoint-path">/api/content/user/:walletId</div>
 
-                    <div class="code-tabs">
-                        <div class="code-tab active" onclick="showCode(this, 'user-content-js')">JavaScript</div>
-                        <div class="code-tab" onclick="showCode(this, 'user-content-py')">Python</div>
-                    </div>
+                                <div class="code-tabs">
+                                    <div class="code-tab active" onclick="showCode(this, 'user-content-js')">JavaScript
+                                    </div>
+                                    <div class="code-tab" onclick="showCode(this, 'user-content-py')">Python</div>
+                                </div>
 
-                    <div id="user-content-js" class="code-block" style="display: block;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>const walletId = 'TRN1a2b3c...';
+                                <div id="user-content-js" class="code-block" style="display: block;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>const walletId = 'TRN1a2b3c...';
 const response = await fetch(`http://localhost:3000/api/content/user/${walletId}`);
 const data = await response.json();
 console.log('Content Count:', data.content.length);</code></pre>
-                    </div>
+                                </div>
 
-                    <div id="user-content-py" class="code-block" style="display: none;">
-                        <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
-                        <pre><code>wallet_id = 'TRN1a2b3c...'
+                                <div id="user-content-py" class="code-block" style="display: none;">
+                                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                    <pre><code>wallet_id = 'TRN1a2b3c...'
 response = requests.get(f'http://localhost:3000/api/content/user/{wallet_id}')
 data = response.json()
 print(f"Content Count: {len(data['content'])}")</code></pre>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Scripts -->
-    <script src="/js/navigation.js"></script>
-    <script src="/js/examples.js"></script>
+                <!-- Scripts -->
+                <script src="/js/navigation.js"></script>
+                <script src="/js/examples.js"></script>
 </body>
 
 </html>
