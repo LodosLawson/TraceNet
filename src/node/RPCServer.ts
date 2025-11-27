@@ -1274,7 +1274,7 @@ export class RPCServer {
             // Client should use KeyManager.encryptForUser() before sending
 
             // Create transaction with pre-encrypted message
-            const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
+            const { TOKEN_CONFIG } = require('../economy/TokenConfig');
             const tx = TransactionModel.create(
                 from_wallet,
                 to_wallet,
