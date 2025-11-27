@@ -479,6 +479,7 @@ export class Blockchain extends EventEmitter {
      * Get blockchain statistics
      */
     getStats(): {
+        chainId: string;
         blockCount: number;
         totalTransactions: number;
         accountCount: number;
@@ -492,7 +493,9 @@ export class Blockchain extends EventEmitter {
 
         const latestBlock = this.getLatestBlock();
 
+        const { NETWORK_CONFIG } = require('../config/NetworkConfig');
         return {
+            chainId: NETWORK_CONFIG.chainId,
             blockCount: this.chain.length,
             totalTransactions,
             accountCount: this.state.size,
