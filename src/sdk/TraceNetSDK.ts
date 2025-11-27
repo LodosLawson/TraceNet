@@ -58,7 +58,7 @@ export class TraceNetSDK {
     async getBalance(address?: string): Promise<number> {
         const targetAddress = address || this.wallet.address;
         const response = await fetch(`${this.apiUrl}/rpc/balance/${targetAddress}`);
-        const data = await response.json();
+        const data: any = await response.json();
         return data.balance;
     }
 
@@ -84,7 +84,7 @@ export class TraceNetSDK {
             throw new Error(`Failed to calculate fee: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data: any = await response.json();
         return data.total_fee;
     }
 
@@ -126,7 +126,7 @@ export class TraceNetSDK {
                 body: JSON.stringify(tx)
             });
 
-            const result = await response.json();
+            const result: any = await response.json();
 
             if (result.success) {
                 return {
@@ -195,7 +195,7 @@ export class TraceNetSDK {
                 })
             });
 
-            const result = await response.json();
+            const result: any = await response.json();
 
             if (result.success) {
                 return {
