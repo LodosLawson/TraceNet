@@ -254,8 +254,13 @@ export class Blockchain extends EventEmitter {
      * Calculate state root hash
      */
     private calculateStateRoot(transactions: Transaction[]): string {
-        // Create a copy of current state
-        const tempState = new Map(this.state);
+        // Create a DEEP copy of current state to avoid modifying the actual state
+        // AccountState objects are mutable, so we must clone them
+        const tempState = new Map<string, AccountState>();
+
+        for (const [address, account] of this.state.entries()) {
+            tempState.set(address, { ...account });
+        }
 
         // Apply transactions to temp state
         for (const tx of transactions) {

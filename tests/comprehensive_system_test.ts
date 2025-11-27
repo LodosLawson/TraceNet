@@ -45,13 +45,18 @@ async function comprehensiveSystemTest() {
     console.log('\n💸 4. TEST: SIMPLE TRANSFER (Alice → Bob)');
     try {
         const transferAmount = 50 * 100000000; // 50 LT
+
+        // Calculate dynamic fee
+        const bobAccount = (blockchain as any).state.get(bob.address) || { incomingTransferCount: 0 };
+        const fee = (blockchain as any).calculateTransferFee(bobAccount, transferAmount, 'STANDARD');
+
         const transferTx = TransactionModel.create(
             alice.address,
             bob.address,
             TransactionType.TRANSFER,
             transferAmount,
-            10000, // Fee
-            {}
+            fee, // Use calculated fee
+            { priority: 'STANDARD' }
         );
 
         transferTx.sender_public_key = alice.publicKey;
@@ -65,9 +70,9 @@ async function comprehensiveSystemTest() {
             const nodeBalance = blockchain.getBalance(nodeOwner.address);
 
             console.log(`✅ Transfer successful`);
-            console.log(`   Alice: ${aliceNewBalance / 100000000} LT (sent 50 + fee)`);
-            console.log(`   Bob: ${bobNewBalance / 100000000} LT (received 50)`);
-            console.log(`   Node: ${nodeBalance / 100000000} LT (fee collected)`);
+            console.log(`   Alice: ${aliceNewBalance / 100000000} LT`);
+            console.log(`   Bob: ${bobNewBalance / 100000000} LT`);
+            console.log(`   Node: ${nodeBalance / 100000000} LT`);
 
             // Verify balances
             if (bobNewBalance !== (1000 * 100000000 + transferAmount)) {
