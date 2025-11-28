@@ -16,6 +16,7 @@ export interface IBlock {
     nonce: number;
     hash?: string;
     metadata?: any; // Network metadata for genesis block
+    node_wallet?: string; // Optional wallet address for node owner fee distribution
 }
 
 /**
@@ -33,6 +34,7 @@ export class Block {
     nonce: number;
     hash?: string;
     metadata?: any;
+    node_wallet?: string;
 
     constructor(data: IBlock) {
         this.index = data.index;
@@ -46,6 +48,7 @@ export class Block {
         this.nonce = data.nonce;
         this.hash = data.hash;
         this.metadata = data.metadata;
+        this.node_wallet = data.node_wallet;
     }
 
     /**
@@ -77,7 +80,8 @@ export class Block {
         previous_hash: string,
         transactions: Transaction[],
         validator_id: string,
-        state_root: string
+        state_root: string,
+        node_wallet?: string
     ): Block {
         const timestamp = Date.now();
         const merkle_root = this.calculateMerkleRoot(transactions);
@@ -92,6 +96,7 @@ export class Block {
             validator_id,
             signature: '',
             nonce: 0,
+            node_wallet,
         });
     }
 
@@ -229,6 +234,7 @@ export class Block {
             nonce: this.nonce,
             hash: this.hash,
             metadata: this.metadata,
+            node_wallet: this.node_wallet,
         };
     }
 }

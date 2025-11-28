@@ -19,11 +19,13 @@ export class ValidatorPool {
     private validators: Map<string, Validator>;
     private onlineValidators: Set<string>;
     private offlineTimeout: number; // milliseconds
+    private validatorWallets: Map<string, string>; // validatorId -> wallet address
 
     constructor(offlineTimeout: number = 60000) {
         this.validators = new Map();
         this.onlineValidators = new Set();
         this.offlineTimeout = offlineTimeout;
+        this.validatorWallets = new Map();
     }
 
     /**
@@ -201,6 +203,27 @@ export class ValidatorPool {
      */
     getAllValidators(): Validator[] {
         return Array.from(this.validators.values());
+    }
+
+    /**
+     * Register wallet address for validator (for fee distribution)
+     */
+    registerWallet(validatorId: string, walletAddress: string): void {
+        this.validatorWallets.set(validatorId, walletAddress);
+    }
+
+    /**
+     * Get registered wallet for validator
+     */
+    getWallet(validatorId: string): string | undefined {
+        return this.validatorWallets.get(validatorId);
+    }
+
+    /**
+     * Get all wallet mappings
+     */
+    getAllWalletMappings(): Map<string, string> {
+        return new Map(this.validatorWallets);
     }
 
     /**

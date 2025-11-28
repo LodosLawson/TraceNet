@@ -150,6 +150,8 @@ export class RPCServer {
         this.app.post('/api/validator/register', this.registerValidator.bind(this));
         this.app.post('/api/validator/heartbeat', this.validatorHeartbeat.bind(this));
         this.app.get('/api/validator/list', this.listValidators.bind(this));
+        this.app.post('/api/validator/:validatorId/wallet', this.registerValidatorWallet.bind(this));
+        this.app.get('/api/validator/:validatorId/wallet', this.getValidatorWallet.bind(this));
 
         // Messaging endpoints
         this.app.post('/api/messaging/send', this.sendPrivateMessage.bind(this));
@@ -658,6 +660,77 @@ export class RPCServer {
                     last_active: v.last_active,
                 })),
                 count: validators.length,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Register wallet for validator (for fee distribution)
+     */
+    private async registerValidatorWallet(req: Request, res: Response): Promise<void> {
+        try {
+            const { validatorId } = req.params;
+            const { wallet_address } = req.body;
+
+            if (!wallet_address) {
+                res.status(400).json({ error: 'wallet_address is required' });
+                return;
+            }
+
+            // Validate wallet address format
+            if (!wallet_address.startsWith('TRN')) {
+                res.status(400).json({ error: 'Invalid wallet address format' });
+                return;
+            }
+
+            // Check if validator exists
+            const validator = this.validatorPool.getValidator(validatorId);
+            if (!validator) {
+                res.status(404).json({ error: 'Validator not found' });
+                return;
+            }
+
+            // Register wallet
+            this.validatorPool.registerWallet(validatorId, wallet_address);
+
+            res.json({
+                success: true,
+                validator_id: validatorId,
+                wallet_address,
+                message: 'Wallet registered successfully for validator',
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get registered wallet for validator
+     */
+    private async getValidatorWallet(req: Request, res: Response): Promise<void> {
+        try {
+            const { validatorId } = req.params;
+
+            const wallet = this.validatorPool.getWallet(validatorId);
+
+            if (!wallet) {
+                res.status(404).json({
+                    validator_id: validatorId,
+                    wallet_address: null,
+                    message: 'No wallet registered for this validator'
+                });
+                return;
+            }
+
+            res.json({
+                validator_id: validatorId,
+                wallet_address: wallet,
             });
         } catch (error) {
             res.status(500).json({

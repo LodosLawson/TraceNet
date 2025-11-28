@@ -9,11 +9,15 @@ export const TOKEN_CONFIG = {
     INITIAL_MARKET_CAP_USD: 1000,
     INITIAL_PRICE_USD: 0.00001, // $1000 / 100M
 
-    // Fees (50% goes to recipient/creator, 50% to blockchain treasury)
-    MESSAGE_FEE: 100, // 0.000001 LT (updated as per request)
-    LIKE_FEE: 1000, // 0.00001 LT (total, split 50/50)
-    COMMENT_FEE: 1000, // 0.00001 LT (total, split 50/50)
-    SHARE_FEE: 1000, // 0.00001 LT
+    // Fees - Node wallet gets 50% if registered, remaining split varies by transaction type
+    // Transfer: 50% node, 50% treasury
+    // Social (like/comment/follow): 50% node, 25% content owner, 25% treasury
+    MESSAGE_FEE: 200, // 0.000002 LT (doubled)
+    LIKE_FEE: 2000, // 0.00002 LT (doubled)
+    COMMENT_FEE: 2000, // 0.00002 LT (doubled)
+    SHARE_FEE: 2000, // 0.00002 LT (doubled)
+    FOLLOW_FEE: 100, // 0.000001 LT (half of message fee)
+    UNFOLLOW_FEE: 100, // 0.000001 LT (half of message fee)
 
     // Dynamic Transfer Fees
     DYNAMIC_TRANSFER_FEES: {
@@ -37,7 +41,8 @@ export const TOKEN_CONFIG = {
     INITIAL_AIRDROP: 625000, // 0.00625 LT
 
     // Fee split percentages
-    FEE_TO_CREATOR_PERCENT: 50, // 50% to content creator/recipient
+    FEE_TO_NODE_OWNER_PERCENT: 50, // 50% to node owner (if wallet registered and not genesis)
+    FEE_TO_CREATOR_PERCENT: 50, // 50% to content creator (for social actions, from remaining 50%)
     FEE_TO_TREASURY_PERCENT: 50, // 50% to blockchain treasury
 };
 
@@ -95,6 +100,12 @@ export const SOCIAL_FEES = {
     },
     message: {
         cost: TOKEN_CONFIG.MESSAGE_FEE,
+    },
+    follow: {
+        cost: TOKEN_CONFIG.FOLLOW_FEE,
+    },
+    unfollow: {
+        cost: TOKEN_CONFIG.UNFOLLOW_FEE,
     },
 };
 

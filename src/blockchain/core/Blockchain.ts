@@ -96,7 +96,8 @@ export class Blockchain extends EventEmitter {
     addBlock(
         transactions: Transaction[],
         validatorId: string,
-        signature: string
+        signature: string,
+        nodeWallet?: string
     ): { success: boolean; error?: string; block?: Block } {
         const latestBlock = this.getLatestBlock();
         const newIndex = latestBlock.index + 1;
@@ -110,7 +111,8 @@ export class Blockchain extends EventEmitter {
             latestBlock.hash!,
             transactions,
             validatorId,
-            newStateRoot
+            newStateRoot,
+            nodeWallet
         );
 
         // Set signature
@@ -123,7 +125,7 @@ export class Blockchain extends EventEmitter {
         }
 
         // Apply transactions to state
-        const stateUpdate = this.applyTransactions(transactions, validatorId);
+        const stateUpdate = this.applyTransactions(transactions, validatorId, newBlock.index, nodeWallet);
         if (!stateUpdate.success) {
             return { success: false, error: stateUpdate.error };
         }
@@ -308,10 +310,12 @@ export class Blockchain extends EventEmitter {
      */
     private applyTransactions(
         transactions: Transaction[],
-        validatorId?: string // Optional for backward compatibility or simulation
+        validatorId?: string, // Optional for backward compatibility or simulation
+        blockIndex?: number, // Block index to check if genesis
+        nodeWallet?: string // Optional node wallet for fee distribution
     ): { success: boolean; error?: string } {
         for (const tx of transactions) {
-            const result = this.applyTransactionToState(tx, this.state, validatorId);
+            const result = this.applyTransactionToState(tx, this.state, validatorId, blockIndex, nodeWallet);
             if (!result.success) {
                 return result;
             }
@@ -325,7 +329,9 @@ export class Blockchain extends EventEmitter {
     private applyTransactionToState(
         tx: Transaction,
         state: Map<string, AccountState>,
-        validatorId?: string
+        validatorId?: string,
+        blockIndex?: number,
+        nodeWallet?: string
     ): { success: boolean; error?: string } {
         const fromAccount = state.get(tx.from_wallet) || {
             address: tx.from_wallet,
@@ -431,31 +437,104 @@ export class Blockchain extends EventEmitter {
         state.set(tx.from_wallet, fromAccount);
         state.set(tx.to_wallet, toAccount);
 
-        // Credit fee to validator (Block Producer)
-        if (tx.fee > 0 && validatorId) {
-            // If validatorId is a wallet address (starts with TRN), credit directly
-            // If it's a node ID, we might need a mapping. For now, we assume validatorId IS the wallet address
-            // or we fallback to a system address if it's not a valid address format.
+        // NEW FEE DISTRIBUTION LOGIC
+        if (tx.fee > 0) {
+            const isGenesis = blockIndex === 0;
+            const isSocialAction = ['LIKE', 'COMMENT', 'FOLLOW', 'UNFOLLOW', 'SHARE'].includes(tx.type);
 
-            const feeRecipient = validatorId.startsWith('TRN') ? validatorId : 'TREASURY_MAIN';
+            if (!isGenesis && nodeWallet) {
+                // Node wallet registered and not genesis block
+                const nodeFee = Math.floor(tx.fee * 0.5); // 50% to node owner
 
-            const validatorAccount = state.get(feeRecipient) || {
-                address: feeRecipient,
-                balance: 0,
-                nonce: 0,
-            };
-            validatorAccount.balance += tx.fee;
-            state.set(feeRecipient, validatorAccount);
-        } else if (tx.fee > 0) {
-            // Fallback if no validator specified (e.g. simulation) -> Burn or Treasury
-            const treasuryAddress = 'TREASURY_MAIN';
-            const treasuryAccount = state.get(treasuryAddress) || {
-                address: treasuryAddress,
-                balance: 0,
-                nonce: 0,
-            };
-            treasuryAccount.balance += tx.fee;
-            state.set(treasuryAddress, treasuryAccount);
+                if (isSocialAction) {
+                    // Social actions: 50% node, 25% content owner, 25% treasury
+                    const remainingFee = tx.fee - nodeFee;
+                    const contentOwnerFee = Math.floor(remainingFee * 0.5); // 25% of total
+                    const treasuryFee = tx.fee - nodeFee - contentOwnerFee; // Remaining 25%
+
+                    // Credit node owner
+                    const nodeAccount = state.get(nodeWallet) || {
+                        address: nodeWallet,
+                        balance: 0,
+                        nonce: 0,
+                    };
+                    nodeAccount.balance += nodeFee;
+                    state.set(nodeWallet, nodeAccount);
+
+                    // Credit content owner (to_wallet for social actions)
+                    const contentOwnerAccount = state.get(tx.to_wallet) || {
+                        address: tx.to_wallet,
+                        balance: 0,
+                        nonce: 0,
+                    };
+                    contentOwnerAccount.balance += contentOwnerFee;
+                    state.set(tx.to_wallet, contentOwnerAccount);
+
+                    // Credit treasury
+                    const treasuryAccount = state.get('TREASURY_MAIN') || {
+                        address: 'TREASURY_MAIN',
+                        balance: 0,
+                        nonce: 0,
+                    };
+                    treasuryAccount.balance += treasuryFee;
+                    state.set('TREASURY_MAIN', treasuryAccount);
+                } else {
+                    // Transfer: 50% node, 50% treasury
+                    const treasuryFee = tx.fee - nodeFee;
+
+                    // Credit node owner
+                    const nodeAccount = state.get(nodeWallet) || {
+                        address: nodeWallet,
+                        balance: 0,
+                        nonce: 0,
+                    };
+                    nodeAccount.balance += nodeFee;
+                    state.set(nodeWallet, nodeAccount);
+
+                    // Credit treasury
+                    const treasuryAccount = state.get('TREASURY_MAIN') || {
+                        address: 'TREASURY_MAIN',
+                        balance: 0,
+                        nonce: 0,
+                    };
+                    treasuryAccount.balance += treasuryFee;
+                    state.set('TREASURY_MAIN', treasuryAccount);
+                }
+            } else {
+                // No node wallet or genesis block
+                if (isSocialAction) {
+                    // Social actions: 50% content owner, 50% treasury
+                    const contentOwnerFee = Math.floor(tx.fee * 0.5);
+                    const treasuryFee = tx.fee - contentOwnerFee;
+
+                    // Credit content owner
+                    const contentOwnerAccount = state.get(tx.to_wallet) || {
+                        address: tx.to_wallet,
+                        balance: 0,
+                        nonce: 0,
+                    };
+                    contentOwnerAccount.balance += contentOwnerFee;
+                    state.set(tx.to_wallet, contentOwnerAccount);
+
+                    // Credit treasury
+                    const treasuryAccount = state.get('TREASURY_MAIN') || {
+                        address: 'TREASURY_MAIN',
+                        balance: 0,
+                        nonce: 0,
+                    };
+                    treasuryAccount.balance += treasuryFee;
+                    state.set('TREASURY_MAIN', treasuryAccount);
+                } else {
+                    // Transfer: 100% treasury
+                    const treasuryAccount = state.get('TREASURY_MAIN') || {
+                        address: 'TREASURY_MAIN',
+                        balance: 0,
+                        nonce: 0,
+                    };
+                    treasuryAccount.balance += tx.fee;
+                    state.set('TREASURY_MAIN', treasuryAccount);
+                }
+            }
         }
 
         return { success: true };
