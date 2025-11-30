@@ -7,7 +7,7 @@ import { WalletService } from '../wallet/WalletService';
 import { ValidatorPool } from '../consensus/ValidatorPool';
 import { TransactionModel, Transaction } from '../blockchain/models/Transaction';
 import { KeyManager } from '../blockchain/crypto/KeyManager';
-import { UserService } from '../services/UserService';
+import { UserService } from '../services/user/UserService';
 import { ContentService } from '../services/ContentService';
 import { SocialService } from '../services/SocialService';
 
