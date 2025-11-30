@@ -2,7 +2,7 @@ import { Blockchain } from '../blockchain/core/Blockchain';
 import { Mempool } from '../node/Mempool';
 import { ContentModel, ContentType, ContentMetadata } from '../models/ContentModel';
 import { TransactionModel, TransactionType } from '../blockchain/models/Transaction';
-import { UserService } from './UserService';
+import { UserService } from './user/UserService';
 
 /**
  * Content creation options

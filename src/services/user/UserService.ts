@@ -125,6 +125,35 @@ export class UserService {
     }
 
     /**
+     * Get user by wallet ID
+     */
+    getUserByWallet(wallet_id: string): User | undefined {
+        for (const user of this.users.values()) {
+            if (user.wallet_ids.includes(wallet_id)) {
+                return user;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Get user stats
+     */
+    getUserStats(): any {
+        return {
+            total_users: this.users.size,
+            total_wallets: Array.from(this.users.values()).reduce((acc, u) => acc + u.wallet_ids.length, 0),
+        };
+    }
+
+    /**
+     * Get user count
+     */
+    getUserCount(): number {
+        return this.users.size;
+    }
+
+    /**
      * Update user profile (creates on-chain PROFILE_UPDATE transaction)
      */
     async updateProfile(
@@ -432,5 +461,11 @@ export class UserService {
             this.emailIndex.set(user.email, user.system_id);
             this.nicknameIndex.set(user.nickname, user.system_id);
         }
+    }
+    /**
+     * Check if nickname is available
+     */
+    isNicknameAvailable(nickname: string): boolean {
+        return !this.nicknameIndex.has(nickname);
     }
 }

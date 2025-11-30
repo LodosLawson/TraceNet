@@ -15,7 +15,9 @@ import { TokenPriceCalculator } from './economy/PriceCalculator';
 import { FeeHandler } from './economy/FeeHandler';
 import { EconomyAPI } from './economy/EconomyAPI';
 import { TREASURY_ADDRESSES } from './economy/TokenConfig';
-import { UserService } from './services/UserService';
+import { AuthService } from './services/auth/AuthService';
+import { UserService } from './services/user/UserService';
+
 import { ContentService } from './services/ContentService';
 import { SocialService } from './services/SocialService';
 import { KeyManager } from './blockchain/crypto/KeyManager';
@@ -46,6 +48,7 @@ class BlockchainNode {
     private priceCalculator: TokenPriceCalculator;
     private feeHandler: FeeHandler;
     private economyAPI: EconomyAPI;
+    private authService: AuthService;
     private userService: UserService;
     private contentService: ContentService;
     private socialService: SocialService;
@@ -134,9 +137,13 @@ class BlockchainNode {
         // Create HTTP server for WebSocket
         this.httpServer = http.createServer(this.rpcServer.getApp());
 
+        // Initialize auth service
+        const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+        this.authService = new AuthService(jwtSecret);
+
         // Initialize user service
-        this.userService = new UserService(this.walletService, this.airdropService);
-        this.userService.setMempool(this.mempool);
+        this.userService = new UserService(this.authService, this.walletService, this.airdropService);
+        // this.userService.setMempool(this.mempool); // Removed as not needed in new UserService
         this.rpcServer.setUserService(this.userService);
 
         // Initialize content service
