@@ -335,21 +335,6 @@ export class UserService {
     /**
      * Update messaging privacy setting
      */
-    updateMessagingPrivacy(system_id: string, privacy: 'public' | 'followers' | 'private'): boolean {
-        const user = this.users.get(system_id);
-        if (!user) {
-            return false;
-        }
-
-        user.messaging_privacy = privacy;
-        user.updated_at = new Date();
-        this.users.set(system_id, user);
-        return true;
-    }
-
-    /**
-     * Check if a user can receive messages from a specific wallet
-     */
     canReceiveMessageFrom(system_id: string, senderWallet: string): boolean {
         const user = this.users.get(system_id);
         if (!user) {

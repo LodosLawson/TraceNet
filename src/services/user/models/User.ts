@@ -69,6 +69,7 @@ export interface UpdateUserInput {
     last_name?: string;
     birthday?: string;
     profile_image_url?: string;
+    encryption_public_key?: string;  // Allow updating encryption key
     messaging_privacy?: 'public' | 'followers' | 'private';
 }
 
