@@ -132,6 +132,62 @@ curl "http://localhost:3000/api/user/search?q=alice&limit=10"
 curl http://localhost:3000/api/user/check-nickname/alice
 ```
 
+### 3.6 Encryption Public Key Al (YENİ - Mesajlaşma İçin!)
+```bash
+# Nickname ile
+curl http://localhost:3000/api/user/encryption-key/alice
+
+# User ID ile
+curl http://localhost:3000/api/user/encryption-key/USER_ID_BURAYA
+
+# Wallet ID ile
+curl http://localhost:3000/api/user/encryption-key/TRN1234567890...
+```
+
+**Yanıt:**
+```json
+{
+  "user_id": "uuid",
+  "nickname": "alice",
+  "wallet_id": "TRN...",
+  "encryption_public_key": "hex_string",
+  "messaging_privacy": "public"
+}
+```
+
+### 3.7 Messaging Privacy Güncelle (YENİ!)
+```bash
+curl -X POST http://localhost:3000/api/user/USER_ID_BURAYA/messaging-privacy \
+  -H "Content-Type: application/json" \
+  -d '{
+    "privacy": "public"
+  }'
+```
+
+**Privacy Seçenekleri:**
+- `public` - Herkes mesaj gönderebilir
+- `followers` - Sadece takipçiler (varsayılan)
+- `private` - Kimse mesaj gönderemez
+
+### 3.8 QR Code Data Oluştur (YENİ!)
+```bash
+curl http://localhost:3000/api/user/USER_ID_BURAYA/qr-code
+```
+
+**Yanıt:**
+```json
+{
+  "qr_data": {
+    "type": "tracenet_messaging",
+    "nickname": "alice",
+    "wallet_id": "TRN...",
+    "encryption_public_key": "hex...",
+    "messaging_privacy": "public"
+  },
+  "qr_string": "tracenet://msg?key=hex&wallet=TRN...&nick=alice"
+}
+```
+
 ---
 
 ## 4. CONTENT ENDPOINTS
@@ -396,6 +452,17 @@ curl http://localhost:3000/api/content/$CONTENT_ID | jq .
 ---
 
 ## YENİ ÖZELLİKLER (Son Güncelleme)
+
+### Encryption Key Infrastructure (En Yeni!)
+- ✅ Her kullanıcı için ayrı encryption public/private key çiftleri
+- ✅ Encryption key'ler signing key'lerden farklı (güvenlik)
+- ✅ Mesajlaşma privacy ayarları (public/followers/private)
+- ✅ QR code ile encryption key paylaşımı
+- ✅ Blockchain'de encryption public key saklama
+- ✅ Yeni endpoint'ler:
+  - `GET /api/user/encryption-key/:identifier`
+  - `POST /api/user/:userId/messaging-privacy`
+  - `GET /api/user/:userId/qr-code`
 
 ### Ücret Yapısı Değişiklikleri
 - Tüm işlem ücretleri 2 katına çıkarıldı

@@ -216,6 +216,43 @@ async function testUserEndpoints() {
         error(`User search hatası: ${err.message}`);
     }
 
+    // 3.6 Get Encryption Public Key (YENİ - Mesajlaşma için!)
+    try {
+        log('USER', `GET /api/user/encryption-key/${createdUser.nickname} - Encryption key al`);
+        const response = await axios.get(`${API_URL}/api/user/encryption-key/${createdUser.nickname}`);
+        success('Encryption public key alındı');
+        console.log('User ID:', response.data.user_id);
+        console.log('Wallet ID:', response.data.wallet_id);
+        console.log('Encryption Key:', response.data.encryption_public_key.substring(0, 40) + '...');
+        console.log('Privacy:', response.data.messaging_privacy);
+    } catch (err) {
+        error(`Get encryption key hatası: ${err.message}`);
+    }
+
+    // 3.7 Update Messaging Privacy (YENİ!)
+    try {
+        log('USER', `POST /api/user/${createdUser.user_id}/messaging-privacy - Privacy güncelle`);
+        const response = await axios.post(`${API_URL}/api/user/${createdUser.user_id}/messaging-privacy`, {
+            privacy: 'public'
+        });
+        success(`Privacy güncellendi: ${response.data.privacy}`);
+        console.log(JSON.stringify(response.data, null, 2));
+    } catch (err) {
+        error(`Update privacy hatası: ${err.message}`);
+    }
+
+    // 3.8 Generate QR Code Data (YENİ!)
+    try {
+        log('USER', `GET /api/user/${createdUser.user_id}/qr-code - QR code data al`);
+        const response = await axios.get(`${API_URL}/api/user/${createdUser.user_id}/qr-code`);
+        success('QR code data oluşturuldu');
+        console.log('QR Data:');
+        console.log(JSON.stringify(response.data.qr_data, null, 2));
+        console.log('QR String:', response.data.qr_string);
+    } catch (err) {
+        error(`QR code hatası: ${err.message}`);
+    }
+
     return createdUser;
 }
 
