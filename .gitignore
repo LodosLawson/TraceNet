@@ -52,3 +52,10 @@ temp/
 *.key
 *.crt
 certs/
+
+# Sensitive test data (DO NOT COMMIT)
+**/test-wallets.json
+**/private-keys.json
+**/mnemonics.txt
+**/test-auth*.ts
+**/test-credentials*
