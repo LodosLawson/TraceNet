@@ -854,27 +854,31 @@ export class RPCServer {
                 return;
             }
 
-            const { nickname, name, surname, birth_date } = req.body;
+            const { nickname, email, password, name, surname, birth_date } = req.body;
 
-            if (!nickname) {
-                res.status(400).json({ error: 'Nickname is required' });
+            if (!nickname || !email || !password) {
+                res.status(400).json({ error: 'Nickname, email, and password are required' });
                 return;
             }
 
-            const result = this.userService.createUser({
+            const result = await this.userService.createUser({
                 nickname,
-                name,
-                surname,
-                birth_date,
+                email,
+                password,
+                first_name: name,
+                last_name: surname,
+                birthday: birth_date,
             });
 
             res.json({
                 user: {
-                    user_id: result.user.user_id,
+                    user_id: result.user.system_id,
                     nickname: result.user.nickname,
-                    name: result.user.name,
-                    surname: result.user.surname,
+                    name: result.user.first_name,
+                    surname: result.user.last_name,
                     created_at: result.user.created_at,
+                    encryption_public_key: result.user.encryption_public_key,
+                    messaging_privacy: result.user.messaging_privacy
                 },
                 wallet: {
                     wallet_id: result.wallet.wallet_id,
@@ -882,7 +886,7 @@ export class RPCServer {
                     created_at: result.wallet.created_at,
                 },
                 mnemonic: result.mnemonic,
-                airdrop_tx_id: result.airdrop_tx_id,
+                // Airdrop logic handled internally by UserService now, usually returns wallet with balance
                 airdrop_amount: '0.00625 LT',
             });
         } catch (error) {
@@ -910,18 +914,20 @@ export class RPCServer {
                 return;
             }
 
-            const wallets = this.walletService.listWallets(user.user_id);
-            const balance = this.blockchain.getBalance(user.wallet_id);
+            const wallets = this.walletService.listWallets(user.system_id);
+            const balance = user.wallet_ids.length > 0 ? this.blockchain.getBalance(user.wallet_ids[0]) : 0;
 
             res.json({
                 user: {
-                    user_id: user.user_id,
+                    user_id: user.system_id,
                     nickname: user.nickname,
-                    name: user.name,
-                    surname: user.surname,
+                    name: user.first_name,
+                    surname: user.last_name,
                     created_at: user.created_at,
+                    encryption_public_key: user.encryption_public_key,
+                    messaging_privacy: user.messaging_privacy
                 },
-                wallet_id: user.wallet_id,
+                wallet_id: user.wallet_ids[0],
                 balance,
                 total_wallets: wallets.length,
             });
@@ -950,18 +956,20 @@ export class RPCServer {
                 return;
             }
 
-            const wallets = this.walletService.listWallets(user.user_id);
-            const balance = this.blockchain.getBalance(user.wallet_id);
+            const wallets = this.walletService.listWallets(user.system_id);
+            const balance = user.wallet_ids.length > 0 ? this.blockchain.getBalance(user.wallet_ids[0]) : 0;
 
             res.json({
                 user: {
-                    user_id: user.user_id,
+                    user_id: user.system_id,
                     nickname: user.nickname,
-                    name: user.name,
-                    surname: user.surname,
+                    name: user.first_name,
+                    surname: user.last_name,
                     created_at: user.created_at,
+                    encryption_public_key: user.encryption_public_key,
+                    messaging_privacy: user.messaging_privacy
                 },
-                wallet_id: user.wallet_id,
+                wallet_id: user.wallet_ids[0],
                 balance,
                 total_wallets: wallets.length,
             });
@@ -994,11 +1002,13 @@ export class RPCServer {
 
             res.json({
                 users: users.map((u) => ({
-                    user_id: u.user_id,
+                    user_id: u.system_id,
                     nickname: u.nickname,
-                    name: u.name,
-                    surname: u.surname,
+                    name: u.first_name,
+                    surname: u.last_name,
                     created_at: u.created_at,
+                    encryption_public_key: u.encryption_public_key,
+                    messaging_privacy: u.messaging_privacy
                 })),
                 count: users.length,
             });
@@ -1017,18 +1027,6 @@ export class RPCServer {
             if (!this.userService) {
                 res.status(503).json({ error: 'User service not available' });
                 return;
-            }
-
-            const { nickname } = req.params;
-            const available = this.userService.isNicknameAvailable(nickname);
-
-            res.json({
-                nickname,
-                available,
-            });
-        } catch (error) {
-            res.status(500).json({
-                error: error instanceof Error ? error.message : 'Unknown error',
             });
         }
     }
