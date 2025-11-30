@@ -1,15 +1,3 @@
-# Multi-stage Dockerfile for TraceNet Blockchain Node
-
-# Stage 1: Build
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-COPY tsconfig.json ./
-
-# Install dependencies
 RUN npm ci
 
 # Copy source code
