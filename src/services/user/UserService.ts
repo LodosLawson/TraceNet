@@ -335,6 +335,39 @@ export class UserService {
     /**
      * Update messaging privacy setting
      */
+    updateMessagingPrivacy(system_id: string, privacy: 'public' | 'followers' | 'private'): boolean {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return false;
+        }
+
+        user.messaging_privacy = privacy;
+        user.updated_at = new Date();
+        this.users.set(system_id, user);
+
+        // Create blockchain transaction for privacy update
+        if (user.wallet_ids.length > 0) {
+            const privacyUpdateTx = TransactionModel.create(
+                user.wallet_ids[0],
+                user.wallet_ids[0],
+                TransactionType.PROFILE_UPDATE,
+                0,
+                0,
+                {
+                    updates: { messaging_privacy: privacy },
+                    timestamp: Date.now(),
+                }
+            );
+            // In production, submit to blockchain node here
+            console.log(`Privacy update transaction created: ${privacyUpdateTx.tx_id}`);
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if a user can receive messages from a specific wallet
+     */
     canReceiveMessageFrom(system_id: string, senderWallet: string): boolean {
         const user = this.users.get(system_id);
         if (!user) {
