@@ -158,6 +158,11 @@ export class RPCServer {
         this.app.get('/api/messaging/inbox/:walletId', this.getMessages.bind(this));
         this.app.post('/api/messaging/decrypt', this.decryptPrivateMessage.bind(this));
 
+        // Encryption key endpoints  
+        this.app.get('/api/user/encryption-key/:identifier', this.getEncryptionKey.bind(this));
+        this.app.post('/api/user/:userId/messaging-privacy', this.updateMessagingPrivacy.bind(this));
+        this.app.get('/api/user/:userId/qr-code', this.generateQRCode.bind(this));
+
         // Error handler
         this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
             console.error('Error:', err);
@@ -731,6 +736,99 @@ export class RPCServer {
             res.json({
                 validator_id: validatorId,
                 wallet_address: wallet,
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get encryption public key for messaging
+     */
+    private async getEncryptionKey(req: Request, res: Response): Promise<void> {
+        try {
+            const { identifier } = req.params;
+
+            if (!this.userService) {
+                res.status(500).json({ error: 'User service not initialized' });
+                return;
+            }
+
+            const keyInfo = this.userService.getEncryptionPublicKey(identifier);
+
+            if (!keyInfo) {
+                res.status(404).json({ error: 'User not found or encryption key not available' });
+                return;
+            }
+
+            res.json(keyInfo);
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Update messaging privacy setting
+     */
+    private async updateMessagingPrivacy(req: Request, res: Response): Promise<void> {
+        try {
+            const { userId } = req.params;
+            const { privacy } = req.body;
+
+            if (!privacy || !['public', 'followers', 'private'].includes(privacy)) {
+                res.status(400).json({ error: 'Invalid privacy setting' });
+                return;
+            }
+
+            if (!this.userService) {
+                res.status(500).json({ error: 'User service not initialized' });
+                return;
+            }
+
+            const success = this.userService.updateMessagingPrivacy(userId, privacy);
+
+            if (!success) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+
+            res.json({ success: true, privacy });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Generate QR code data for messaging
+     */
+    private async generateQRCode(req: Request, res: Response): Promise<void> {
+        try {
+            const { userId } = req.params;
+
+            if (!this.userService) {
+                res.status(500).json({ error: 'User service not initialized' });
+                return;
+            }
+
+            const qrData = this.userService.generateQRCodeData(userId);
+
+            if (!qrData) {
+                res.status(404).json({ error: 'User not found or encryption key not available' });
+                return;
+            }
+
+            // Generate QR string format
+            const qrString = `tracenet://msg?key=${qrData.encryption_public_key}&wallet=${qrData.wallet_id}&nick=${qrData.nickname}`;
+
+            res.json({
+                qr_data: qrData,
+                qr_string: qrString
             });
         } catch (error) {
             res.status(500).json({

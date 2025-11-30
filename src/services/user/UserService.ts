@@ -66,6 +66,8 @@ export class UserService {
             first_name: input.first_name,
             last_name: input.last_name,
             birthday: input.birthday,
+            encryption_public_key: undefined,  // Will be set from wallet
+            messaging_privacy: 'followers',    // Default privacy setting
             metadata: [],
             status: UserStatus.ONLINE,
             roles: [UserRole.USER],
@@ -77,6 +79,9 @@ export class UserService {
         // Create first wallet
         const walletResult = this.walletService.createWallet(system_id);
         user.wallet_ids.push(walletResult.wallet.wallet_id);
+
+        // Store encryption public key from first wallet
+        user.encryption_public_key = walletResult.encryptionPublicKey;
 
         // Store user
         this.users.set(system_id, user);
@@ -284,6 +289,109 @@ export class UserService {
      */
     getAllUsers(): User[] {
         return Array.from(this.users.values());
+    }
+
+    /**
+     * Get user's encryption public key by identifier (user_id, nickname, or wallet_id)
+     */
+    getEncryptionPublicKey(identifier: string): {
+        user_id: string;
+        nickname: string;
+        wallet_id: string;
+        encryption_public_key: string;
+        messaging_privacy: string;
+    } | undefined {
+        // Try as user_id first
+        let user = this.users.get(identifier);
+
+        // Try as nickname
+        if (!user) {
+            user = this.getUserByNickname(identifier);
+        }
+
+        // Try as wallet_id
+        if (!user) {
+            for (const u of this.users.values()) {
+                if (u.wallet_ids.includes(identifier)) {
+                    user = u;
+                    break;
+                }
+            }
+        }
+
+        if (!user || !user.encryption_public_key || user.wallet_ids.length === 0) {
+            return undefined;
+        }
+
+        return {
+            user_id: user.system_id,
+            nickname: user.nickname,
+            wallet_id: user.wallet_ids[0],
+            encryption_public_key: user.encryption_public_key,
+            messaging_privacy: user.messaging_privacy
+        };
+    }
+
+    /**
+     * Update messaging privacy setting
+     */
+    updateMessagingPrivacy(system_id: string, privacy: 'public' | 'followers' | 'private'): boolean {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return false;
+        }
+
+        user.messaging_privacy = privacy;
+        user.updated_at = new Date();
+        this.users.set(system_id, user);
+        return true;
+    }
+
+    /**
+     * Check if a user can receive messages from a specific wallet
+     */
+    canReceiveMessageFrom(system_id: string, senderWallet: string): boolean {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return false;
+        }
+
+        // Check privacy setting
+        if (user.messaging_privacy === 'public') {
+            return true;
+        }
+
+        if (user.messaging_privacy === 'private') {
+            return false;
+        }
+
+        // For 'followers' privacy, would need to check follow relationship
+        // Simplified for now - return false
+        return false;
+    }
+
+    /**
+     * Generate QR code data for messaging
+     */
+    generateQRCodeData(system_id: string): {
+        type: string;
+        nickname: string;
+        wallet_id: string;
+        encryption_public_key: string;
+        messaging_privacy: string;
+    } | undefined {
+        const user = this.users.get(system_id);
+        if (!user || !user.encryption_public_key || user.wallet_ids.length === 0) {
+            return undefined;
+        }
+
+        return {
+            type: 'tracenet_messaging',
+            nickname: user.nickname,
+            wallet_id: user.wallet_ids[0],
+            encryption_public_key: user.encryption_public_key,
+            messaging_privacy: user.messaging_privacy
+        };
     }
 
     /**

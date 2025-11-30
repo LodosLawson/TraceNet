@@ -7,7 +7,8 @@ import crypto from 'crypto';
 export interface Wallet {
     wallet_id: string;
     user_id: string;
-    public_key: string;
+    public_key: string;               // Ed25519 signing public key
+    encryption_public_key: string;    // Curve25519 encryption public key
     encrypted_private_key: string;
     mnemonic_encrypted?: string;
     created_at: number;
@@ -35,6 +36,8 @@ export class WalletService {
         wallet: Wallet;
         mnemonic: string;
         privateKey: string;
+        encryptionPublicKey: string;
+        encryptionPrivateKey: string;
     } {
         // Generate wallet keys
         const walletKeys: WalletKeys = KeyManager.generateWalletFromMnemonic();
@@ -58,6 +61,7 @@ export class WalletService {
             wallet_id: walletKeys.address,
             user_id: userId,
             public_key: walletKeys.publicKey,
+            encryption_public_key: walletKeys.encryptionPublicKey,
             encrypted_private_key: encryptedPrivateKey,
             mnemonic_encrypted: encryptedMnemonic,
             created_at: Date.now(),
@@ -75,6 +79,8 @@ export class WalletService {
             wallet,
             mnemonic: walletKeys.mnemonic,
             privateKey: walletKeys.privateKey,
+            encryptionPublicKey: walletKeys.encryptionPublicKey,
+            encryptionPrivateKey: walletKeys.encryptionPrivateKey,
         };
     }
 
@@ -115,6 +121,7 @@ export class WalletService {
             wallet_id: walletKeys.address,
             user_id: userId,
             public_key: walletKeys.publicKey,
+            encryption_public_key: walletKeys.encryptionPublicKey,
             encrypted_private_key: encryptedPrivateKey,
             mnemonic_encrypted: encryptedMnemonic,
             created_at: Date.now(),

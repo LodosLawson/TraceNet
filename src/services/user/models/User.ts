@@ -10,6 +10,8 @@ export interface User {
     last_name?: string;
     birthday?: string;              // ISO date (YYYY-MM-DD)
     profile_image_url?: string;
+    encryption_public_key?: string;  // Curve25519 public key for messaging
+    messaging_privacy: 'public' | 'followers' | 'private';  // Messaging privacy setting
     metadata: MetadataEntry[];      // Versioned key-value pairs
     status: UserStatus;
     roles: UserRole[];
@@ -67,6 +69,7 @@ export interface UpdateUserInput {
     last_name?: string;
     birthday?: string;
     profile_image_url?: string;
+    messaging_privacy?: 'public' | 'followers' | 'private';
 }
 
 /**
@@ -78,6 +81,8 @@ export interface UserProfile {
     first_name?: string;
     last_name?: string;
     profile_image_url?: string;
+    encryption_public_key?: string;  // For messaging
+    messaging_privacy: 'public' | 'followers' | 'private';
     status: UserStatus;
     roles: UserRole[];
     created_at: Date;
