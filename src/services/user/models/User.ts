@@ -1,23 +1,24 @@
 /**
  * User data model
+ * All fields are optional except system_id (wallet address)
+ * User data is stored on blockchain if provided
  */
 export interface User {
-    system_id: string;              // UUID (primary key)
-    nickname: string;               // Unique username
-    email: string;                  // Email (unique)
-    password_hash: string;          // Bcrypt hash
-    first_name?: string;
-    last_name?: string;
-    birthday?: string;              // ISO date (YYYY-MM-DD)
-    profile_image_url?: string;
-    encryption_public_key?: string;  // Curve25519 public key for messaging
+    system_id: string;              // Wallet address (primary key)
+    nickname?: string;              // Optional unique username
+    email?: string;                 // Optional email
+    first_name?: string;            // Optional first name
+    last_name?: string;             // Optional last name
+    birthday?: string;              // Optional ISO date (YYYY-MM-DD)
+    profile_image_url?: string;     // Optional profile image
+    encryption_public_key?: string; // Curve25519 public key for messaging
     messaging_privacy: 'public' | 'followers' | 'private';  // Messaging privacy setting
     metadata: MetadataEntry[];      // Versioned key-value pairs
-    status: UserStatus;
-    roles: UserRole[];
+    status: UserStatus;             // Online/offline status
+    roles: UserRole[];              // User roles
     wallet_ids: string[];           // Associated blockchain wallets
-    created_at: Date;
-    updated_at: Date;
+    created_at: Date;               // Creation timestamp
+    updated_at: Date;               // Last update timestamp
 }
 
 /**
@@ -50,14 +51,15 @@ export enum UserRole {
 
 /**
  * User creation input
+ * All fields are optional - user can provide as much or as little info as they want
+ * Provided data will be stored on blockchain
  */
 export interface CreateUserInput {
-    nickname: string;
-    email: string;
-    password: string;
-    first_name?: string;
-    last_name?: string;
-    birthday?: string;
+    nickname?: string;      // Optional username
+    email?: string;         // Optional email
+    first_name?: string;    // Optional first name
+    last_name?: string;     // Optional last name
+    birthday?: string;      // Optional birthday (YYYY-MM-DD)
 }
 
 /**
@@ -77,8 +79,8 @@ export interface UpdateUserInput {
  * User profile response (public)
  */
 export interface UserProfile {
-    system_id: string;
-    nickname: string;
+    system_id: string;              // Wallet address
+    nickname?: string;              // Optional username
     first_name?: string;
     last_name?: string;
     profile_image_url?: string;

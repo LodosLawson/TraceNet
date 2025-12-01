@@ -855,17 +855,13 @@ export class RPCServer {
                 return;
             }
 
-            const { nickname, email, password, name, surname, birth_date } = req.body;
+            const { nickname, email, name, surname, birth_date } = req.body;
 
-            if (!nickname || !email || !password) {
-                res.status(400).json({ error: 'Nickname, email, and password are required' });
-                return;
-            }
+            // No validation required - all fields are optional
 
             const result = await this.userService.createUser({
                 nickname,
                 email,
-                password,
                 first_name: name,
                 last_name: surname,
                 birthday: birth_date,

@@ -30,9 +30,9 @@ export class WalletService {
     }
 
     /**
-     * Create a new wallet for a user
+     * Create a new wallet (optionally for a user)
      */
-    createWallet(userId: string): {
+    createWallet(userId?: string): {
         wallet: Wallet;
         mnemonic: string;
         privateKey: string;
@@ -42,8 +42,11 @@ export class WalletService {
         // Generate wallet keys
         const walletKeys: WalletKeys = KeyManager.generateWalletFromMnemonic();
 
+        // Determine user ID (use provided ID or wallet address)
+        const effectiveUserId = userId || walletKeys.address;
+
         // Check if this is the first wallet for the user
-        const userWalletList = this.userWallets.get(userId) || [];
+        const userWalletList = this.userWallets.get(effectiveUserId) || [];
         const isFirstWallet = userWalletList.length === 0;
 
         // Encrypt private key and mnemonic
@@ -59,7 +62,7 @@ export class WalletService {
         // Create wallet object
         const wallet: Wallet = {
             wallet_id: walletKeys.address,
-            user_id: userId,
+            user_id: effectiveUserId,
             public_key: walletKeys.publicKey,
             encryption_public_key: walletKeys.encryptionPublicKey,
             encrypted_private_key: encryptedPrivateKey,
@@ -73,7 +76,7 @@ export class WalletService {
 
         // Update user wallet list
         userWalletList.push(wallet.wallet_id);
-        this.userWallets.set(userId, userWalletList);
+        this.userWallets.set(effectiveUserId, userWalletList);
 
         return {
             wallet,

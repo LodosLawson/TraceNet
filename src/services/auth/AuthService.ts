@@ -149,23 +149,20 @@ export class AuthService {
      * Validate user input for registration
      */
     validateRegistrationInput(input: CreateUserInput): { valid: boolean; error?: string } {
-        // Validate nickname
-        if (!input.nickname || input.nickname.length < 3 || input.nickname.length > 50) {
-            return { valid: false, error: 'Nickname must be between 3 and 50 characters' };
+        // Validate nickname if provided
+        if (input.nickname) {
+            if (input.nickname.length < 3 || input.nickname.length > 50) {
+                return { valid: false, error: 'Nickname must be between 3 and 50 characters' };
+            }
+
+            if (!/^[a-zA-Z0-9_]+$/.test(input.nickname)) {
+                return { valid: false, error: 'Nickname can only contain letters, numbers, and underscores' };
+            }
         }
 
-        if (!/^[a-zA-Z0-9_]+$/.test(input.nickname)) {
-            return { valid: false, error: 'Nickname can only contain letters, numbers, and underscores' };
-        }
-
-        // Validate email
-        if (!input.email || !this.isValidEmail(input.email)) {
+        // Validate email if provided
+        if (input.email && !this.isValidEmail(input.email)) {
             return { valid: false, error: 'Invalid email address' };
-        }
-
-        // Validate password
-        if (!input.password || input.password.length < 8) {
-            return { valid: false, error: 'Password must be at least 8 characters' };
         }
 
         // Validate birthday if provided

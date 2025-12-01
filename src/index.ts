@@ -141,9 +141,8 @@ class BlockchainNode {
         const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
         this.authService = new AuthService(jwtSecret);
 
-        // Initialize user service
-        this.userService = new UserService(this.authService, this.walletService, this.airdropService);
-        // this.userService.setMempool(this.mempool); // Removed as not needed in new UserService
+        // Initialize user service (no auth service needed - no passwords!)
+        this.userService = new UserService(this.walletService, this.airdropService);
         this.rpcServer.setUserService(this.userService);
 
         // Initialize content service

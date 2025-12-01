@@ -12,81 +12,76 @@ export class UserService {
     private users: Map<string, User>;
     private emailIndex: Map<string, string>;      // email -> system_id
     private nicknameIndex: Map<string, string>;   // nickname -> system_id
-    private authService: AuthService;
     private walletService: WalletService;
     private airdropService: AirdropService;
 
     constructor(
-        authService: AuthService,
         walletService: WalletService,
         airdropService: AirdropService
     ) {
         this.users = new Map();
         this.emailIndex = new Map();
         this.nicknameIndex = new Map();
-        this.authService = authService;
         this.walletService = walletService;
         this.airdropService = airdropService;
     }
 
     /**
-     * Create a new user
+     * Create new user with optional profile data
+     * All fields are optional - user can provide as much or as little info as they want
+     * System ID will be the wallet address
      */
     async createUser(input: CreateUserInput): Promise<{
         user: User;
         wallet: any;
         mnemonic: string;
     }> {
-        // Validate input
-        const validation = this.authService.validateRegistrationInput(input);
-        if (!validation.valid) {
-            throw new Error(validation.error);
-        }
-
-        // Check if email already exists
-        if (this.emailIndex.has(input.email)) {
-            throw new Error('Email already registered');
-        }
-
-        // Check if nickname already exists
-        if (this.nicknameIndex.has(input.nickname)) {
+        // Optional validation: Check if nickname already exists (if provided)
+        if (input.nickname && this.nicknameIndex.has(input.nickname)) {
             throw new Error('Nickname already taken');
         }
 
-        // Hash password
-        const password_hash = await this.authService.hashPassword(input.password);
+        // Optional validation: Check if email already exists (if provided)
+        if (input.email && this.emailIndex.has(input.email)) {
+            throw new Error('Email already registered');
+        }
 
-        // Create user
-        const system_id = uuidv4();
+        // Create wallet first (24-word mnemonic)
+        const walletResult = this.walletService.createWallet();
+
+        // Use wallet address as system_id
+        const system_id = walletResult.wallet.wallet_id;
+
+        // Create user with optional fields
         const user: User = {
-            system_id,
-            nickname: input.nickname,
-            email: input.email,
-            password_hash,
-            first_name: input.first_name,
-            last_name: input.last_name,
-            birthday: input.birthday,
-            encryption_public_key: undefined,  // Will be set from wallet
-            messaging_privacy: 'followers',    // Default privacy setting
+            system_id,                      // Wallet address (primary key)
+            nickname: input.nickname,       // Optional
+            email: input.email,             // Optional
+            first_name: input.first_name,   // Optional
+            last_name: input.last_name,     // Optional
+            birthday: input.birthday,       // Optional
+            encryption_public_key: walletResult.encryptionPublicKey,  // From wallet
+            messaging_privacy: 'public',    // Default privacy setting
             metadata: [],
-            status: UserStatus.ONLINE,
-            roles: [UserRole.USER],
-            wallet_ids: [],
+            status: UserStatus.OFFLINE,     // Default status
+            roles: [UserRole.USER],         // Default role
+            wallet_ids: [walletResult.wallet.wallet_id],
             created_at: new Date(),
             updated_at: new Date(),
         };
 
-        // Create first wallet
-        const walletResult = this.walletService.createWallet(system_id);
-        user.wallet_ids.push(walletResult.wallet.wallet_id);
-
-        // Store encryption public key from first wallet
-        user.encryption_public_key = walletResult.encryptionPublicKey;
-
         // Store user
         this.users.set(system_id, user);
-        this.emailIndex.set(input.email, system_id);
-        this.nicknameIndex.set(input.nickname, system_id);
+
+        // Index nickname if provided
+        if (input.nickname) {
+            this.nicknameIndex.set(input.nickname, system_id);
+        }
+
+        // Index email if provided
+        if (input.email) {
+            this.emailIndex.set(input.email, system_id);
+        }
 
         // Trigger airdrop for first wallet
         const airdropTx = this.airdropService.createAirdropTransaction(
