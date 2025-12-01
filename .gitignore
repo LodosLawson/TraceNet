@@ -59,3 +59,20 @@ certs/
 **/mnemonics.txt
 **/test-auth*.ts
 **/test-credentials*
+
+# Additional security
+*.env.backup
+.env.production
+.env.staging
+secrets/
+private/
+wallets/
+*.wallet
+*.mnemonic
+backup/
+*.backup
+
+# OS specific
+Thumbs.db
+desktop.ini
+
