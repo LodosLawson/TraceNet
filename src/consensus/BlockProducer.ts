@@ -45,6 +45,18 @@ export class BlockProducer extends EventEmitter {
 
         this.isProducing = true;
 
+        // Check for existing transactions in mempool at startup
+        const existingTxCount = this.mempool.getSize();
+        if (existingTxCount > 0) {
+            console.log(`Found ${existingTxCount} existing transaction(s) in mempool, scheduling initial block production...`);
+            // Schedule initial block production with small delay
+            setTimeout(() => {
+                if (this.isProducing) {
+                    this.produceBlock();
+                }
+            }, 1000);
+        }
+
         // Listen for new transactions in mempool
         this.mempool.on('transactionAdded', () => {
             // Use a small delay to batch multiple transactions into one block
@@ -188,7 +200,12 @@ export class BlockProducer extends EventEmitter {
             const producer = this.validatorPool.selectBlockProducer(nextIndex);
 
             if (!producer) {
-                return { success: false, error: 'No validator available' };
+                const allValidators = this.validatorPool.getAllValidators();
+                const onlineValidators = allValidators.filter(v => v.is_online);
+                return {
+                    success: false,
+                    error: `No validator available for block production (${onlineValidators.length}/${allValidators.length} validators online)`
+                };
             }
 
             const stateRoot = '0'.repeat(64);

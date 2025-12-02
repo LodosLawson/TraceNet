@@ -249,6 +249,21 @@ class BlockchainNode {
     start(): void {
         console.log('Starting Blockchain Node...');
 
+        //  Verify system validator is online before starting block production
+        const systemValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
+        const systemValidator = this.validatorPool.getValidator(systemValidatorId);
+
+        if (!systemValidator) {
+            console.error(`❌ CRITICAL: System validator '${systemValidatorId}' not found!`);
+            console.error('Block production cannot start without a validator.');
+        } else if (!systemValidator.is_online) {
+            console.warn(`⚠️  WARNING: System validator '${systemValidatorId}' registered but not online`);
+            console.warn('Setting validator online now...');
+            this.validatorPool.setOnline(systemValidatorId);
+        } else {
+            console.log(`✅ System validator '${systemValidatorId}' is ready and online`);
+        }
+
         // Start block production
         this.blockProducer.start();
 
