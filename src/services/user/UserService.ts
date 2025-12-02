@@ -3,6 +3,7 @@ import { User, CreateUserInput, UpdateUserInput, UserRole, UserStatus, MetadataE
 import { AuthService } from '../auth/AuthService';
 import { WalletService } from '../../wallet/WalletService';
 import { AirdropService } from '../../wallet/AirdropService';
+import { Mempool } from '../../node/Mempool';
 import { TransactionModel, TransactionType } from '../../blockchain/models/Transaction';
 
 /**
@@ -14,16 +15,19 @@ export class UserService {
     private nicknameIndex: Map<string, string>;   // nickname -> system_id
     private walletService: WalletService;
     private airdropService: AirdropService;
+    private mempool: Mempool;
 
     constructor(
         walletService: WalletService,
-        airdropService: AirdropService
+        airdropService: AirdropService,
+        mempool: Mempool
     ) {
         this.users = new Map();
         this.emailIndex = new Map();
         this.nicknameIndex = new Map();
         this.walletService = walletService;
         this.airdropService = airdropService;
+        this.mempool = mempool;
     }
 
     /**
@@ -88,6 +92,16 @@ export class UserService {
             system_id,
             walletResult.wallet.wallet_id
         );
+
+        // Add airdrop transaction to mempool to trigger block production
+        if (airdropTx) {
+            const result = this.mempool.addTransaction(airdropTx.toJSON());
+            if (!result.success) {
+                console.error(`Failed to add airdrop transaction to mempool: ${result.error}`);
+            } else {
+                console.log(`Airdrop transaction added to mempool: ${airdropTx.tx_id}`);
+            }
+        }
 
         return {
             user,

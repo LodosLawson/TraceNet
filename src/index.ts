@@ -142,7 +142,7 @@ class BlockchainNode {
         this.authService = new AuthService(jwtSecret);
 
         // Initialize user service (no auth service needed - no passwords!)
-        this.userService = new UserService(this.walletService, this.airdropService);
+        this.userService = new UserService(this.walletService, this.airdropService, this.mempool);
         this.rpcServer.setUserService(this.userService);
 
         // Initialize content service
