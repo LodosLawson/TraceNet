@@ -10,6 +10,7 @@ import { KeyManager } from '../blockchain/crypto/KeyManager';
 import { UserService } from '../services/user/UserService';
 import { ContentService } from '../services/ContentService';
 import { SocialService } from '../services/SocialService';
+import { BlockProducer } from '../consensus/BlockProducer';
 
 /**
  * RPC Server for blockchain node
@@ -20,6 +21,7 @@ export class RPCServer {
     private mempool: Mempool;
     private walletService: WalletService;
     private validatorPool: ValidatorPool;
+    private blockProducer?: BlockProducer;
     private userService?: UserService;
     private contentService?: ContentService;
     private socialService?: SocialService;
@@ -116,6 +118,9 @@ export class RPCServer {
         // Dynamic transfer fee endpoints
         this.app.post('/rpc/calculateTransferFee', this.calculateTransferFee.bind(this));
         this.app.post('/rpc/transfer', this.sendTransfer.bind(this));
+
+        // Mining endpoint
+        this.app.post('/rpc/mine', this.triggerMining.bind(this));
 
         // Wallet API endpoints
         this.app.post('/api/wallet/create', this.createWallet.bind(this));
@@ -1634,5 +1639,52 @@ export class RPCServer {
      */
     getApp(): express.Application {
         return this.app;
+    }
+
+    /**
+     * Set block producer (to be called after construction)
+     */
+    setBlockProducer(blockProducer: BlockProducer): void {
+        this.blockProducer = blockProducer;
+    }
+
+    /**
+     * Manually trigger mining (for dev/testing)
+     */
+    private async triggerMining(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.blockProducer) {
+                res.status(503).json({
+                    error: 'Block producer not available',
+                    message: 'Mining system not initialized'
+                });
+                return;
+            }
+
+            const result = await this.blockProducer.triggerBlockProduction();
+
+            if (result.success && result.block) {
+                res.json({
+                    success: true,
+                    block: {
+                        index: result.block.index,
+                        hash: result.block.hash,
+                        transaction_count: result.block.transactions.length
+                    },
+                    message: 'Block mined successfully'
+                });
+            } else {
+                res.status(400).json({
+                    success: false,
+                    error: result.error || 'Mining failed',
+                    message: 'Unable to mine block'
+                });
+            }
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+                message: 'Mining trigger failed'
+            });
+        }
     }
 }

@@ -1,0 +1,966 @@
+================================================================================
+                    TRACENET - TÜM API ENDPOINT'LERİ VE ÖRNEKLERİ
+================================================================================
+
+Bu dosya TraceNet Blockchain'in tüm API endpoint'lerini ve kullanım örneklerini içerir.
+
+İÇİNDEKİLER:
+1. RPC Endpoints (Blockchain Core)
+2. Wallet Endpoints
+3. User Endpoints
+4. Content Endpoints
+5. Social Endpoints
+6. Messaging Endpoints
+7. Validator Endpoints
+
+================================================================================
+1. RPC ENDPOINTS (BLOCKCHAIN CORE)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+1.1 GET /rpc/status - Blockchain Durumu
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Blockchain'in mevcut durumunu döner (yükseklik, işlem sayısı, zincir ID)
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/rpc/status');
+const data = await response.json();
+console.log('Blockchain Height:', data.blockchain.height);
+console.log('Total Transactions:', data.blockchain.txCount);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/rpc/status
+
+RESPONSE ÖRNEĞİ:
+{
+  "blockchain": {
+    "height": 150,
+    "txCount": 432,
+    "chainId": "tracenet-mainnet"
+  },
+  "network": {
+    "activeValidators": 5
+  }
+}
+
+────────────────────────────────────────────────────────────────────────────────
+1.2 GET /rpc/block/:indexOrHash - Blok Bilgisi Al
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Belirli bir bloğu yükseklik (index) veya hash ile getirir
+
+JAVASCRIPT ÖRNEĞİ (Index ile):
+const response = await fetch('http://localhost:3000/rpc/block/1');
+const block = await response.json();
+console.log('Block:', block);
+
+JAVASCRIPT ÖRNEĞİ (Hash ile):
+const hash = 'abc123...';
+const response = await fetch(`http://localhost:3000/rpc/block/${hash}`);
+const block = await response.json();
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/rpc/block/1
+
+────────────────────────────────────────────────────────────────────────────────
+1.3 GET /rpc/transaction/:txId - İşlem Bilgisi Al
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Belirli bir işlemi ID'si ile getirir
+
+JAVASCRIPT ÖRNEĞİ:
+const txId = 'TX_1234567890';
+const response = await fetch(`http://localhost:3000/rpc/transaction/${txId}`);
+const transaction = await response.json();
+console.log('Transaction:', transaction);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/rpc/transaction/TX_1234567890
+
+────────────────────────────────────────────────────────────────────────────────
+1.4 GET /rpc/balance/:walletId - Bakiye Sorgula
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Cüzdan adresinin bakiyesini döner
+
+JAVASCRIPT ÖRNEĞİ:
+const walletId = 'TRN4a3b2c1...';
+const response = await fetch(`http://localhost:3000/rpc/balance/${walletId}`);
+const data = await response.json();
+console.log('Balance:', data.balance / 100000000, 'LT');
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/rpc/balance/TRN4a3b2c1...
+
+RESPONSE ÖRNEĞİ:
+{
+  "wallet_id": "TRN4a3b2c1...",
+  "balance": 500000000,
+  "readable_balance": "5.00 LT"
+}
+
+────────────────────────────────────────────────────────────────────────────────
+1.5 GET /rpc/accounts - Tüm Hesapları Listele
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Sıfır olmayan bakiyeye sahip tüm hesapları listeler
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/rpc/accounts');
+const data = await response.json();
+data.accounts.forEach(acc => {
+    console.log(`${acc.address}: ${acc.balance / 100000000} LT`);
+});
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/rpc/accounts
+
+────────────────────────────────────────────────────────────────────────────────
+1.6 POST /rpc/calculateTransferFee - Transfer Ücreti Hesapla
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Transfer için dinamik ücret hesaplar (alıcı aktivitesi ve önceliğe göre)
+
+REQUEST BODY:
+{
+  "recipient_address": "TRN...",
+  "amount": 100000000,
+  "priority": "STANDARD"
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/rpc/calculateTransferFee', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    recipient_address: 'TRN4a3b2c1...',
+    amount: 100 * 100000000,
+    priority: 'STANDARD'
+  })
+});
+const data = await response.json();
+console.log('Fee:', data.total_fee_readable);
+console.log('Base Tier:', data.base_tier);
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/rpc/calculateTransferFee \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipient_address": "TRN4a3b2c1...",
+    "amount": 10000000000,
+    "priority": "STANDARD"
+  }'
+
+RESPONSE ÖRNEĞİ:
+{
+  "recipient_address": "TRN4a3b2c1...",
+  "amount": 10000000000,
+  "priority": "STANDARD",
+  "recipient_incoming_transfers": 150,
+  "base_tier": "TIER_2",
+  "base_rate": 0.0005,
+  "priority_rate": 0,
+  "total_fee": 50000000,
+  "total_fee_readable": "0.50 LT"
+}
+
+────────────────────────────────────────────────────────────────────────────────
+1.7 POST /rpc/transfer - Para Transfer Et
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Basitleştirilmiş transfer endpoint'i (imza gerektirir)
+
+REQUEST BODY:
+{
+  "from_wallet": "TRN...",
+  "to_wallet": "TRN...",
+  "amount": 50000000,
+  "priority": "MEDIUM",
+  "sender_public_key": "...",
+  "sender_signature": "..."
+}
+
+JAVASCRIPT ÖRNEĞİ:
+// İmzalama işlemi client tarafında yapılmalı
+const txData = {
+  from_wallet: 'TRN1a2b3c...',
+  to_wallet: 'TRN4d5e6f...',
+  amount: 50 * 100000000,
+  priority: 'MEDIUM'
+};
+
+// İmza oluştur (KeyManager kullanarak)
+const signature = signTransactionData(txData, privateKey);
+
+// Transfer gönder
+const response = await fetch('http://localhost:3000/rpc/transfer', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    ...txData,
+    sender_public_key: publicKey,
+    sender_signature: signature
+  })
+});
+
+────────────────────────────────────────────────────────────────────────────────
+1.8 POST /rpc/sendRawTx - Ham İşlem Gönder
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Önceden imzalanmış ham işlemi mempool'a gönderir
+
+REQUEST BODY:
+{
+  "tx_id": "TX_...",
+  "from_wallet": "TRN...",
+  "to_wallet": "TRN...",
+  "type": "TRANSFER",
+  "amount": 10000000,
+  "fee": 100000,
+  "timestamp": 1234567890,
+  "payload": {},
+  "signatures": [],
+  "sender_public_key": "...",
+  "sender_signature": "..."
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const tx = {
+  tx_id: 'TX_' + Date.now(),
+  from_wallet: 'TRN1a2b3c...',
+  to_wallet: 'TRN4d5e6f...',
+  type: 'TRANSFER',
+  amount: 10 * 100000000,
+  fee: 100000,
+  timestamp: Date.now(),
+  payload: {},
+  signatures: [],
+  sender_public_key: publicKey,
+  sender_signature: signature
+};
+
+const response = await fetch('http://localhost:3000/rpc/sendRawTx', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(tx)
+});
+
+================================================================================
+2. WALLET ENDPOINTS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+2.1 POST /api/wallet/create - Yeni Cüzdan Oluştur
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Bir kullanıcı için yeni cüzdan oluşturur. Mnemonic ve anahtarları döner.
+
+REQUEST BODY:
+{
+  "userId": "USR_123" // Opsiyonel
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/wallet/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    userId: 'USR_abc123'
+  })
+});
+
+const data = await response.json();
+console.log('Wallet ID:', data.wallet.wallet_id);
+console.log('Mnemonic:', data.mnemonic); // GÜVENLİ SAKLAYIN!
+console.log('Encryption Public Key:', data.encryptionPublicKey);
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/wallet/create \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "USR_abc123"}'
+
+RESPONSE ÖRNEĞİ:
+{
+  "wallet": {
+    "wallet_id": "TRN4a3b2c1d4e5f6...",
+    "public_key": "9f8e7d6c5b4a3...",
+    "balance": 0
+  },
+  "mnemonic": "word1 word2 word3 ... word24",
+  "encryptionPublicKey": "abc123...",
+  "encryptionPrivateKey": "def456..." // GÜVENLİ SAKLAYIN!
+}
+
+────────────────────────────────────────────────────────────────────────────────
+2.2 GET /api/wallet/list/:userId - Kullanıcının Cüzdanlarını Listele
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Belirli bir kullanıcının tüm cüzdanlarını listeler
+
+JAVASCRIPT ÖRNEĞİ:
+const userId = 'USR_abc123';
+const response = await fetch(`http://localhost:3000/api/wallet/list/${userId}`);
+const data = await response.json();
+data.wallets.forEach(wallet => {
+    console.log('Wallet:', wallet.wallet_id, 'Balance:', wallet.balance);
+});
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/wallet/list/USR_abc123
+
+────────────────────────────────────────────────────────────────────────────────
+2.3 GET /api/wallet/:walletId - Cüzdan Bilgisi Al
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Belirli bir cüzdanın genel bilgilerini getirir
+
+JAVASCRIPT ÖRNEĞİ:
+const walletId = 'TRN4a3b2c1...';
+const response = await fetch(`http://localhost:3000/api/wallet/${walletId}`);
+const data = await response.json();
+console.log('Balance:', data.balance / 100000000, 'LT');
+console.log('Public Key:', data.public_key);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/wallet/TRN4a3b2c1...
+
+================================================================================
+3. USER ENDPOINTS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+3.1 POST /api/user/create - Yeni Kullanıcı Oluştur
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Blockchain'de yeni kullanıcı profili oluşturur. TÜM ALANLAR OPSİYONEL!
+
+REQUEST BODY:
+{
+  "nickname": "alice",        // Opsiyonel
+  "email": "alice@example.com", // Opsiyonel
+  "name": "Alice",            // Opsiyonel
+  "surname": "Wonderland",    // Opsiyonel
+  "birth_date": "1995-01-01"  // Opsiyonel
+}
+
+JAVASCRIPT ÖRNEĞİ (Tam Kayıt):
+const response = await fetch('http://localhost:3000/api/user/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    nickname: 'alice_v2',
+    email: 'alice@example.com',
+    name: 'Alice',
+    surname: 'Wonderland',
+    birth_date: '1995-01-01'
+  })
+});
+
+const data = await response.json();
+console.log('User ID:', data.user.user_id);
+console.log('Wallet:', data.wallet.wallet_id);
+console.log('Mnemonic:', data.mnemonic); // GÜVENLİ SAKLAYIN!
+console.log('Airdrop:', data.airdrop_amount);
+
+JAVASCRIPT ÖRNEĞİ (Anonim Kayıt):
+const response = await fetch('http://localhost:3000/api/user/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    nickname: 'bob_anon'
+  })
+});
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/user/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nickname": "alice_v2",
+    "email": "alice@example.com"
+  }'
+
+RESPONSE ÖRNEĞİ:
+{
+  "user": {
+    "user_id": "TRN4a3b2c1...",
+    "nickname": "alice_v2",
+    "email": "alice@example.com",
+    "encryption_public_key": "abc123...",
+    "created_at": "2024-01-01T00:00:00.000Z"
+  },
+  "wallet": {
+    "wallet_id": "TRN4a3b2c1...",
+    "public_key": "9f8e7d...",
+    "balance": 625000
+  },
+  "mnemonic": "word1 word2 word3 ... word24",
+  "airdrop_tx_id": "TX_airdrop123",
+  "airdrop_amount": "0.00625 LT"
+}
+
+────────────────────────────────────────────────────────────────────────────────
+3.2 GET /api/user/nickname/:nickname - Kullanıcı Adına Göre Bul
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Kullanıcı adı (nickname) ile kullanıcıyı bulur
+
+JAVASCRIPT ÖRNEĞİ:
+const nickname = 'alice';
+const response = await fetch(`http://localhost:3000/api/user/nickname/${nickname}`);
+const data = await response.json();
+console.log('User:', data.user);
+console.log('Balance:', data.balance / 100000000, 'LT');
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/user/nickname/alice
+
+────────────────────────────────────────────────────────────────────────────────
+3.3 GET /api/user/:userId - Kullanıcı ID'si ile Bul
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Kullanıcı ID'si ile profil getirir
+
+JAVASCRIPT ÖRNEĞİ:
+const userId = 'USR_abc123';
+const response = await fetch(`http://localhost:3000/api/user/${userId}`);
+const user = await response.json();
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/user/USR_abc123
+
+────────────────────────────────────────────────────────────────────────────────
+3.4 GET /api/user/search - Kullanıcı Ara
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: İsim veya kullanıcı adına göre arama yapar
+
+JAVASCRIPT ÖRNEĞİ:
+const query = 'ali';
+const limit = 10;
+const response = await fetch(`http://localhost:3000/api/user/search?q=${query}&limit=${limit}`);
+const data = await response.json();
+data.users.forEach(user => {
+    console.log(user.nickname, '-', user.name);
+});
+
+CURL ÖRNEĞİ:
+curl "http://localhost:3000/api/user/search?q=ali&limit=10"
+
+────────────────────────────────────────────────────────────────────────────────
+3.5 GET /api/user/check-nickname/:nickname - Kullanıcı Adı Müsaitlik Kontrolü
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Kullanıcı adının kullanılabilir olup olmadığını kontrol eder
+
+JAVASCRIPT ÖRNEĞİ:
+const nickname = 'newuser';
+const response = await fetch(`http://localhost:3000/api/user/check-nickname/${nickname}`);
+const data = await response.json();
+console.log('Available:', data.available);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/user/check-nickname/newuser
+
+RESPONSE ÖRNEĞİ:
+{
+  "nickname": "newuser",
+  "available": true
+}
+
+────────────────────────────────────────────────────────────────────────────────
+3.6 GET /api/user/encryption-key/:nickname - Encryption Key Al
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Kullanıcının şifreleme public key'ini getirir (mesajlaşma için)
+
+JAVASCRIPT ÖRNEĞİ:
+const nickname = 'alice';
+const response = await fetch(`http://localhost:3000/api/user/encryption-key/${nickname}`);
+const data = await response.json();
+console.log('Encryption Key:', data.encryption_public_key);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/user/encryption-key/alice
+
+RESPONSE ÖRNEĞİ:
+{
+  "nickname": "alice",
+  "encryption_public_key": "abc123def456..."
+}
+
+────────────────────────────────────────────────────────────────────────────────
+3.7 POST /api/user/:userId/messaging-privacy - Gizlilik Ayarları
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Mesajlaşma gizlilik ayarlarını değiştirir
+
+REQUEST BODY:
+{
+  "privacy": "public" // "public", "followers", "private"
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const userId = 'USR_abc123';
+const response = await fetch(`http://localhost:3000/api/user/${userId}/messaging-privacy`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    privacy: 'public'
+  })
+});
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/user/USR_abc123/messaging-privacy \
+  -H "Content-Type: application/json" \
+  -d '{"privacy": "public"}'
+
+================================================================================
+4. CONTENT ENDPOINTS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+4.1 POST /api/content/create - İçerik Oluştur
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Blockchain'de yeni içerik (post, medya) yayınlar
+
+REQUEST BODY:
+{
+  "wallet_id": "TRN...",
+  "content_type": "POST",
+  "title": "My Post",
+  "description": "Content body",
+  "content_url": "https://...", // Opsiyonel
+  "tags": ["tag1", "tag2"]
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/content/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'TRN1a2b3c...',
+    content_type: 'POST',
+    title: 'Merhaba Dünya',
+    description: 'İlk gönderim!',
+    content_url: 'https://example.com/image.jpg',
+    tags: ['hello', 'first']
+  })
+});
+
+const data = await response.json();
+console.log('Content ID:', data.content.content_id);
+console.log('TX ID:', data.tx_id);
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/content/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wallet_id": "TRN1a2b3c...",
+    "content_type": "POST",
+    "title": "Test Post",
+    "description": "Test content"
+  }'
+
+────────────────────────────────────────────────────────────────────────────────
+4.2 GET /api/content/feed - İçerik Akışı Al
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Global içerik akışını getirir (sayfalandırılmış)
+
+JAVASCRIPT ÖRNEĞİ:
+const limit = 20;
+const response = await fetch(`http://localhost:3000/api/content/feed?limit=${limit}`);
+const data = await response.json();
+data.feed.forEach(content => {
+    console.log(content.title, '-', content.likes_count, 'likes');
+});
+
+CURL ÖRNEĞİ:
+curl "http://localhost:3000/api/content/feed?limit=20"
+
+────────────────────────────────────────────────────────────────────────────────
+4.3 GET /api/content/user/:walletId - Kullanıcının İçeriklerini Al
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Belirli bir cüzdanın yayınladığı tüm içerikleri getirir
+
+JAVASCRIPT ÖRNEĞİ:
+const walletId = 'TRN1a2b3c...';
+const response = await fetch(`http://localhost:3000/api/content/user/${walletId}`);
+const data = await response.json();
+console.log('Content Count:', data.content.length);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/content/user/TRN1a2b3c...
+
+────────────────────────────────────────────────────────────────────────────────
+4.4 GET /api/content/:contentId - İçerik Detayı Al
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Belirli bir içeriği ID'si ile getirir
+
+JAVASCRIPT ÖRNEĞİ:
+const contentId = 'CONTENT_123';
+const response = await fetch(`http://localhost:3000/api/content/${contentId}`);
+const content = await response.json();
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/content/CONTENT_123
+
+================================================================================
+5. SOCIAL ENDPOINTS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+5.1 POST /api/social/like - İçeriği Beğen
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Bir içeriği beğenir
+
+REQUEST BODY:
+{
+  "wallet_id": "TRN...",
+  "content_id": "CONTENT_123"
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/social/like', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'TRN1a2b3c...',
+    content_id: 'CONTENT_123'
+  })
+});
+
+const data = await response.json();
+console.log('Like TX ID:', data.tx_id);
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/social/like \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wallet_id": "TRN1a2b3c...",
+    "content_id": "CONTENT_123"
+  }'
+
+────────────────────────────────────────────────────────────────────────────────
+5.2 POST /api/social/comment - Yorum Yap
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: İçeriğe yorum ekler
+
+REQUEST BODY:
+{
+  "wallet_id": "TRN...",
+  "content_id": "CONTENT_123",
+  "comment": "Great post!"
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/social/comment', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'TRN1a2b3c...',
+    content_id: 'CONTENT_123',
+    comment: 'Great post!'
+  })
+});
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/social/comment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wallet_id": "TRN...",
+    "content_id": "CONTENT_123",
+    "comment": "Great!"
+  }'
+
+────────────────────────────────────────────────────────────────────────────────
+5.3 POST /api/social/follow - Kullanıcıyı Takip Et
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Başka bir kullanıcıyı/cüzdanı takip eder
+
+REQUEST BODY:
+{
+  "follower_wallet": "TRN...",
+  "following_wallet": "TRN..."
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/social/follow', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    follower_wallet: 'TRN1a2b3c...',
+    following_wallet: 'TRN4d5e6f...'
+  })
+});
+
+const data = await response.json();
+console.log('Follow TX ID:', data.tx_id);
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/social/follow \
+  -H "Content-Type: application/json" \
+  -d '{
+    "follower_wallet": "TRN1a2b3c...",
+    "following_wallet": "TRN4d5e6f..."
+  }'
+
+────────────────────────────────────────────────────────────────────────────────
+5.4 POST /api/social/unfollow - Takipten Çık
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Kullanıcı takibini bırakır
+
+REQUEST BODY:
+{
+  "follower_wallet": "TRN...",
+  "following_wallet": "TRN..."
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/social/unfollow', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    follower_wallet: 'TRN1a2b3c...',
+    following_wallet: 'TRN4d5e6f...'
+  })
+});
+
+────────────────────────────────────────────────────────────────────────────────
+5.5 GET /api/social/likes/:contentId - Beğenileri Listele
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Belirli bir içeriğin tüm beğenilerini listeler
+
+JAVASCRIPT ÖRNEĞİ:
+const contentId = 'CONTENT_123';
+const response = await fetch(`http://localhost:3000/api/social/likes/${contentId}`);
+const data = await response.json();
+console.log('Total Likes:', data.likes.length);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/social/likes/CONTENT_123
+
+────────────────────────────────────────────────────────────────────────────────
+5.6 GET /api/social/comments/:contentId - Yorumları Listele
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Belirli bir içeriğin tüm yorumlarını listeler
+
+JAVASCRIPT ÖRNEĞİ:
+const contentId = 'CONTENT_123';
+const response = await fetch(`http://localhost:3000/api/social/comments/${contentId}`);
+const data = await response.json();
+data.comments.forEach(comment => {
+    console.log(`${comment.wallet_id}: ${comment.comment}`);
+});
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/social/comments/CONTENT_123
+
+────────────────────────────────────────────────────────────────────────────────
+5.7 GET /api/social/followers/:walletId - Takipçileri Listele
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Bir cüzdanın takipçilerini listeler
+
+JAVASCRIPT ÖRNEĞİ:
+const walletId = 'TRN1a2b3c...';
+const response = await fetch(`http://localhost:3000/api/social/followers/${walletId}`);
+const data = await response.json();
+console.log('Followers:', data.followers.length);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/social/followers/TRN1a2b3c...
+
+────────────────────────────────────────────────────────────────────────────────
+5.8 GET /api/social/following/:walletId - Takip Edilenleri Listele
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Bir cüzdanın takip ettiği kişileri listeler
+
+JAVASCRIPT ÖRNEĞİ:
+const walletId = 'TRN1a2b3c...';
+const response = await fetch(`http://localhost:3000/api/social/following/${walletId}`);
+const data = await response.json();
+console.log('Following:', data.following.length);
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/social/following/TRN1a2b3c...
+
+================================================================================
+6. MESSAGING ENDPOINTS (GÜVENLİ)
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+6.1 POST /api/messaging/send - Şifreli Mesaj Gönder
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Uçtan uca şifrelenmiş mesaj gönderir
+ÖNEMLİ: Şifreleme CLIENT TARAFINDA yapılmalıdır!
+
+REQUEST BODY:
+{
+  "from_wallet": "TRN...",
+  "to_wallet": "TRN...",
+  "encrypted_message": "HEX_STRING",
+  "sender_public_key": "HEX",
+  "sender_signature": "HEX"
+}
+
+JAVASCRIPT ÖRNEĞİ (Tam Akış):
+const nacl = require('tweetnacl');
+
+// 1. Alıcının encryption public key'ini al
+const response = await fetch('http://localhost:3000/api/user/encryption-key/bob');
+const { encryption_public_key } = await response.json();
+
+// 2. Mesajı şifrele
+const message = "Merhaba Bob!";
+const nonce = nacl.randomBytes(nacl.box.nonceLength);
+const encryptedMessage = nacl.box(
+  Buffer.from(message, 'utf8'),
+  nonce,
+  Buffer.from(encryption_public_key, 'hex'),
+  myEncryptionPrivateKey
+);
+
+// 3. Mesajı gönder
+const sendResponse = await fetch('http://localhost:3000/api/messaging/send', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    from_wallet: 'TRN_Alice...',
+    to_wallet: 'TRN_Bob...',
+    encrypted_message: Buffer.from(encryptedMessage).toString('hex'),
+    sender_public_key: myPublicKey,
+    sender_signature: mySignature
+  })
+});
+
+const data = await sendResponse.json();
+console.log('Message TX ID:', data.tx_id);
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/messaging/send \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from_wallet": "TRN...",
+    "to_wallet": "TRN...",
+    "encrypted_message": "abc123...",
+    "sender_public_key": "def456...",
+    "sender_signature": "ghi789..."
+  }'
+
+────────────────────────────────────────────────────────────────────────────────
+6.2 GET /api/messaging/inbox/:walletId - Gelen Kutusu
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Cüzdanın şifreli mesajlarını getirir
+ÖNEMLİ: Şifre çözme CLIENT TARAFINDA yapılmalıdır!
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/messaging/inbox/TRN...');
+const data = await response.json();
+
+data.messages.forEach(msg => {
+    // Client tarafında şifre çözme
+    const decrypted = nacl.box.open(
+      Buffer.from(msg.encrypted_message, 'hex'),
+      msg.nonce,
+      senderEncryptionPublicKey,
+      myEncryptionPrivateKey
+    );
+    console.log('Message:', Buffer.from(decrypted).toString('utf8'));
+});
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/messaging/inbox/TRN...
+
+================================================================================
+7. VALIDATOR ENDPOINTS
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+7.1 POST /api/validator/register - Validator Kaydı
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Yeni validator node kaydeder
+
+REQUEST BODY:
+{
+  "wallet_id": "TRN...",
+  "ip_address": "192.168.1.100",
+  "port": 3000
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/validator/register', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'TRN1a2b3c...',
+    ip_address: '192.168.1.100',
+    port: 3000
+  })
+});
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/validator/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wallet_id": "TRN...",
+    "ip_address": "192.168.1.100",
+    "port": 3000
+  }'
+
+────────────────────────────────────────────────────────────────────────────────
+7.2 POST /api/validator/heartbeat - Heartbeat Gönder
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Validator'un aktif durumunu korumak için heartbeat sinyali gönderir
+
+REQUEST BODY:
+{
+  "wallet_id": "TRN..."
+}
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/validator/heartbeat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'TRN1a2b3c...'
+  })
+});
+
+CURL ÖRNEĞİ:
+curl -X POST http://localhost:3000/api/validator/heartbeat \
+  -H "Content-Type: application/json" \
+  -d '{"wallet_id": "TRN..."}'
+
+────────────────────────────────────────────────────────────────────────────────
+7.3 GET /api/validator/list - Aktif Validator'ları Listele
+────────────────────────────────────────────────────────────────────────────────
+AÇIKLAMA: Network'teki tüm aktif validator'ları listeler
+
+JAVASCRIPT ÖRNEĞİ:
+const response = await fetch('http://localhost:3000/api/validator/list');
+const data = await response.json();
+data.validators.forEach(validator => {
+    console.log(`${validator.wallet_id} - ${validator.ip_address}:${validator.port}`);
+});
+
+CURL ÖRNEĞİ:
+curl http://localhost:3000/api/validator/list
+
+================================================================================
+NOTLAR VE BEST PRACTICES
+================================================================================
+
+1. ŞİFRELEME:
+   - Tüm mesaj şifreleme/çözme işlemleri CLIENT tarafında yapılmalıdır
+   - TweetNaCl kütüphanesi kullanılması önerilir
+   - Private key'ler asla sunucuya gönderilmemelidir
+
+2. İMZALAMA:
+   - Para transferleri ve önemli işlemler imza gerektirir
+   - İmzalama client tarafında yapılmalıdır
+   - Public key ve signature her istekte gönderilmelidir
+
+3. GÜVENLİK:
+   - Mnemonic ve private key'leri güvenli saklayın
+   - Asla bu bilgileri başkalarıyla paylaşmayın
+   - Hot wallet kullanımı için ekstra önlemler alın
+
+4. KULLANICI KAYDI:
+   - Tüm alanlar opsiyoneldir
+   - Gizlilik odaklı: Minimum veri ile kayıt olunabilir
+   - Girilen tüm bilgiler blockchain'de saklanır (public)
+
+5. FEE YAPISI:
+   - Dinamik ücretlendirme sistemi
+   - Alıcının popülerliğine göre değişir
+   - Priority seçeneği: STANDARD, LOW, MEDIUM, HIGH
+
+6. RATE LIMITING:
+   - API'lerde rate limit uygulanmaktadır
+   - Aşırı istek durumunda 429 hatası alınır
+
+================================================================================
+SON
+================================================================================

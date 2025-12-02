@@ -155,6 +155,9 @@ class BlockchainNode {
         this.socialService.setContentService(this.contentService);
         this.rpcServer.setSocialService(this.socialService);
 
+        // Inject BlockProducer into RPCServer for manual mining
+        this.rpcServer.setBlockProducer(this.blockProducer);
+
         // Add economy API routes
         this.rpcServer.getApp().use('/economy', this.economyAPI.getRouter());
 
