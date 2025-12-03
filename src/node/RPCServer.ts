@@ -1443,7 +1443,7 @@ export class RPCServer {
      */
     private async sendPrivateMessage(req: Request, res: Response): Promise<void> {
         try {
-            const { from_wallet, to_wallet, encrypted_message, sender_public_key, sender_signature } = req.body;
+            const { from_wallet, to_wallet, encrypted_message, sender_public_key, sender_signature, sender_encryption_key } = req.body;
 
             if (!from_wallet || !to_wallet || !encrypted_message) {
                 res.status(400).json({
@@ -1465,7 +1465,8 @@ export class RPCServer {
                 TOKEN_CONFIG.MESSAGE_FEE, // Use configured fee (0.000001 LT)
                 {
                     message: encrypted_message,
-                    encrypted: true
+                    encrypted: true,
+                    sender_encryption_key: sender_encryption_key // Curve25519 public key for decryption
                 }
             );
 
@@ -1528,7 +1529,8 @@ export class RPCServer {
                             from: tx.from_wallet,
                             timestamp: tx.timestamp,
                             encrypted_content: tx.payload.message || tx.payload.encrypted_content, // Support both formats
-                            sender_public_key: tx.sender_public_key
+                            sender_public_key: tx.sender_public_key,
+                            sender_encryption_key: tx.payload.sender_encryption_key // Curve25519 public key for decryption
                         });
                     }
                 }
