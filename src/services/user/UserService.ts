@@ -87,6 +87,33 @@ export class UserService {
             this.emailIndex.set(input.email, system_id);
         }
 
+        // 🆕 CREATE PROFILE_UPDATE TRANSACTION FOR USER CREATION (BLOCKCHAIN RECORD)
+        const profileCreationTx = TransactionModel.create(
+            walletResult.wallet.wallet_id,
+            walletResult.wallet.wallet_id,
+            TransactionType.PROFILE_UPDATE,
+            0,
+            0, // No fee for initial profile creation
+            {
+                action: 'USER_CREATED',
+                encryption_public_key: walletResult.encryptionPublicKey, // ← BLOCKCHAIN'DE!
+                nickname: input.nickname,
+                email: input.email,
+                first_name: input.first_name,
+                last_name: input.last_name,
+                messaging_privacy: 'public',
+                created_at: Date.now(),
+            }
+        );
+
+        // Add profile creation to mempool
+        const profileResult = this.mempool.addTransaction(profileCreationTx);
+        if (!profileResult.success) {
+            console.error(`Failed to add profile creation transaction: ${profileResult.error}`);
+        } else {
+            console.log(`Profile creation transaction added: ${profileCreationTx.tx_id}`);
+        }
+
         // Trigger airdrop for first wallet
         const airdropTx = this.airdropService.createAirdropTransaction(
             system_id,
