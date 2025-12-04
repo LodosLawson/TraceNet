@@ -18,6 +18,8 @@ export const TOKEN_CONFIG = {
     SHARE_FEE: 2000, // 0.00002 LT (doubled)
     FOLLOW_FEE: 100, // 0.000001 LT (half of message fee)
     UNFOLLOW_FEE: 100, // 0.000001 LT (half of message fee)
+    PRIVACY_UPDATE_FEE: 500, // 0.000005 LT
+    KEY_ROTATION_FEE: 1000, // 0.00001 LT
 
     // Dynamic Transfer Fees
     DYNAMIC_TRANSFER_FEES: {

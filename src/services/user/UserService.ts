@@ -361,6 +361,16 @@ export class UserService {
             return undefined;
         }
 
+        // Check privacy settings
+        if (user.messaging_privacy === 'private') {
+            return undefined;
+        }
+
+        // If 'followers', we should check if the requester is a follower.
+        // However, this method is often called to just get the key.
+        // The actual enforcement happens in 'canReceiveMessageFrom' or 'sendPrivateMessage'.
+        // But if privacy is 'private', we definitely shouldn't return the key.
+
         return {
             user_id: user.system_id,
             nickname: user.nickname,
@@ -385,22 +395,100 @@ export class UserService {
 
         // Create blockchain transaction for privacy update
         if (user.wallet_ids.length > 0) {
+            const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
             const privacyUpdateTx = TransactionModel.create(
                 user.wallet_ids[0],
-                user.wallet_ids[0],
+                user.wallet_ids[0], // Self-transaction
                 TransactionType.PROFILE_UPDATE,
                 0,
-                0,
+                TOKEN_CONFIG.PRIVACY_UPDATE_FEE,
                 {
                     updates: { messaging_privacy: privacy },
                     timestamp: Date.now(),
                 }
             );
-            // In production, submit to blockchain node here
-            console.log(`Privacy update transaction created: ${privacyUpdateTx.tx_id}`);
+
+            // Add to mempool
+            const result = this.mempool.addTransaction(privacyUpdateTx);
+            if (!result.success) {
+                console.error(`Failed to add privacy update transaction: ${result.error}`);
+                // In a real scenario, we might want to revert the local state change if tx fails
+                // But for now we keep it consistent with existing pattern
+            } else {
+                console.log(`Privacy update transaction added: ${privacyUpdateTx.tx_id}`);
+            }
         }
 
         return true;
+    }
+
+    /**
+     * Rotate encryption key
+     * Generates a new Curve25519 key pair and updates the user profile
+     */
+    rotateEncryptionKey(system_id: string): { success: boolean; newPublicKey?: string; newPrivateKey?: string; error?: string } {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return { success: false, error: 'User not found' };
+        }
+
+        try {
+            // Generate new keys using WalletService utility
+            // We need to access the static method or use a new instance if not exposed
+            // Since WalletService.createWallet() creates a full wallet, we might need a helper
+            // For now, we'll assume WalletService has a helper or we use the underlying library directly
+            // But to keep it clean, let's use the wallet service if possible.
+            // Looking at WalletService, it uses nacl.
+
+            const nacl = require('tweetnacl');
+            const util = require('tweetnacl-util');
+
+            const newKeyPair = nacl.box.keyPair();
+            const newPublicKey = util.encodeBase64(newKeyPair.publicKey);
+            // IMPORTANT: The private key must be securely delivered to the user.
+            // In this simulation, we'll return it, but in production it should be handled with extreme care.
+            const newPrivateKey = util.encodeBase64(newKeyPair.secretKey);
+
+            user.encryption_public_key = newPublicKey;
+            user.updated_at = new Date();
+            this.users.set(system_id, user);
+
+            // Create blockchain transaction for key rotation
+            if (user.wallet_ids.length > 0) {
+                const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
+                const keyRotationTx = TransactionModel.create(
+                    user.wallet_ids[0],
+                    user.wallet_ids[0],
+                    TransactionType.PROFILE_UPDATE,
+                    0,
+                    TOKEN_CONFIG.KEY_ROTATION_FEE,
+                    {
+                        updates: { encryption_public_key: newPublicKey },
+                        action: 'KEY_ROTATION',
+                        timestamp: Date.now(),
+                    }
+                );
+
+                const result = this.mempool.addTransaction(keyRotationTx);
+                if (!result.success) {
+                    console.error(`Failed to add key rotation transaction: ${result.error}`);
+                } else {
+                    console.log(`Key rotation transaction added: ${keyRotationTx.tx_id}`);
+                }
+            }
+
+            return {
+                success: true,
+                newPublicKey,
+                // We return the private key here so the user can update their local storage
+                // In a real app, this response would be sent over a secure channel
+                // and the user would be prompted to save it immediately.
+                // @ts-ignore - Adding dynamic property for return
+                newPrivateKey
+            };
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
     }
 
     /**

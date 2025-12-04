@@ -158,6 +158,9 @@ export class RPCServer {
         this.app.post('/api/validator/:validatorId/wallet', this.registerValidatorWallet.bind(this));
         this.app.get('/api/validator/:validatorId/wallet', this.getValidatorWallet.bind(this));
 
+        this.app.post('/api/user/privacy', this.updateMessagingPrivacy.bind(this));
+        this.app.post('/api/user/rotate-key', this.rotateEncryptionKey.bind(this));
+
         // Messaging endpoints
         this.app.post('/api/messaging/send', this.sendPrivateMessage.bind(this));
         this.app.get('/api/messaging/inbox/:walletId', this.getMessages.bind(this));
@@ -770,39 +773,6 @@ export class RPCServer {
             }
 
             res.json(keyInfo);
-        } catch (error) {
-            res.status(500).json({
-                error: error instanceof Error ? error.message : 'Unknown error',
-            });
-        }
-    }
-
-    /**
-     * Update messaging privacy setting
-     */
-    private async updateMessagingPrivacy(req: Request, res: Response): Promise<void> {
-        try {
-            const { userId } = req.params;
-            const { privacy } = req.body;
-
-            if (!privacy || !['public', 'followers', 'private'].includes(privacy)) {
-                res.status(400).json({ error: 'Invalid privacy setting' });
-                return;
-            }
-
-            if (!this.userService) {
-                res.status(500).json({ error: 'User service not initialized' });
-                return;
-            }
-
-            const success = this.userService.updateMessagingPrivacy(userId, privacy);
-
-            if (!success) {
-                res.status(404).json({ error: 'User not found' });
-                return;
-            }
-
-            res.json({ success: true, privacy });
         } catch (error) {
             res.status(500).json({
                 error: error instanceof Error ? error.message : 'Unknown error',
@@ -1452,6 +1422,21 @@ export class RPCServer {
                 return;
             }
 
+            // Check if recipient accepts messages from sender
+            if (this.userService) {
+                // Find recipient user by wallet
+                const recipient = this.userService.getUserByWallet(to_wallet);
+                if (recipient) {
+                    const canReceive = this.userService.canReceiveMessageFrom(recipient.system_id, from_wallet);
+                    if (!canReceive) {
+                        res.status(403).json({
+                            error: 'Recipient does not accept messages from you due to privacy settings'
+                        });
+                        return;
+                    }
+                }
+            }
+
             // NO SERVER-SIDE ENCRYPTION - Message must already be encrypted by client
             // Client should use KeyManager.encryptForUser() before sending
 
@@ -1619,6 +1604,85 @@ export class RPCServer {
                 success: true,
                 message: 'Login successful',
                 user_id: KeyManager.deriveAddress(public_key) // Use address as user ID for now
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+    * Update messaging privacy settings
+    */
+    private async updateMessagingPrivacy(req: Request, res: Response): Promise<void> {
+        try {
+            const { system_id, privacy } = req.body;
+
+            if (!system_id || !privacy) {
+                res.status(400).json({ error: 'system_id and privacy are required' });
+                return;
+            }
+
+            if (!['public', 'followers', 'private'].includes(privacy)) {
+                res.status(400).json({ error: 'Invalid privacy setting. Must be public, followers, or private' });
+                return;
+            }
+
+            if (!this.userService) {
+                res.status(503).json({ error: 'User service not available' });
+                return;
+            }
+
+            const success = this.userService.updateMessagingPrivacy(system_id, privacy);
+
+            if (!success) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+
+            res.json({
+                success: true,
+                message: `Messaging privacy updated to ${privacy}`,
+                fee: '0.000005 LT'
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Rotate encryption key
+     */
+    private async rotateEncryptionKey(req: Request, res: Response): Promise<void> {
+        try {
+            const { system_id } = req.body;
+
+            if (!system_id) {
+                res.status(400).json({ error: 'system_id is required' });
+                return;
+            }
+
+            if (!this.userService) {
+                res.status(503).json({ error: 'User service not available' });
+                return;
+            }
+
+            const result = this.userService.rotateEncryptionKey(system_id);
+
+            if (!result.success) {
+                res.status(400).json({ error: result.error || 'Failed to rotate key' });
+                return;
+            }
+
+            res.json({
+                success: true,
+                message: 'Encryption key rotated successfully',
+                new_public_key: result.newPublicKey,
+                new_private_key: result.newPrivateKey, // CAUTION: Only returned for demo/simulation purposes
+                fee: '0.00001 LT'
             });
         } catch (error) {
             res.status(500).json({
