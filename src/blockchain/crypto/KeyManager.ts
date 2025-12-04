@@ -1,5 +1,6 @@
 import * as nacl from 'tweetnacl';
 import * as bip39 from 'bip39';
+import { derivePath } from 'ed25519-hd-key';
 import crypto from 'crypto';
 
 /**
@@ -59,10 +60,11 @@ export class KeyManager {
         const publicKey = Buffer.from(signKeyPair.publicKey).toString('hex');
         const privateKey = Buffer.from(signKeyPair.secretKey).toString('hex');
 
-        // 2. Encryption Keys (Curve25519) - Use hash of seed to get different entropy
-        // We hash the seed to get a new 32-byte seed for encryption keys
-        const encryptionSeed = crypto.createHash('sha256').update(seed).digest();
-        const boxKeyPair = nacl.box.keyPair.fromSecretKey(new Uint8Array(encryptionSeed));
+        // 2. Encryption Keys (Curve25519) - BIP32 HD derivation for compatibility
+        // Using standard HD path m/44'/0'/0'/1'/0' for encryption keys
+        const encryptionPath = "m/44'/0'/0'/1'/0'";
+        const { key: encryptionDerivedKey } = derivePath(encryptionPath, seed.toString('hex'));
+        const boxKeyPair = nacl.box.keyPair.fromSecretKey(encryptionDerivedKey.slice(0, 32));
 
         const encryptionPublicKey = Buffer.from(boxKeyPair.publicKey).toString('hex');
         const encryptionPrivateKey = Buffer.from(boxKeyPair.secretKey).toString('hex');
