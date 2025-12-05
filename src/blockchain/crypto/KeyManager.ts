@@ -1,6 +1,6 @@
 import * as nacl from 'tweetnacl';
 import * as bip39 from 'bip39';
-import { derivePath } from 'ed25519-hd-key';
+import { HDKey } from '@scure/bip32';
 import crypto from 'crypto';
 
 /**
@@ -62,9 +62,16 @@ export class KeyManager {
 
         // 2. Encryption Keys (Curve25519) - BIP32 HD derivation for compatibility
         // Using standard HD path m/44'/0'/0'/1'/0' for encryption keys
+        // Using @scure/bip32 for consistent derivation with frontend
         const encryptionPath = "m/44'/0'/0'/1'/0'";
-        const { key: encryptionDerivedKey } = derivePath(encryptionPath, seed.toString('hex'));
-        const boxKeyPair = nacl.box.keyPair.fromSecretKey(encryptionDerivedKey.slice(0, 32));
+        const hdkey = HDKey.fromMasterSeed(seed);
+        const derived = hdkey.derive(encryptionPath);
+
+        if (!derived.privateKey) {
+            throw new Error('Failed to derive encryption private key');
+        }
+
+        const boxKeyPair = nacl.box.keyPair.fromSecretKey(derived.privateKey.slice(0, 32));
 
         const encryptionPublicKey = Buffer.from(boxKeyPair.publicKey).toString('hex');
         const encryptionPrivateKey = Buffer.from(boxKeyPair.secretKey).toString('hex');
