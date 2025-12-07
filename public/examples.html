@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TraceNet API Examples - Kod Örnekleri</title>
+    <meta name="description" content="TraceNet Blockchain API - Detaylı kod örnekleri ve kullanım kılavuzu">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/examples.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="brand-section">
+            <h1 class="brand-title">💻 TraceNet API Examples</h1>
+            <div class="brand-subtitle">Kod Örnekleri ve Kullanım Kılavuzu</div>
+            <div class="brand-tagline">JavaScript ve Python ile tüm API endpoint örnekleri</div>
+
+            <!-- Navigation -->
+            <h3 class="example-title">Blockchain Durumu</h3>
+            <span class="endpoint-badge get">GET</span>
+            <div class="endpoint-path">/rpc/status</div>
+
+            <div class="code-tabs">
+                <div class="code-tab active" onclick="showCode(this, 'status-js')">JavaScript</div>
+                <div class="code-tab" onclick="showCode(this, 'status-py')">Python</div>
+            </div>
+
+            <div id="status-js" class="code-block" style="display: block;">
+                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                <pre><code>const response = await fetch('http://localhost:3000/rpc/status');
+const data = await response.json();
+console.log('Block Height:', data.blockchain.height);
+console.log('Total TX:', data.blockchain.txCount);</code></pre>
+            </div>
+
+            <div id="status-py" class="code-block" style="display: none;">
+                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                <pre><code>import requests
+
+response = requests.get('http://localhost:3000/rpc/status')
+data = response.json()
+print(f"Block Height: {data['blockchain']['height']}")
+print(f"Total TX: {data['blockchain']['txCount']}")</code></pre>
+            </div>
+        </div>
+
+        <!-- Get Balance -->
+        <div class="example-block">
+            <h3 class="example-title">Bakiye Sorgula</h3>
+            <span class="endpoint-badge get">GET</span>
+            <div class="endpoint-path">/rpc/balance/:walletId</div>
+
+            <div class="code-tabs">
+                <div class="code-tab active" onclick="showCode(this, 'balance-js')">JavaScript</div>
+                <div class="code-tab" onclick="showCode(this, 'balance-py')">Python</div>
+            </div>
+
+            <div id="balance-js" class="code-block" style="display: block;">
+                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                <pre><code>const walletId = 'TRN4a3b2c1...';
+const response = await fetch(`http://localhost:3000/rpc/balance/${walletId}`);
+const data = await response.json();
+console.log('Balance:', data.balance / 100000000, 'LT');</code></pre>
+            </div>
+
+            <div id="balance-py" class="code-block" style="display: none;">
+                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                <pre><code>wallet_id = 'TRN4a3b2c1...'
+response = requests.get(f'http://localhost:3000/rpc/balance/{wallet_id}')
+data = response.json()
+print(f"Balance: {data['balance'] / 100000000} LT")</code></pre>
+            </div>
+        </div>
+
+        <!-- Get All Accounts -->
+        <div class="example-block">
+            <h3 class="example-title">Tüm Hesapları Listele</h3>
+            <span class="endpoint-badge get">GET</span>
+            <div class="endpoint-path">/rpc/accounts</div>
+
+            <div class="code-tabs">
+                <div class="code-tab active" onclick="showCode(this, 'accounts-js')">JavaScript</div>
+                <div class="code-tab" onclick="showCode(this, 'accounts-py')">Python</div>
+            </div>
+
+            <div id="accounts-js" class="code-block" style="display: block;">
+                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                <pre><code>const response = await fetch('http://localhost:3000/rpc/accounts');
+const data = await response.json();
+data.accounts.forEach(acc => {
+    console.log(`${acc.address}: ${acc.balance / 100000000} LT`);
+});</code></pre>
+            </div>
+
+            <div id="accounts-py" class="code-block" style="display: none;">
+                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                <pre><code>response = requests.get('http://localhost:3000/rpc/accounts')
+data = response.json()
+for acc in data['accounts']:
+    print(f"{acc['address']}: {acc['balance'] / 100000000} LT")</code></pre>
+            </div>
+        </div>
+
+        <!-- Get Block -->
+        <div class="example-block">
+            <h3 class="example-title">Blok Bilgisi Al</h3>
+            <span class="endpoint-badge get">GET</span>
+            <div class="endpoint-path">/rpc/block/:indexOrHash</div>
+
+            <div class="code-tabs">
+                <div class="code-tab active" onclick="showCode(this, 'block-js')">JavaScript</div>
+                <div class="code-tab" onclick="showCode(this, 'block-py')">Python</div>
+            </div>
+
+            <div id="block-js" class="code-block" style="display: block;">
+                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                <pre><code>// Index ile
+const response = await fetch('http://localhost:3000/rpc/block/1');
+const data = await response.json();
+console.log('Block:', data);</code></pre>
+            </div>
+
+            <div id="block-py" class="code-block" style="display: none;">
+                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                <pre><code>response = requests.get('http://localhost:3000/rpc/block/1')
+data = response.json()
+print('Block:', data)</code></pre>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Transfer APIs Tab -->
+    <div id="transfer" class="tab-content">
+        <div class="section">
+            <h2 class="section-title">💸 Transfer API Örnekleri</h2>
+
+            <!-- Calculate Transfer Fee -->
+            <div class="example-block">
+                <h3 class="example-title">Transfer Ücreti Hesapla (Yeni!)</h3>
+                <span class="endpoint-badge">POST</span>
+                <div class="endpoint-path">/rpc/calculateTransferFee</div>
+                <div class="description">Dinamik ücret hesaplama - Alıcının popülerliğine ve işlem hızına göre</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'calcfee-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'calcfee-py')">Python</div>
+                </div>
+
+                <div id="calcfee-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const response = await fetch('http://localhost:3000/rpc/calculateTransferFee', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    recipient_address: 'TRN4a3b2c1...',
+    amount: 100 * 100000000, // 100 LT
+    priority: 'STANDARD' // STANDARD, LOW, MEDIUM, HIGH
+  })
+});
+
+const data = await response.json();
+console.log('Fee:', data.total_fee_readable);
+console.log('Base Tier:', data.base_tier);
+console.log('Recipient Transfers:', data.recipient_incoming_transfers);</code></pre>
+                </div>
+
+                <div id="calcfee-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>response = requests.post('http://localhost:3000/rpc/calculateTransferFee', json={
+    'recipient_address': 'TRN4a3b2c1...',
+    'amount': 100 * 100000000,  # 100 LT
+    'priority': 'STANDARD'  # STANDARD, LOW, MEDIUM, HIGH
+})
+
+data = response.json()
+print(f"Fee: {data['total_fee_readable']}")
+print(f"Base Tier: {data['base_tier']}")
+print(f"Recipient Transfers: {data['recipient_incoming_transfers']}")</code></pre>
+                </div>
+
+                <div class="response-block">
+                    <div class="response-title">✅ Response:</div>
+                    <pre><code>{
+  "recipient_address": "TRN4a3b2c1...",
+  "amount": 10000000000,
+  "priority": "HIGH",
+  "recipient_incoming_transfers": 150,
+  "base_tier": "TIER_2",
+  "base_rate": 0.0005,
+  "priority_rate": 0.01,
+  "total_fee": 105000000,
+  "total_fee_readable": "1.05 LT"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Send Transfer -->
+            <div class="example-block">
+                <h3 class="example-title">Para Transferi (Yeni!)</h3>
+                <span class="endpoint-badge">POST</span>
+                <div class="endpoint-path">/rpc/transfer</div>
+                <div class="description">Otomatik ücret hesaplamalı transfer - İmza gerektirir</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'transfer-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'transfer-py')">Python</div>
+                </div>
+
+                <div id="transfer-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>// İlk olarak: İşlem imzala (KeyManager ile)
+const txData = {
+  from_wallet: 'TRN1a2b3c...',
+  to_wallet: 'TRN4d5e6f...',
+  amount: 50 * 100000000, // 50 LT
+  priority: 'MEDIUM' // Opsiyonel
+};
+
+// İmza oluştur (client-side)
+const signature = signTransactionData(txData, privateKey);
+
+// Transfer gönder
+const response = await fetch('http://localhost:3000/rpc/transfer', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    ...txData,
+    sender_public_key: publicKey,
+    sender_signature: signature
+  })
+});
+
+const data = await response.json();
+console.log('TX ID:', data.tx_id);
+console.log('Fee:', data.fee_readable);</code></pre>
+                </div>
+
+                <div id="transfer-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>tx_data = {
+    'from_wallet': 'TRN1a2b3c...',
+    'to_wallet': 'TRN4d5e6f...',
+    'amount': 50 * 100000000,  # 50 LT
+    'priority': 'MEDIUM'
+}
+
+# İmza oluştur
+signature = sign_transaction(tx_data, private_key)
+
+# Transfer gönder
+response = requests.post('http://localhost:3000/rpc/transfer', json={
+    **tx_data,
+    'sender_public_key': public_key,
+    'sender_signature': signature
+})
+
+data = response.json()
+print(f"TX ID: {data['tx_id']}")
+print(f"Fee: {data['fee_readable']}")</code></pre>
+                </div>
+
+                <div class="info-block">
+                    <strong>💡 Ücret Kademeleri:</strong>
+                    <ul>
+                        <li><strong>Temel Ücret</strong> (Alıcının gelen transfer sayısına göre):
+                            <ul>
+                                <li>0-49 transfer: 0.01%</li>
+                                <li>50-99 transfer: 0.025%</li>
+                                <li>100-199 transfer: 0.05%</li>
+                                <li>200+ transfer: 0.10%</li>
+                            </ul>
+                        </li>
+                        <li><strong>Öncelik Ücreti</strong> (İşlem hızı):
+                            <ul>
+                                <li>STANDARD: +0%</li>
+                                <li>LOW: +0.20%</li>
+                                <li>MEDIUM: +0.60%</li>
+                                <li>HIGH: +1%</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Send Raw Transaction -->
+            <div class="example-block">
+                <h3 class="example-title">Ham İşlem Gönder</h3>
+                <span class="endpoint-badge">POST</span>
+                <div class="endpoint-path">/rpc/sendRawTx</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'rawtx-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'rawtx-py')">Python</div>
+                </div>
+
+                <div id="rawtx-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const tx = {
+  tx_id: 'TX_' + Date.now(),
+  from_wallet: 'TRN1a2b3c...',
+  to_wallet: 'TRN4d5e6f...',
+  type: 'TRANSFER',
+  amount: 10 * 100000000,
+  fee: 100000,
+  timestamp: Date.now(),
+  payload: { priority: 'STANDARD' },
+  signatures: [],
+  sender_public_key: 'abc...',
+  sender_signature: 'signature...'
+};
+
+const response = await fetch('http://localhost:3000/rpc/sendRawTx', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(tx)
+});
+
+const data = await response.json();
+console.log(data);</code></pre>
+                </div>
+
+                <div id="rawtx-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>import time
+
+tx = {
+    'tx_id': f'TX_{int(time.time() * 1000)}',
+    'from_wallet': 'TRN1a2b3c...',
+    'to_wallet': 'TRN4d5e6f...',
+    'type': 'TRANSFER',
+    'amount': 10 * 100000000,
+    'fee': 100000,
+    'timestamp': int(time.time() * 1000),
+    'payload': {'priority': 'STANDARD'},
+    'signatures': [],
+    'sender_public_key': 'abc...',
+    'sender_signature': 'signature...'
+}
+
+response = requests.post('http://localhost:3000/rpc/sendRawTx', json=tx)
+print(response.json())</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User APIs Tab -->
+    <div id="user" class="tab-content">
+        <div class="section">
+            <h2 class="section-title">👤 Kullanıcı API Örnekleri</h2>
+
+            <!-- Create User -->
+            <div class="example-block">
+                <h3 class="example-title">Yeni Kullanıcı Oluştur</h3>
+                <span class="endpoint-badge">POST</span>
+                <div class="endpoint-path">/api/user/create</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'user-create-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'user-create-py')">Python</div>
+                </div>
+
+                <div id="user-create-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const response = await fetch('http://localhost:3000/api/user/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    nickname: 'alice',
+    name: 'Alice',
+    surname: 'Smith',
+    birth_date: '1990-01-15'
+  })
+});
+
+const data = await response.json();
+console.log('User ID:', data.user.user_id);
+console.log('Wallet:', data.wallet.wallet_id);
+console.log('Mnemonic:', data.mnemonic); // Güvenli saklayın!</code></pre>
+                </div>
+
+                <div id="user-create-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>response = requests.post('http://localhost:3000/api/user/create', json={
+    'nickname': 'alice',
+    'name': 'Alice',
+    'surname': 'Smith',
+    'birth_date': '1990-01-15'
+})
+
+data = response.json()
+print(f"User ID: {data['user']['user_id']}")
+print(f"Wallet: {data['wallet']['wallet_id']}")
+print(f"Mnemonic: {data['mnemonic']}")  # Güvenli saklayın!</code></pre>
+                </div>
+
+                <div class="response-block">
+                    <div class="response-title">✅ Response:</div>
+                    <pre><code>{
+  "user": {
+    "user_id": "USR_abc123",
+    "nickname": "alice",
+    "name": "Alice",
+    "surname": "Smith"
+  },
+  "wallet": {
+    "wallet_id": "TRN4a3b2c1...",
+    "public_key": "9f8e7d..."
+  },
+  "mnemonic": "word1 word2 word3 ... word24",
+  "airdrop_tx_id": "TX_airdrop123",
+  "airdrop_amount": "0.00625 LT"
+}</code></pre>
+                </div>
+            </div>
+
+            <!-- Get User By Nickname -->
+            <div class="example-block">
+                <h3 class="example-title">Kullanıcı Adına Göre Bul</h3>
+                <span class="endpoint-badge get">GET</span>
+                <div class="endpoint-path">/api/user/nickname/:nickname</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'user-get-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'user-get-py')">Python</div>
+                </div>
+
+                <div id="user-get-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const nickname = 'alice';
+const response = await fetch(`http://localhost:3000/api/user/nickname/${nickname}`);
+const data = await response.json();
+console.log('User:', data.user);
+console.log('Balance:', data.balance / 100000000, 'LT');</code></pre>
+                </div>
+
+                <div id="user-get-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>nickname = 'alice'
+response = requests.get(f'http://localhost:3000/api/user/nickname/{nickname}')
+data = response.json()
+print(f"User: {data['user']}")
+print(f"Balance: {data['balance'] / 100000000} LT")</code></pre>
+                </div>
+            </div>
+
+            <!-- Search Users -->
+            <div class="example-block">
+                <h3 class="example-title">Kullanıcı Ara</h3>
+                <span class="endpoint-badge get">GET</span>
+                <div class="endpoint-path">/api/user/search?q=query</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'user-search-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'user-search-py')">Python</div>
+                </div>
+
+                <div id="user-search-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const query = 'ali';
+const response = await fetch(`http://localhost:3000/api/user/search?q=${query}&limit=10`);
+const data = await response.json();
+data.users.forEach(user => {
+    console.log(user.nickname, '-', user.name);
+});</code></pre>
+                </div>
+
+                <div id="user-search-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>query = 'ali'
+response = requests.get(f'http://localhost:3000/api/user/search?q={query}&limit=10')
+data = response.json()
+for user in data['users']:
+    print(f"{user['nickname']} - {user['name']}")</code></pre>
+                </div>
+            </div>
+
+            <!-- Check Nickname -->
+            <div class="example-block">
+                <h3 class="example-title">Kullanıcı Adı Müsaitlik Kontrolü</h3>
+                <span class="endpoint-badge get">GET</span>
+                <div class="endpoint-path">/api/user/check-nickname/:nickname</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'nick-check-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'nick-check-py')">Python</div>
+                </div>
+
+                <div id="nick-check-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const nickname = 'newuser';
+const response = await fetch(`http://localhost:3000/api/user/check-nickname/${nickname}`);
+const data = await response.json();
+console.log('Available:', data.available);</code></pre>
+                </div>
+
+                <div id="nick-check-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>nickname = 'newuser'
+response = requests.get(f'http://localhost:3000/api/user/check-nickname/{nickname}')
+data = response.json()
+print(f"Available: {data['available']}")</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet APIs Tab -->
+    <div id="wallet" class="tab-content">
+        <div class="section">
+            <h2 class="section-title">💼 Cüzdan API Örnekleri</h2>
+
+            <!-- Create Wallet -->
+            <div class="example-block">
+                <h3 class="example-title">Yeni Cüzdan Oluştur</h3>
+                <span class="endpoint-badge">POST</span>
+                <div class="endpoint-path">/api/wallet/create</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'wallet-create-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'wallet-create-py')">Python</div>
+                </div>
+
+                <div id="wallet-create-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const response = await fetch('http://localhost:3000/api/wallet/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    userId: 'USR_abc123'
+  })
+});
+
+const data = await response.json();
+console.log('Wallet ID:', data.wallet.wallet_id);
+console.log('Mnemonic:', data.mnemonic);</code></pre>
+                </div>
+
+                <div id="wallet-create-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>response = requests.post('http://localhost:3000/api/wallet/create', json={
+    'userId': 'USR_abc123'
+})
+
+data = response.json()
+print(f"Wallet ID: {data['wallet']['wallet_id']}")
+print(f"Mnemonic: {data['mnemonic']}")</code></pre>
+                </div>
+            </div>
+
+            <!-- List Wallets -->
+            <div class="example-block">
+                <h3 class="example-title">Kullanıcının Cüzdanlarını Listele</h3>
+                <span class="endpoint-badge get">GET</span>
+                <div class="endpoint-path">/api/wallet/list/:userId</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'wallet-list-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'wallet-list-py')">Python</div>
+                </div>
+
+                <div id="wallet-list-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const userId = 'USR_abc123';
+const response = await fetch(`http://localhost:3000/api/wallet/list/${userId}`);
+const data = await response.json();
+data.wallets.forEach(wallet => {
+    console.log('Wallet:', wallet.wallet_id);
+});</code></pre>
+                </div>
+
+                <div id="wallet-list-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>user_id = 'USR_abc123'
+response = requests.get(f'http://localhost:3000/api/wallet/list/{user_id}')
+data = response.json()
+for wallet in data['wallets']:
+    print(f"Wallet: {wallet['wallet_id']}")</code></pre>
+                </div>
+            </div>
+
+            <!-- Get Wallet -->
+            <div class="example-block">
+                <h3 class="example-title">Cüzdan Bilgisi Al</h3>
+                <span class="endpoint-badge get">GET</span>
+                <div class="endpoint-path">/api/wallet/:walletId</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'wallet-get-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'wallet-get-py')">Python</div>
+                </div>
+
+                <div id="wallet-get-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>const walletId = 'TRN4a3b2c1...';
+const response = await fetch(`http://localhost:3000/api/wallet/${walletId}`);
+const data = await response.json();
+console.log('Balance:', data.balance / 100000000, 'LT');
+console.log('Public Key:', data.public_key);</code></pre>
+                </div>
+
+                <div id="wallet-get-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>wallet_id = 'TRN4a3b2c1...'
+response = requests.get(f'http://localhost:3000/api/wallet/{wallet_id}')
+data = response.json()
+print(f"Balance: {data['balance'] / 100000000} LT")
+print(f"Public Key: {data['public_key']}")</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messaging APIs Tab -->
+    <div id="messaging" class="tab-content">
+        <div class="section">
+            <h2 class="section-title">💬 Mesajlaşma API Örnekleri</h2>
+
+            <!-- Send Private Message -->
+            <div class="example-block">
+                <h3 class="example-title">Şifreli Mesaj Gönder</h3>
+                <span class="endpoint-badge">POST</span>
+                <div class="endpoint-path">/api/messaging/send</div>
+                <div class="description">Uçtan uca şifreli mesajlaşma</div>
+
+                <div class="code-tabs">
+                    <div class="code-tab active" onclick="showCode(this, 'msg-send-js')">JavaScript</div>
+                    <div class="code-tab" onclick="showCode(this, 'msg-send-py')">Python</div>
+                </div>
+
+                <div id="msg-send-js" class="code-block" style="display: block;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code>// Mesajı şifrele (KeyManager kullanarak)
+const encryptedMessage = encryptForUser(
+  message,
+  senderEncryptionPrivateKey,
+  recipientEncryptionPublicKey
+);
+
+const response = await fetch('http://localhost:3000/api/messaging/send', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    from_wallet: 'TRN1a2b3c...',
+    to_wallet: 'TRN4d5e6f...',
+    encrypted_message: encryptedMessage,
+    sender_public_key: senderPublicKey,
+    sender_signature: signature
+  })
+});
+
+const data = await response.json();
+console.log('Message TX ID:', data.tx_id);</code></pre>
+                </div>
+
+                <div id="msg-send-py" class="code-block" style="display: none;">
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                    <pre><code># Mesajı şifrele
+encrypted_message = encrypt_for_user(
+    message,
+    sender_encryption_private_key,
+    recipient_encryption_public_key
+)
+
+response = requests.post('http://localhost:3000/api/messaging/send', json={
+    'from_wallet': 'TRN1a2b3c...',
+    'to_wallet': 'TRN4d5e6f...',
+    'encrypted_message': encrypted_message,
+    'sender_public_key': sender_public_key,
+    'sender_signature': signature
+})
+
+data = response.json()
+print(f"Message TX ID: {data['tx_id']}")</code></pre>
+                </div>
+
+                <div class="info-block">
+                    <strong>💡 Şifreleme:</strong>
+                    <div class="section">
+                        <h2 class="section-title">❤️ Sosyal API Örnekleri</h2>
+
+                        <!-- Like Content -->
+                        <div class="example-block">
+                            <h3 class="example-title">İçeriği Beğen</h3>
+                            <span class="endpoint-badge">POST</span>
+                            <div class="endpoint-path">/api/social/like</div>
+
+                            <div class="code-tabs">
+                                <div class="code-tab active" onclick="showCode(this, 'like-js')">JavaScript</div>
+                                <div class="code-tab" onclick="showCode(this, 'like-py')">Python</div>
+                            </div>
+
+                            <div id="like-js" class="code-block" style="display: block;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>const response = await fetch('http://localhost:3000/api/social/like', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'TRN1a2b3c...',
+    content_id: 'CONTENT_123'
+  })
+});
+
+const data = await response.json();
+console.log('Like TX ID:', data.tx_id);</code></pre>
+                            </div>
+
+                            <div id="like-py" class="code-block" style="display: none;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>response = requests.post('http://localhost:3000/api/social/like', json={
+    'wallet_id': 'TRN1a2b3c...',
+    'content_id': 'CONTENT_123'
+})
+
+data = response.json()
+print(f"Like TX ID: {data['tx_id']}")</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- Follow User -->
+                        <div class="example-block">
+                            <h3 class="example-title">Kullanıcıyı Takip Et</h3>
+                            <span class="endpoint-badge">POST</span>
+                            <div class="endpoint-path">/api/social/follow</div>
+
+                            <div class="code-tabs">
+                                <div class="code-tab active" onclick="showCode(this, 'follow-js')">JavaScript</div>
+                                <div class="code-tab" onclick="showCode(this, 'follow-py')">Python</div>
+                            </div>
+
+                            <div id="follow-js" class="code-block" style="display: block;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>const response = await fetch('http://localhost:3000/api/social/follow', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    follower_wallet: 'TRN1a2b3c...',
+    following_wallet: 'TRN4d5e6f...'
+  })
+});
+
+const data = await response.json();
+console.log('Follow TX ID:', data.tx_id);</code></pre>
+                            </div>
+
+                            <div id="follow-py" class="code-block" style="display: none;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>response = requests.post('http://localhost:3000/api/social/follow', json={
+    'follower_wallet': 'TRN1a2b3c...',
+    'following_wallet': 'TRN4d5e6f...'
+})
+
+data = response.json()
+print(f"Follow TX ID: {data['tx_id']}")</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- Get Followers -->
+                        <div class="example-block">
+                            <h3 class="example-title">Takipçileri Listele</h3>
+                            <span class="endpoint-badge get">GET</span>
+                            <div class="endpoint-path">/api/social/followers/:walletId</div>
+
+                            <div class="code-tabs">
+                                <div class="code-tab active" onclick="showCode(this, 'followers-js')">JavaScript
+                                </div>
+                                <div class="code-tab" onclick="showCode(this, 'followers-py')">Python</div>
+                            </div>
+
+                            <div id="followers-js" class="code-block" style="display: block;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>const walletId = 'TRN1a2b3c...';
+const response = await fetch(`http://localhost:3000/api/social/followers/${walletId}`);
+const data = await response.json();
+console.log('Followers:', data.followers.length);</code></pre>
+                            </div>
+
+                            <div id="followers-py" class="code-block" style="display: none;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>wallet_id = 'TRN1a2b3c...'
+response = requests.get(f'http://localhost:3000/api/social/followers/{wallet_id}')
+data = response.json()
+print(f"Followers: {len(data['followers'])}")</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Content APIs Tab -->
+                <div id="content" class="tab-content">
+                    <div class="section">
+                        <h2 class="section-title">📝 İçerik API Örnekleri</h2>
+
+                        <!-- Create Content -->
+                        <div class="example-block">
+                            <h3 class="example-title">İçerik Oluştur</h3>
+                            <span class="endpoint-badge">POST</span>
+                            <div class="endpoint-path">/api/content/create</div>
+
+                            <div class="code-tabs">
+                                <div class="code-tab active" onclick="showCode(this, 'content-create-js')">
+                                    JavaScript</div>
+                                <div class="code-tab" onclick="showCode(this, 'content-create-py')">Python</div>
+                            </div>
+
+                            <div id="content-create-js" class="code-block" style="display: block;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>const response = await fetch('http://localhost:3000/api/content/create', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    wallet_id: 'TRN1a2b3c...',
+    content_type: 'POST',
+    title: 'Merhaba Dünya',
+    description: 'İlk gönderim!',
+    content_url: 'https://example.com/content.jpg',
+    tags: ['hello', 'first']
+  })
+});
+
+const data = await response.json();
+console.log('Content ID:', data.content.content_id);</code></pre>
+                            </div>
+
+                            <div id="content-create-py" class="code-block" style="display: none;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>response = requests.post('http://localhost:3000/api/content/create', json={
+    'wallet_id': 'TRN1a2b3c...',
+    'content_type': 'POST',
+    'title': 'Merhaba Dünya',
+    'description': 'İlk gönderim!',
+    'content_url': 'https://example.com/content.jpg',
+    'tags': ['hello', 'first']
+})
+
+data = response.json()
+print(f"Content ID: {data['content']['content_id']}")</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- Get Content Feed -->
+                        <div class="example-block">
+                            <h3 class="example-title">İçerik Akışı Al</h3>
+                            <span class="endpoint-badge get">GET</span>
+                            <div class="endpoint-path">/api/content/feed?limit=20</div>
+
+                            <div class="code-tabs">
+                                <div class="code-tab active" onclick="showCode(this, 'feed-js')">JavaScript</div>
+                                <div class="code-tab" onclick="showCode(this, 'feed-py')">Python</div>
+                            </div>
+
+                            <div id="feed-js" class="code-block" style="display: block;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>const response = await fetch('http://localhost:3000/api/content/feed?limit=20');
+const data = await response.json();
+data.feed.forEach(content => {
+    console.log(content.title, '-', content.likes_count, 'likes');
+});</code></pre>
+                            </div>
+
+                            <div id="feed-py" class="code-block" style="display: none;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>response = requests.get('http://localhost:3000/api/content/feed?limit=20')
+data = response.json()
+for content in data['feed']:
+    print(f"{content['title']} - {content['likes_count']} likes")</code></pre>
+                            </div>
+                        </div>
+
+                        <!-- Get User Content -->
+                        <div class="example-block">
+                            <h3 class="example-title">Kullanıcının İçeriklerini Al</h3>
+                            <span class="endpoint-badge get">GET</span>
+                            <div class="endpoint-path">/api/content/user/:walletId</div>
+
+                            <div class="code-tabs">
+                                <div class="code-tab active" onclick="showCode(this, 'user-content-js')">JavaScript
+                                </div>
+                                <div class="code-tab" onclick="showCode(this, 'user-content-py')">Python</div>
+                            </div>
+
+                            <div id="user-content-js" class="code-block" style="display: block;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>const walletId = 'TRN1a2b3c...';
+const response = await fetch(`http://localhost:3000/api/content/user/${walletId}`);
+const data = await response.json();
+console.log('Content Count:', data.content.length);</code></pre>
+                            </div>
+
+                            <div id="user-content-py" class="code-block" style="display: none;">
+                                <button class="copy-btn" onclick="copyCode(this)">📋 Kopyala</button>
+                                <pre><code>wallet_id = 'TRN1a2b3c...'
+response = requests.get(f'http://localhost:3000/api/content/user/{wallet_id}')
+data = response.json()
+print(f"Content Count: {len(data['content'])}")</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scripts -->
+            <script src="/js/navigation.js"></script>
+            <script src="/js/examples.js"></script>
+</body>
+
+</html>

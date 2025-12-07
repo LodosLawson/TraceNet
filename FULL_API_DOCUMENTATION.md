@@ -24,6 +24,7 @@ Returns current blockchain status (height, tx count, chain ID).
 
 **Example:**
 ```javascript
+
 const response = await fetch('http://localhost:3000/rpc/status');
 const data = await response.json();
 console.log(data);

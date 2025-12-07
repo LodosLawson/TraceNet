@@ -42,8 +42,10 @@ export class KeyManager {
 
     /**
      * Generate wallet from mnemonic (BIP39)
+     * @param mnemonic Optional mnemonic (generates new if not provided)
+     * @param encryptionIndex Optional index for encryption key rotation (default: 0)
      */
-    static generateWalletFromMnemonic(mnemonic?: string): WalletKeys {
+    static generateWalletFromMnemonic(mnemonic?: string, encryptionIndex: number = 0): WalletKeys {
         // Generate or use provided mnemonic
         const mnemonicPhrase = mnemonic || bip39.generateMnemonic(256); // 24 words
 
@@ -61,9 +63,9 @@ export class KeyManager {
         const privateKey = Buffer.from(signKeyPair.secretKey).toString('hex');
 
         // 2. Encryption Keys (Curve25519) - BIP32 HD derivation for compatibility
-        // Using standard HD path m/44'/0'/0'/1'/0' for encryption keys
-        // Using @scure/bip32 for consistent derivation with frontend
-        const encryptionPath = "m/44'/0'/0'/1'/0'";
+        // Standard HD path for encryption: m/44'/0'/0'/1'/index'
+        // Index 0 is default. Incrementing index rotates the key (forward secrecy).
+        const encryptionPath = `m/44'/0'/0'/1'/${encryptionIndex}'`;
         const hdkey = HDKey.fromMasterSeed(seed);
         const derived = hdkey.derive(encryptionPath);
 

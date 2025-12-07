@@ -28,50 +28,59 @@ export class MessageEncryption {
         const recipientPublicKey = Buffer.from(recipientPublicKeyHex, 'hex');
         const senderPrivateKey = Buffer.from(senderPrivateKeyHex, 'hex');
 
-        // Generate ephemeral keypair for this message
-        const ephemeralKeyPair = nacl.box.keyPair();
-
         // Generate nonce
         const nonce = nacl.randomBytes(nacl.box.nonceLength);
 
         // Encrypt message
         const messageBytes = Buffer.from(message, 'utf8');
 
-        // Convert Ed25519 keys to X25519 for encryption
-        // Note: In production, you'd want to use proper key derivation
-        // For now, we'll use a simple approach
+        // Use sender's private key for authenticated encryption (allows sender to decrypt later)
         const encrypted = nacl.box(
             messageBytes,
             nonce,
             recipientPublicKey.slice(0, 32), // Use first 32 bytes
-            ephemeralKeyPair.secretKey
+            senderPrivateKey.slice(0, 32)    // Use sender's private key
         );
 
         return {
             encrypted_content: Buffer.from(encrypted).toString('hex'),
             nonce: Buffer.from(nonce).toString('hex'),
-            ephemeral_public_key: Buffer.from(ephemeralKeyPair.publicKey).toString('hex'),
+            ephemeral_public_key: '', // No longer used/needed for authenticated encryption
         };
     }
 
     /**
      * Decrypt message using recipient's private key
+     * Supports both Authenticated Encryption (senderPublicKey provided) and Anonymous/Ephemeral (embedded key)
      */
     static decryptMessage(
         encryptedMessage: EncryptedMessage,
-        recipientPrivateKeyHex: string
+        recipientPrivateKeyHex: string,
+        senderPublicKeyHex?: string
     ): string | null {
         try {
             const encrypted = Buffer.from(encryptedMessage.encrypted_content, 'hex');
             const nonce = Buffer.from(encryptedMessage.nonce, 'hex');
-            const ephemeralPublicKey = Buffer.from(encryptedMessage.ephemeral_public_key, 'hex');
             const recipientPrivateKey = Buffer.from(recipientPrivateKeyHex, 'hex');
+
+            let otherPublicKey: Buffer;
+
+            if (senderPublicKeyHex) {
+                // Authenticated Decryption: Use Sender's Public Key
+                otherPublicKey = Buffer.from(senderPublicKeyHex, 'hex');
+            } else if (encryptedMessage.ephemeral_public_key) {
+                // Legacy/Anonymous: Use Ephemeral Public Key from message
+                otherPublicKey = Buffer.from(encryptedMessage.ephemeral_public_key, 'hex');
+            } else {
+                console.error('Decryption failed: No public key available for decryption');
+                return null;
+            }
 
             // Decrypt
             const decrypted = nacl.box.open(
                 encrypted,
                 nonce,
-                ephemeralPublicKey,
+                otherPublicKey.slice(0, 32), // Use first 32 bytes
                 recipientPrivateKey.slice(0, 32) // Use first 32 bytes
             );
 
