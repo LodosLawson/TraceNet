@@ -1658,7 +1658,7 @@ export class RPCServer {
      */
     private async rotateEncryptionKey(req: Request, res: Response): Promise<void> {
         try {
-            const { system_id } = req.body;
+            const { system_id, shredHistory, public_key } = req.body;
 
             if (!system_id) {
                 res.status(400).json({ error: 'system_id is required' });
@@ -1670,7 +1670,7 @@ export class RPCServer {
                 return;
             }
 
-            const result = this.userService.rotateEncryptionKey(system_id);
+            const result = this.userService.rotateEncryptionKey(system_id, shredHistory, public_key);
 
             if (!result.success) {
                 res.status(400).json({ error: result.error || 'Failed to rotate key' });

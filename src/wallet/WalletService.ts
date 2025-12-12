@@ -257,4 +257,15 @@ export class WalletService {
             this.userWallets.set(wallet.user_id, userWalletList);
         }
     }
+    /**
+     * Delete mnemonic (Crypto-Shredding)
+     * CAUTION: Irreversible. Removes backup capability.
+     */
+    deleteMnemonic(walletId: string): void {
+        const wallet = this.wallets.get(walletId);
+        if (wallet) {
+            wallet.mnemonic_encrypted = undefined;
+            this.wallets.set(walletId, wallet);
+        }
+    }
 }

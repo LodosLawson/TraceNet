@@ -453,32 +453,42 @@ export class UserService {
      * Rotate encryption key
      * Generates a new Curve25519 key pair and updates the user profile
      */
-    rotateEncryptionKey(system_id: string): { success: boolean; newPublicKey?: string; newPrivateKey?: string; error?: string } {
+    rotateEncryptionKey(system_id: string, shredHistory: boolean = false, clientProvidedPublicKey?: string): { success: boolean; newPublicKey?: string; newPrivateKey?: string; error?: string } {
         const user = this.users.get(system_id);
         if (!user) {
             return { success: false, error: 'User not found' };
         }
 
         try {
-            // Generate new keys using WalletService utility
-            // We need to access the static method or use a new instance if not exposed
-            // Since WalletService.createWallet() creates a full wallet, we might need a helper
-            // For now, we'll assume WalletService has a helper or we use the underlying library directly
-            // But to keep it clean, let's use the wallet service if possible.
-            // Looking at WalletService, it uses nacl.
+            let newPublicKey: string;
+            let newPrivateKey: string | undefined;
 
-            const nacl = require('tweetnacl');
-            const util = require('tweetnacl-util');
+            if (clientProvidedPublicKey) {
+                // Client generated key pair - preferred for security
+                newPublicKey = clientProvidedPublicKey;
+                // Private key is unknown to server
+            } else {
+                // Server generated key pair (Legacy/Fallback)
+                const nacl = require('tweetnacl');
+                const util = require('tweetnacl-util');
 
-            const newKeyPair = nacl.box.keyPair();
-            const newPublicKey = util.encodeBase64(newKeyPair.publicKey);
-            // IMPORTANT: The private key must be securely delivered to the user.
-            // In this simulation, we'll return it, but in production it should be handled with extreme care.
-            const newPrivateKey = util.encodeBase64(newKeyPair.secretKey);
+                const newKeyPair = nacl.box.keyPair();
+                newPublicKey = util.encodeBase64(newKeyPair.publicKey);
+                newPrivateKey = util.encodeBase64(newKeyPair.secretKey);
+            }
 
             user.encryption_public_key = newPublicKey;
             user.updated_at = new Date();
             this.users.set(system_id, user);
+
+            // Crypto-Shredding Logic
+            if (shredHistory && user.wallet_ids.length > 0) {
+                for (const walletId of user.wallet_ids) {
+                    this.walletService.deleteMnemonic(walletId);
+                }
+                console.log(`[Crypto-Shredding] Mnemonic deleted for user ${system_id}`);
+            }
+
 
             // Create blockchain transaction for key rotation
             if (user.wallet_ids.length > 0) {
