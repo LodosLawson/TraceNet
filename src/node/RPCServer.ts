@@ -118,6 +118,8 @@ export class RPCServer {
         // Dynamic transfer fee endpoints
         this.app.post('/rpc/calculateTransferFee', this.calculateTransferFee.bind(this));
         this.app.post('/rpc/transfer', this.sendTransfer.bind(this));
+        // Alias for frontend compatibility
+        this.app.post('/api/users/transaction', this.sendTransfer.bind(this));
 
         // Mining endpoint
         this.app.post('/rpc/mine', this.triggerMining.bind(this));
