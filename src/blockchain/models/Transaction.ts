@@ -14,6 +14,8 @@ export enum TransactionType {
     SHARE = 'SHARE',                    // New: Share content
     UNFOLLOW = 'UNFOLLOW',              // New: Unfollow user
     PRIVATE_MESSAGE = 'PRIVATE_MESSAGE', // New: Encrypted private message
+    BATCH = 'BATCH',                    // New: Batch of multiple transactions
+    CONVERSATION_BATCH = 'CONVERSATION_BATCH', // New: Optimized conversation batch
 }
 
 /**
@@ -23,6 +25,28 @@ export interface Signature {
     validator_id: string;
     signature: string;
     timestamp: number;
+}
+
+/**
+ * Inner transaction structure for Batches
+ */
+export interface InnerTransaction {
+    type: TransactionType;
+    from_wallet: string;
+    to_wallet: string;
+    amount: number;
+    payload: any;
+    timestamp: number;
+    nonce: number;
+    signature: string; // Sender's signature for this specific inner message
+    max_wait_time?: number; // Anti-censorship: Max time to wait before upgrading lane
+}
+
+/**
+ * Payload structure for Batch transactions
+ */
+export interface BatchPayload {
+    transactions: InnerTransaction[];
 }
 
 /**
@@ -37,9 +61,11 @@ export interface Transaction {
     amount: number;
     fee: number;
     timestamp: number;
+    nonce: number;
     signatures: Signature[];
     sender_public_key?: string;
     sender_signature?: string;
+    valid_until?: number; // New: Timestamp until which the transaction is valid
 }
 
 /**
@@ -54,9 +80,11 @@ export class TransactionModel {
     amount: number;
     fee: number;
     timestamp: number;
+    nonce: number;
     signatures: Signature[];
     sender_public_key?: string;
     sender_signature?: string;
+    valid_until?: number; // New: Timestamp until which the transaction is valid
 
     constructor(data: Transaction) {
         this.tx_id = data.tx_id;
@@ -67,9 +95,11 @@ export class TransactionModel {
         this.amount = data.amount;
         this.fee = data.fee;
         this.timestamp = data.timestamp;
+        this.nonce = data.nonce;
         this.signatures = data.signatures || [];
         this.sender_public_key = data.sender_public_key;
         this.sender_signature = data.sender_signature;
+        this.valid_until = data.valid_until; // Initialize valid_until
     }
 
     /**
@@ -81,12 +111,14 @@ export class TransactionModel {
         type: TransactionType,
         amount: number,
         fee: number,
+        nonce: number,
         payload: any = {},
         sender_public_key?: string,
-        sender_signature?: string
+        sender_signature?: string,
+        valid_until?: number // New: Optional valid_until parameter
     ): TransactionModel {
         const timestamp = Date.now();
-        const tx_id = this.generateTxId(from_wallet, to_wallet, amount, timestamp);
+        const tx_id = this.generateTxId(from_wallet, to_wallet, amount, timestamp, valid_until);
 
         return new TransactionModel({
             tx_id,
@@ -97,9 +129,11 @@ export class TransactionModel {
             amount,
             fee,
             timestamp,
+            nonce,
             signatures: [],
             sender_public_key,
-            sender_signature
+            sender_signature,
+            valid_until // Pass valid_until to the constructor
         });
     }
 
@@ -110,10 +144,11 @@ export class TransactionModel {
         from: string,
         to: string,
         amount: number,
-        timestamp: number
+        timestamp: number,
+        valid_until?: number // Include valid_until in ID generation
     ): string {
         const crypto = require('crypto');
-        const data = `${from}${to}${amount}${timestamp}`;
+        const data = `${from}${to}${amount}${timestamp}${valid_until || ''}`; // Include valid_until in hash
         return crypto.createHash('sha256').update(data).digest('hex');
     }
 
@@ -148,6 +183,8 @@ export class TransactionModel {
             amount: this.amount,
             fee: this.fee,
             timestamp: this.timestamp,
+            nonce: this.nonce,
+            valid_until: this.valid_until, // Include valid_until in signable data
             sender_public_key: this.sender_public_key // Include public key in signable data if present
         });
     }
@@ -169,6 +206,16 @@ export class TransactionModel {
         // Validate timestamp
         if (this.timestamp <= 0) {
             return { valid: false, error: 'Invalid timestamp' };
+        }
+
+        // Validate nonce
+        if (this.nonce < 0) {
+            return { valid: false, error: 'Nonce must be non-negative' };
+        }
+
+        // Validate valid_until if present
+        if (this.valid_until !== undefined && this.valid_until <= this.timestamp) {
+            return { valid: false, error: 'valid_until must be greater than timestamp' };
         }
 
         // Type-specific validation
@@ -203,9 +250,11 @@ export class TransactionModel {
             amount: this.amount,
             fee: this.fee,
             timestamp: this.timestamp,
+            nonce: this.nonce,
             signatures: this.signatures,
             sender_public_key: this.sender_public_key,
-            sender_signature: this.sender_signature
+            sender_signature: this.sender_signature,
+            valid_until: this.valid_until // Include valid_until in JSON output
         };
     }
 }

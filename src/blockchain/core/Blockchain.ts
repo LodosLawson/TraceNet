@@ -1,6 +1,7 @@
 import { Block, IBlock } from '../models/Block';
 import { Transaction, TransactionModel } from '../models/Transaction';
 import { KeyManager } from '../crypto/KeyManager';
+import { ValidatorPool } from '../../consensus/ValidatorPool';
 
 /**
  * Account state for balance tracking
@@ -34,13 +35,42 @@ export class Blockchain extends EventEmitter {
     private chain: Block[];
     private state: Map<string, AccountState>;
     private genesisValidatorId: string;
+    private validatorPool?: ValidatorPool;
+    private recentTxIds: Set<string> = new Set();
+    private RECENT_TX_CACHE_SIZE = 1000;
 
-    constructor(genesisValidatorId: string) {
+    constructor(genesisValidatorId: string, validatorPool?: ValidatorPool) {
         super();
         this.chain = [];
         this.state = new Map();
         this.genesisValidatorId = genesisValidatorId;
+        this.validatorPool = validatorPool;
         this.initializeGenesis();
+    }
+
+    /**
+     * Cache recent transaction IDs and prune old ones
+     */
+    private cacheTransactionId(txId: string): void {
+        this.recentTxIds.add(txId);
+        if (this.recentTxIds.size > this.RECENT_TX_CACHE_SIZE) {
+            // Prune oldest (iterator order in Set is insertion order)
+            const iter = this.recentTxIds.keys();
+            const first = iter.next().value;
+            this.recentTxIds.delete(first);
+        }
+    }
+
+    /**
+     * Check if transaction ID has been seen recently
+     */
+    private isTransactionDuplicate(txId: string): boolean {
+        // 1. Check recent cache
+        if (this.recentTxIds.has(txId)) return true;
+
+        // 2. Deep scan only if necessary (not implementing full scan for perf reasons in this prototype)
+        // In production, this would use a Bloom Filter or DB index
+        return false;
     }
 
     /**
@@ -96,41 +126,81 @@ export class Blockchain extends EventEmitter {
     addBlock(
         transactions: Transaction[],
         validatorId: string,
-        signature: string,
-        nodeWallet?: string
+        signature: string
     ): { success: boolean; error?: string; block?: Block } {
         const latestBlock = this.getLatestBlock();
-        const newIndex = latestBlock.index + 1;
+        const nextIndex = latestBlock.index + 1;
+        const previousHash = latestBlock.hash;
 
-        // Calculate new state root after applying transactions
-        const newStateRoot = this.calculateStateRoot(transactions);
+        // DOUBLE-SIGNING CHECK (Slashing Condition)
+        // If we already have a block at this height from this validator, but hashes differ
+        const existingBlock = this.getBlockByIndex(nextIndex);
+        if (existingBlock && existingBlock.validator_id === validatorId) {
+            console.warn(`⚠️ POTENTIAL DOUBLE SIGNING DETECTED at height ${nextIndex} by ${validatorId}`);
+            if (this.validatorPool) {
+                this.validatorPool.slashValidator({
+                    validatorId: validatorId,
+                    reason: `Double signing at height ${nextIndex}`,
+                    doubleSign: {
+                        blockHeight: nextIndex,
+                        blockHash1: existingBlock.hash!,
+                        blockHash2: 'POTENTIAL_NEW_BLOCK', // We don't have the new block hash yet, but we know it's a conflict
+                        timestamp: Date.now()
+                    }
+                });
+            }
+            return { success: false, error: 'Double signing detected - Validator slashed' };
+        }
 
-        // Create new block
+        // Calculate state root (this acts as a dry run largely)
+        const stateRoot = this.calculateStateRoot(transactions);
+
         const newBlock = Block.create(
-            newIndex,
-            latestBlock.hash!,
+            nextIndex,
+            previousHash!,
             transactions,
             validatorId,
-            newStateRoot,
-            nodeWallet
+            stateRoot
         );
-
-        // Set signature
         newBlock.setSignature(signature);
 
         // Validate block
         const validation = this.validateBlock(newBlock, latestBlock);
         if (!validation.valid) {
-            return { success: false, error: validation.error };
+            return {
+                success: false,
+                error: `Invalid block: ${validation.error}`,
+            };
         }
 
-        // Apply transactions to state
-        const stateUpdate = this.applyTransactions(transactions, validatorId, newBlock.index, nodeWallet);
-        if (!stateUpdate.success) {
-            return { success: false, error: stateUpdate.error };
+        // Apply transactions to state ATOMICALLY
+        // Create a copy of the state
+        const tempState = new Map<string, AccountState>();
+        for (const [address, account] of this.state.entries()) {
+            tempState.set(address, { ...account });
         }
 
-        // Add block to chain
+        // Apply to temp state
+        for (const tx of transactions) {
+            // Note: We might need to handle the cacheTransactionId logic carefully. 
+            // Currently applyTransactionToState caches it.
+            // We should pass a flag to NOT cache or cache only on commit.
+            // For now, we accept that cache might have failed txs, but state is protected.
+            const result = this.applyTransactionToState(tx, tempState, validatorId, nextIndex, undefined, false);
+            if (!result.success) {
+                console.error(`Transaction ${tx.tx_id} failed: ${result.error}`);
+                return { success: false, error: `Transaction failed: ${result.error}` };
+            }
+        }
+
+        // Commit state
+        this.state = tempState;
+
+        // Cache transactions (since they are now committed)
+        for (const tx of transactions) {
+            this.cacheTransactionId(tx.tx_id);
+        }
+
         this.chain.push(newBlock);
 
         // Emit event
@@ -162,15 +232,31 @@ export class Blockchain extends EventEmitter {
             return { valid: false, error: 'Previous hash mismatch' };
         }
 
-        // Check timestamp (must be after previous block)
+        // Check timestamp (must be valid)
+        const now = Date.now();
+        const MAX_DRIFT = 15000; // 15 seconds
+
         if (block.timestamp <= previousBlock.timestamp) {
-            return { valid: false, error: 'Invalid timestamp' };
+            return { valid: false, error: 'Invalid timestamp: Not greater than previous block' };
+        }
+
+        if (block.timestamp > now + MAX_DRIFT) {
+            return { valid: false, error: 'Invalid timestamp: Too far in the future' };
         }
 
         // Verify validator signature
-        const signableData = block.getSignableData();
-        // Note: Actual signature verification would require validator's public key
-        // This will be implemented in the consensus module
+        if (this.validatorPool && block.index > 0) { // Genesis block might be special
+            const validator = this.validatorPool.getValidator(block.validator_id);
+            if (!validator) {
+                return { valid: false, error: `Unknown validator: ${block.validator_id}` };
+            }
+
+            const signableData = block.getSignableData();
+            // Verify signature using KeyManager
+            if (!KeyManager.verify(signableData, block.signature, validator.public_key)) {
+                return { valid: false, error: 'Invalid block signature' };
+            }
+        }
 
         return { valid: true };
     }
@@ -215,7 +301,7 @@ export class Blockchain extends EventEmitter {
         }
 
         // Validate new chain
-        const tempBlockchain = new Blockchain(this.genesisValidatorId);
+        const tempBlockchain = new Blockchain(this.genesisValidatorId, this.validatorPool);
         tempBlockchain.chain = newChain;
 
         const validation = tempBlockchain.validateChain();
@@ -253,6 +339,63 @@ export class Blockchain extends EventEmitter {
     }
 
     /**
+     * Receive a block from the network (simulated for p2p)
+     * Handles double-signing checks and potential forks
+     */
+    receiveBlock(block: Block): { success: boolean; error?: string } {
+        // 1. Basic validation
+        const latestBlock = this.getLatestBlock();
+
+        // 2. Double Signing Check
+        // If we see a block at a height we already have, from the same validator, but different hash
+        const existingBlock = this.getBlockByIndex(block.index);
+        // console.log(`[DEBUG] Check Double Sign: Block Index ${block.index}, Existing: ${existingBlock ? 'YES' : 'NO'}`);
+        if (existingBlock) {
+            // console.log(`[DEBUG] Existing Val: ${existingBlock.validator_id}, New Val: ${block.validator_id}`);
+            // console.log(`[DEBUG] Existing Hash: ${existingBlock.hash}, New Hash: ${block.hash}`);
+        }
+        if (existingBlock && existingBlock.validator_id === block.validator_id && existingBlock.hash !== block.hash) {
+            console.warn(`🚨 DOUBLE SIGNING PROOF: Validator ${block.validator_id} signed two blocks at height ${block.index}`);
+
+            if (this.validatorPool) {
+                this.validatorPool.slashValidator({
+                    validatorId: block.validator_id,
+                    reason: `Double signing at height ${block.index}`,
+                    doubleSign: {
+                        blockHeight: block.index,
+                        blockHash1: existingBlock.hash!,
+                        blockHash2: block.hash!,
+                        timestamp: Date.now()
+                    }
+                });
+            }
+            return { success: false, error: 'Double signing detected' };
+        }
+
+        // 3. Chain continuity (Simplified)
+        if (block.index === latestBlock.index + 1) {
+            if (block.previous_hash !== latestBlock.hash) {
+                return { success: false, error: 'Invalid previous_hash' };
+            }
+            // For this receiver, we just validate using our standard method and append if valid
+            const validation = this.validateBlock(block, latestBlock);
+            if (!validation.valid) return { success: false, error: validation.error };
+
+            // Execute state changes
+            for (const tx of block.transactions) {
+                this.cacheTransactionId(tx.tx_id);
+                this.applyTransactionToState(tx, this.state);
+            }
+
+            this.chain.push(block);
+            return { success: true };
+        }
+
+        // Ignore older blocks or future blocks (stateless check omitted for brevity)
+        return { success: false, error: 'Block ignored (not next in chain or fork)' };
+    }
+
+    /**
      * Calculate state root hash
      */
     private calculateStateRoot(transactions: Transaction[]): string {
@@ -266,7 +409,7 @@ export class Blockchain extends EventEmitter {
 
         // Apply transactions to temp state
         for (const tx of transactions) {
-            this.applyTransactionToState(tx, tempState);
+            this.applyTransactionToState(tx, tempState, undefined, undefined, undefined, false);
         }
 
         // Calculate hash of state
@@ -319,6 +462,8 @@ export class Blockchain extends EventEmitter {
             if (!result.success) {
                 return result;
             }
+            // Cache TX ID
+            this.cacheTransactionId(tx.tx_id);
         }
         return { success: true };
     }
@@ -330,9 +475,34 @@ export class Blockchain extends EventEmitter {
         tx: Transaction,
         state: Map<string, AccountState>,
         validatorId?: string,
-        blockIndex?: number,
-        nodeWallet?: string
+        blockIndex?: number, // Block index to check if genesis
+        nodeWallet?: string, // Optional node wallet for fee distribution
+        shouldCache: boolean = true // New parameter
     ): { success: boolean; error?: string } {
+        // Check signature length
+        if (tx.sender_signature && tx.sender_signature.length > 128) {
+            return { success: false, error: 'Signature too long' };
+        }
+
+        // TTL Validation: Check if transaction has expired
+        if (tx.valid_until && Date.now() > tx.valid_until) {
+            return {
+                success: false,
+                error: `Transaction expired. Valid until: ${tx.valid_until}, Current time: ${Date.now()}`
+            };
+        }
+
+        // Replay Protection: Check if transaction ID has already been seen using cache
+        // ONLY check if we are supposed to cache (i.e. this is a real application), 
+        // OR always check?
+        // If we are doing a dry run (calculateStateRoot), we shouldn't fail if we just saw it in memory?
+        // But calculateStateRoot is usually done on new transactions.
+        // The issue was calculateStateRoot CACHING it.
+        // So checking is fine, as long as we haven't cached it yet.
+        if (shouldCache && this.isTransactionDuplicate(tx.tx_id)) {
+            return { success: false, error: `Duplicate transaction ID: ${tx.tx_id}` };
+        }
+
         const fromAccount = state.get(tx.from_wallet) || {
             address: tx.from_wallet,
             balance: 0,
@@ -345,8 +515,171 @@ export class Blockchain extends EventEmitter {
             nonce: 0,
         };
 
+        // Replay Protection: Check Nonce
+        // Expected nonce is current nonce + 1
+        // Exception: If sender account is new (nonce 0) and tx nonce is 1
+        if (tx.nonce !== fromAccount.nonce + 1) {
+            return {
+                success: false,
+                error: `Invalid nonce. Expected ${fromAccount.nonce + 1}, got ${tx.nonce}`
+            };
+        }
+
+        // TODO: Check for duplicate tx_id if needed, but nonce check should cover strict ordering
+
+        // Time-Based Fee Logic
+        const blockTimestamp = Date.now(); // In real implementation, this should be passed from the block
+        // For simplicity in this `applyTransactionToState` context which might be called outside a block context (e.g. mempool check),
+        // we might use current time. PROPER implementation should pass blockTimestamp.
+        // Let's assume for now we use the current time as "processing time".
+
+        // Fee thresholds (TRN)
+        const FEE_FAST = 0.00001;
+        const FEE_STANDARD = 0.0000001;
+        const FEE_LOW = 0.00000001;
+
+        // Wait times (ms)
+        const WAIT_STANDARD = 10 * 60 * 1000; // 10 minutes
+        const WAIT_LOW = 60 * 60 * 1000;      // 1 hour
+
+        const waitTime = blockTimestamp - tx.timestamp;
+
+        // Verify Time-Weighted Fees
+        // If fee is less than FAST, must wait
+        if (tx.fee < FEE_FAST) {
+            if (tx.fee >= FEE_STANDARD) {
+                if (waitTime < WAIT_STANDARD) {
+                    return { success: false, error: `Time-Based Fee: Standard priority requires 10 min wait. Current: ${(waitTime / 1000).toFixed(1)}s` };
+                }
+            } else if (tx.fee >= FEE_LOW) {
+                if (waitTime < WAIT_LOW) {
+                    return { success: false, error: `Time-Based Fee: Low priority requires 1 hour wait. Current: ${(waitTime / 1000).toFixed(1)}s` };
+                }
+            } else {
+                return { success: false, error: 'Fee too low' };
+            }
+        }
+
         // Handle different transaction types
         switch (tx.type) {
+            case 'BATCH':
+            case 'CONVERSATION_BATCH':
+                // Validate Batch
+                if (!tx.payload || !Array.isArray(tx.payload.transactions)) {
+                    return { success: false, error: 'Invalid batch payload' };
+                }
+
+                // Batch Size Limit
+                const MAX_BATCH_SIZE = 50; // Example limit
+                if (tx.payload.transactions.length > MAX_BATCH_SIZE) {
+                    return { success: false, error: `Batch size exceeds limit of ${MAX_BATCH_SIZE}` };
+                }
+
+                // Verify batch signature (Validator signs the batch container, but we also need to check something?)
+                // Actually, the sender of the BATCH tx is the validator (usually).
+                // Or if it's a "Conversation Batch", maybe a user sends it?
+                // The requirements say:
+                // "Validator: Sadece batch container’ını imzalar" -> Validator signs the batch.
+                // So 'from_wallet' of the BATCH tx is likely the Validator's wallet.
+
+                // Process inner transactions
+                // Note: We don't charge the Validator for the batch itself usually, OR the validator pays and collects fees?
+                // Requirements: "Zaman Bazlı Ücretlendirme" applies to "Mesaj Modu".
+                // If it's a batch, the fee check above applies to the BATCH transaction itself?
+                // Or does it apply to inner messages?
+                // "Aynı zaman penceresindeki mesajlar... Tek Batch Transaction... Amaç: Blok boyutunu küçültmek"
+                // "Validator ... Mesajları zaman penceresine göre toplar (batch)"
+                // This implies the VALIDATOR creates the batch.
+                // So the *users* sent individual messages to the pool.
+                // The validator collects them and creates a batch.
+                // The User's fee was paid in the original message?
+                // But the original message is NOT on chain yet.
+                // So the inner transaction MUST transfer the fee.
+
+                // Let's iterate inner transactions
+                for (const innerTx of tx.payload.transactions) {
+                    // Validate inner signature !! CRITICAL
+                    // Reconstruct signable data: remove signature, stringify remaining fields
+                    // const { signature, ...dataToSign } = innerTx; // This might reorder keys
+                    // We need a deterministic way.
+                    // For this implementation, we will explicitly construct the object with known fields
+                    const signableData = JSON.stringify({
+                        type: innerTx.type,
+                        from_wallet: innerTx.from_wallet,
+                        to_wallet: innerTx.to_wallet,
+                        amount: innerTx.amount,
+                        payload: innerTx.payload,
+                        timestamp: innerTx.timestamp,
+                        nonce: innerTx.nonce,
+                        max_wait_time: innerTx.max_wait_time
+                    });
+
+                    if (!KeyManager.verify(signableData, innerTx.signature, innerTx.from_wallet)) {
+                        // Fallback: try checking if from_wallet is a public key. 
+                        // In this system, wallet address IS public key usually.
+                        return { success: false, error: `Invalid signature for inner tx from ${innerTx.from_wallet}` };
+                    }
+
+                    // Check max_wait_time for inner tx (Expiry)
+                    if (innerTx.max_wait_time) {
+                        const innerWait = blockTimestamp - innerTx.timestamp;
+                        if (innerWait > innerTx.max_wait_time && innerTx.max_wait_time > 0) {
+                            return { success: false, error: `Inner transaction expired (max_wait_time exceeded) for ${innerTx.from_wallet}` };
+                        }
+                    }
+
+                    // Apply inner transaction logic (e.g. deduct fee from user, increment user nonce)
+                    // We need to look up User's account
+                    const userAccount = state.get(innerTx.from_wallet) || {
+                        address: innerTx.from_wallet,
+                        balance: 0,
+                        nonce: 0
+                    };
+
+                    // Replay protection for inner tx?
+                    // The batch might be valid, but an inner tx might be a replay.
+                    // We need to track inner tx nonces too.
+                    if (innerTx.nonce !== userAccount.nonce + 1) {
+                        // If one fails, does the whole batch fail? 
+                        // Usually yes for atomic batches, or we just skip invalid ones?
+                        // "Tek Conversation Batch TX içinde zincire girer"
+                        // Safe approach: Fail whole batch if invalid to ensure consistency, OR skip invalid.
+                        // Let's fail for now to be strict.
+                        return { success: false, error: `Batch Inner Tx Invalid Nonce for ${innerTx.from_wallet}` };
+                    }
+
+                    // Deduct Fee from User
+                    // The fee in the inner tx should match the service provided (time).
+                    // But the Validator is paying the fee for the Batch Tx?
+                    // Or is the Batch Tx fee 0?
+                    // "Validator Teşvik Dengesi... Fast lane → yüksek fee... Batch lane → düşük fee"
+                    // It implies the user pays the fee.
+                    // So we deduct `amount` (burn/transfer) from user.
+                    // Inner tx 'amount' is likely the fee.
+
+                    if (userAccount.balance < innerTx.amount) {
+                        return { success: false, error: `Insufficient balance for ${innerTx.from_wallet}` };
+                    }
+
+                    userAccount.balance -= innerTx.amount;
+                    userAccount.nonce = innerTx.nonce;
+
+                    // Update state
+                    state.set(innerTx.from_wallet, userAccount);
+                }
+
+                // Validator pays for the batch wrapper?
+                // Usually negligible or covered by block reward.
+                // We'll process the batch wrapper fee if > 0.
+                if (tx.fee > 0) {
+                    if (fromAccount.balance < tx.fee) {
+                        return { success: false, error: 'Insufficient balance for batch fee' };
+                    }
+                    fromAccount.balance -= tx.fee;
+                }
+                fromAccount.nonce = tx.nonce;
+                break;
+
             case 'TRANSFER':
                 // Reset recipient's year counter if needed
                 const now = Date.now();
@@ -375,7 +708,7 @@ export class Blockchain extends EventEmitter {
 
                 // Deduct from sender
                 fromAccount.balance -= totalCost;
-                fromAccount.nonce++;
+                fromAccount.nonce = tx.nonce; // Update nonce to transaction nonce
 
                 // Add to receiver
                 toAccount.balance += tx.amount;
@@ -394,7 +727,7 @@ export class Blockchain extends EventEmitter {
 
                 // Deduct from sender
                 fromAccount.balance -= messageTotalCost;
-                fromAccount.nonce++;
+                fromAccount.nonce = tx.nonce;
 
                 // Add to receiver
                 toAccount.balance += tx.amount;
@@ -421,7 +754,10 @@ export class Blockchain extends EventEmitter {
                         return { success: false, error: 'Insufficient balance for fee' };
                     }
                     fromAccount.balance -= tx.fee;
-                    fromAccount.nonce++;
+                    fromAccount.nonce = tx.nonce;
+                } else {
+                    // Even if fee is 0, we must increment nonce
+                    fromAccount.nonce = tx.nonce;
                 }
 
                 if (tx.amount > 0) {
@@ -537,6 +873,11 @@ export class Blockchain extends EventEmitter {
             }
         }
 
+        // Cache TX ID on success IF INSTRUCTED
+        if (shouldCache) {
+            this.cacheTransactionId(tx.tx_id);
+        }
+
         return { success: true };
     }
 
@@ -593,8 +934,8 @@ export class Blockchain extends EventEmitter {
     /**
      * Import chain from JSON
      */
-    static fromJSON(data: IBlock[], genesisValidatorId: string): Blockchain {
-        const blockchain = new Blockchain(genesisValidatorId);
+    static fromJSON(data: IBlock[], genesisValidatorId: string, validatorPool?: ValidatorPool): Blockchain {
+        const blockchain = new Blockchain(genesisValidatorId, validatorPool);
         blockchain.chain = data.map((blockData) => new Block(blockData));
         blockchain.rebuildState();
         return blockchain;

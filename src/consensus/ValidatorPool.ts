@@ -13,6 +13,20 @@ export interface Validator {
 }
 
 /**
+ * Evidence for slashing a validator
+ */
+export interface SlashingEvidence {
+    validatorId: string;
+    doubleSign?: {
+        blockHeight: number;
+        blockHash1: string;
+        blockHash2: string;
+        timestamp: number;
+    };
+    reason: string;
+}
+
+/**
  * Validator pool for DPoA consensus
  */
 export class ValidatorPool {
@@ -143,7 +157,13 @@ export class ValidatorPool {
     /**
      * Select block producer (round-robin or weighted)
      */
-    selectBlockProducer(blockIndex: number): Validator | null {
+    /**
+     * Select block producer (round-robin or weighted)
+     * @param blockIndex Index of the block to be produced
+     * @param previousBlockHash Hash of the previous block (for randomness)
+     * @param round Round number (for fallback/soft-turn) - defaults to 0
+     */
+    selectBlockProducer(blockIndex: number, previousBlockHash?: string, round: number = 0): Validator | null {
         const online = this.getOnlineValidators();
 
         if (online.length === 0) {
@@ -153,8 +173,27 @@ export class ValidatorPool {
         // Sort by validator_id for deterministic selection
         online.sort((a, b) => a.validator_id.localeCompare(b.validator_id));
 
-        // Round-robin based on block index
-        const index = blockIndex % online.length;
+        let index = 0;
+        if (previousBlockHash) {
+            const crypto = require('crypto');
+            // Use hash of previous block hash + block index to select validator
+            // This makes it deterministic but hard to predict far in advance without knowing previous block hashes
+            const hash = crypto.createHash('sha256')
+                .update(previousBlockHash + blockIndex.toString())
+                .digest('hex');
+
+            // Take last 8 chars of hash to convert to number
+            const hashNum = parseInt(hash.substring(hash.length - 8), 16);
+            index = hashNum % online.length;
+        } else {
+            // Fallback to round-robin based on block index
+            index = blockIndex % online.length;
+        }
+
+        // Apply round rotation (fallback mechanism)
+        // If round > 0, we shift to the next validator in the sorted list
+        index = (index + round) % online.length;
+
         return online[index];
     }
 
@@ -186,8 +225,48 @@ export class ValidatorPool {
     updateReputation(validatorId: string, change: number): void {
         const validator = this.validators.get(validatorId);
         if (validator) {
-            validator.reputation = Math.max(0, Math.min(100, validator.reputation + change));
+            validator.reputation += change;
+
+            // Cap reputation at 100
+            if (validator.reputation > 100) validator.reputation = 100;
+
+            // If reputation falls too low, set offline
+            if (validator.reputation < 0) {
+                validator.reputation = 0;
+                this.setOffline(validatorId);
+            }
+
             this.validators.set(validatorId, validator);
+        }
+    }
+
+    // ... inside ValidatorPool class ...
+
+    /**
+     * Slash a validator for malicious behavior
+     * Penalizes reputation and sets offline (jail)
+     */
+    slashValidator(evidence: SlashingEvidence): void {
+        const validatorId = evidence.validatorId;
+        const validator = this.validators.get(validatorId);
+
+        if (validator) {
+            console.warn(`🚨 SLASHING VALIDATOR ${validatorId}: ${evidence.reason}`);
+
+            if (evidence.doubleSign) {
+                console.warn(`   Evidence: Double signing at height ${evidence.doubleSign.blockHeight}`);
+                console.warn(`   Hash A: ${evidence.doubleSign.blockHash1}`);
+                console.warn(`   Hash B: ${evidence.doubleSign.blockHash2}`);
+            }
+
+            // Heavy reputation penalty
+            this.updateReputation(validatorId, -50);
+
+            // Immediate jail (offline)
+            this.setOffline(validatorId);
+
+            // log slashing event (in real system, would be a chain event)
+            console.log(`Validator ${validatorId} has been slashed and jailed.`);
         }
     }
 

@@ -35,6 +35,7 @@ dotenv.config();
 class BlockchainNode {
     private blockchain: Blockchain;
     private mempool: Mempool;
+    private messagePool: any; // Type strictly in real implementation
     private walletService: WalletService;
     private airdropService: AirdropService;
     private validatorPool: ValidatorPool;
@@ -57,12 +58,14 @@ class BlockchainNode {
         console.log('Initializing Blockchain Node...');
 
         // Initialize core components IN ORDER with correct parameters
-        const genesisValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
-        this.blockchain = new Blockchain(genesisValidatorId);
-
         const maxMempoolSize = parseInt(process.env.MAX_MEMPOOL_SIZE || '10000', 10);
         const mempoolExpiration = parseInt(process.env.MEMPOOL_EXPIRATION_MS || '3600000', 10);
         this.mempool = new Mempool(maxMempoolSize, mempoolExpiration);
+
+        // Initialize MessagePool
+        // Import must be at top, using require here for simplicity in this edit block or I should add import
+        const { MessagePool } = require('./node/MessagePool');
+        this.messagePool = new MessagePool();
 
         const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
         this.walletService = new WalletService(encryptionKey);
@@ -82,6 +85,10 @@ class BlockchainNode {
         this.validatorPool.registerValidator(systemValidatorId, sysUserId, sysKeyPair.publicKey);
         this.validatorPool.setOnline(systemValidatorId);
         console.log(`System Validator registered and online: ${systemValidatorId}`);
+
+        // Initialize core components IN ORDER with correct parameters
+        const genesisValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
+        this.blockchain = new Blockchain(genesisValidatorId, this.validatorPool);
 
         // Keep system validator online
         setInterval(() => {
@@ -129,6 +136,9 @@ class BlockchainNode {
         this.rpcServer = new RPCServer(
             this.blockchain,
             this.mempool,
+            this.blockchain,
+            this.mempool,
+            this.messagePool,
             this.walletService,
             this.validatorPool,
             port

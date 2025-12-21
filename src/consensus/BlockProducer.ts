@@ -111,7 +111,22 @@ export class BlockProducer extends EventEmitter {
             // Select block producer
             const latestBlock = this.blockchain.getLatestBlock();
             const nextIndex = latestBlock.index + 1;
-            const producer = this.validatorPool.selectBlockProducer(nextIndex);
+
+            // Calculate current round based on time elapsed
+            // If block time is 5s:
+            // 0-5s: Round 0
+            // 5-10s: Round 1 (Fallback 1)
+            // 10-15s: Round 2 (Fallback 2)
+            const elapsedTime = Date.now() - latestBlock.timestamp;
+            // Ensure round is at least 0 (in case of clock skew)
+            const currentRound = Math.max(0, Math.floor(elapsedTime / this.blockTime));
+
+            if (currentRound > 0) {
+                console.log(`[Consensus] Slow block production. Elapsed: ${elapsedTime}ms. Round: ${currentRound}. Switching validator...`);
+            }
+
+            // Pass previous block hash for deterministic random selection
+            const producer = this.validatorPool.selectBlockProducer(nextIndex, latestBlock.hash, currentRound);
 
             if (!producer) {
                 console.warn('No validator available for block production');
@@ -197,7 +212,13 @@ export class BlockProducer extends EventEmitter {
 
             const latestBlock = this.blockchain.getLatestBlock();
             const nextIndex = latestBlock.index + 1;
-            const producer = this.validatorPool.selectBlockProducer(nextIndex);
+
+            // Calculate current round
+            const elapsedTime = Date.now() - latestBlock.timestamp;
+            const currentRound = Math.max(0, Math.floor(elapsedTime / this.blockTime));
+
+            // Pass previous block hash for deterministic random selection
+            const producer = this.validatorPool.selectBlockProducer(nextIndex, latestBlock.hash, currentRound);
 
             if (!producer) {
                 const allValidators = this.validatorPool.getAllValidators();

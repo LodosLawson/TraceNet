@@ -5,7 +5,7 @@ import { Blockchain } from '../blockchain/core/Blockchain';
 import { Mempool } from './Mempool';
 import { WalletService } from '../wallet/WalletService';
 import { ValidatorPool } from '../consensus/ValidatorPool';
-import { TransactionModel, Transaction } from '../blockchain/models/Transaction';
+import { TransactionModel, Transaction, InnerTransaction } from '../blockchain/models/Transaction';
 import { KeyManager } from '../blockchain/crypto/KeyManager';
 import { UserService } from '../services/user/UserService';
 import { ContentService } from '../services/ContentService';
@@ -19,6 +19,7 @@ export class RPCServer {
     private app: express.Application;
     private blockchain: Blockchain;
     private mempool: Mempool;
+    private messagePool: any; // MessagePool type
     private walletService: WalletService;
     private validatorPool: ValidatorPool;
     private blockProducer?: BlockProducer;
@@ -30,6 +31,7 @@ export class RPCServer {
     constructor(
         blockchain: Blockchain,
         mempool: Mempool,
+        messagePool: any, // MessagePool
         walletService: WalletService,
         validatorPool: ValidatorPool,
         port: number = 3000
@@ -37,6 +39,7 @@ export class RPCServer {
         this.app = express();
         this.blockchain = blockchain;
         this.mempool = mempool;
+        this.messagePool = messagePool;
         this.walletService = walletService;
         this.validatorPool = validatorPool;
         this.port = port;
@@ -165,6 +168,11 @@ export class RPCServer {
 
         // Messaging endpoints
         this.app.post('/api/messaging/send', this.sendPrivateMessage.bind(this));
+
+        // NEW: Message Pool Endpoints (Optimized Batching)
+        this.app.post('/api/messaging/pool', this.submitToMessagePool.bind(this));
+        this.app.get('/api/validator/messages', this.getMessagesForBatching.bind(this));
+
         this.app.get('/api/messaging/inbox/:walletId', this.getMessages.bind(this));
         this.app.post('/api/messaging/decrypt', this.decryptPrivateMessage.bind(this));
 
@@ -435,12 +443,14 @@ export class RPCServer {
             const fee = (this.blockchain as any).calculateTransferFee(recipientAccount, amount, priority || 'STANDARD');
 
             // Create transaction
+            // Create transaction
             const tx = TransactionModel.create(
                 from_wallet,
                 to_wallet,
                 'TRANSFER' as any,
                 amount,
                 fee,
+                (Date.now() % 1000000), // Random Nonce
                 { priority: priority || 'STANDARD' }
             );
 
@@ -1024,6 +1034,87 @@ export class RPCServer {
     }
 
     /**
+     * Submit message to Message Pool
+     * POST /api/messaging/pool
+     */
+    private async submitToMessagePool(req: Request, res: Response): Promise<void> {
+        try {
+            const innerTx: InnerTransaction = req.body;
+
+            // Validate basic fields
+            if (!innerTx.from_wallet || !innerTx.to_wallet || !innerTx.payload || !innerTx.signature) {
+                res.status(400).json({ error: 'Missing required fields for InnerTransaction' });
+                return;
+            }
+
+            // Verify signature (lightweight check before adding to pool)
+            const signableData = JSON.stringify({
+                type: innerTx.type,
+                from_wallet: innerTx.from_wallet,
+                to_wallet: innerTx.to_wallet,
+                amount: innerTx.amount,
+                payload: innerTx.payload,
+                timestamp: innerTx.timestamp,
+                nonce: innerTx.nonce,
+                max_wait_time: innerTx.max_wait_time
+            });
+
+            if (!KeyManager.verify(signableData, innerTx.signature, innerTx.from_wallet)) {
+                res.status(400).json({ error: 'Invalid signature' });
+                return;
+            }
+
+            // Check nonce against current state (prevent obvious replays)
+            const account = this.blockchain.getAllAccounts().find(a => a.address === innerTx.from_wallet);
+            const currentNonce = account ? account.nonce : 0;
+            if (innerTx.nonce <= currentNonce) {
+                res.status(400).json({ error: `Invalid nonce. Current: ${currentNonce}, Received: ${innerTx.nonce}` });
+                return;
+            }
+
+            // Add to pool
+            const result = this.messagePool.addMessage(innerTx);
+
+            if (!result.success) {
+                res.status(400).json({ error: result.error });
+                return;
+            }
+
+            res.json({
+                success: true,
+                message: 'Message added to pool for batching',
+                pool_id: `${innerTx.from_wallet}:${innerTx.nonce}`
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get messages for Batching (Validator API)
+     * GET /api/validator/messages
+     */
+    private async getMessagesForBatching(req: Request, res: Response): Promise<void> {
+        try {
+            const limit = parseInt(req.query.limit as string || '50', 10);
+            const minWaitTime = parseInt(req.query.minWaitTime as string || '0', 10);
+
+            const messages = this.messagePool.getMessages(limit, minWaitTime);
+
+            res.json({
+                count: messages.length,
+                messages
+            });
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
      * Create content
      */
     private async createContent(req: Request, res: Response): Promise<void> {
@@ -1450,6 +1541,7 @@ export class RPCServer {
                 'PRIVATE_MESSAGE' as any,
                 0, // No amount transfer
                 TOKEN_CONFIG.MESSAGE_FEE, // Use configured fee (0.000001 LT)
+                (Date.now() % 1000000), // Random Nonce
                 {
                     message: encrypted_message,
                     encrypted: true,
