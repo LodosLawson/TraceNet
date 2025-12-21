@@ -58,6 +58,7 @@ export class RewardDistributor {
             TransactionType.REWARD,
             this.config.blockReward,
             0,
+            0, // Nonce
             {
                 type: 'block_production',
                 block_index: blockIndex,
@@ -96,6 +97,7 @@ export class RewardDistributor {
                 TransactionType.REWARD,
                 this.config.signatureReward,
                 0,
+                0, // Nonce
                 {
                     type: 'signature',
                     block_index: blockIndex,
@@ -152,6 +154,7 @@ export class RewardDistributor {
                 TransactionType.REWARD,
                 rewardPerValidator,
                 0,
+                0, // Nonce
                 {
                     type: 'fee_share',
                     block_index: blockIndex,

@@ -68,6 +68,7 @@ export class RewardEngine {
             TransactionType.REWARD,
             this.rules.postCreation,
             0,
+            0, // Nonce
             {
                 type: 'post_creation',
                 user_id: userId,
@@ -84,6 +85,7 @@ export class RewardEngine {
                 TransactionType.REWARD,
                 this.rules.firstPostBonus,
                 0,
+                0, // Nonce
                 {
                     type: 'first_post_bonus',
                     user_id: userId,
@@ -112,6 +114,7 @@ export class RewardEngine {
                 TransactionType.REWARD,
                 this.rules.likeMilestone,
                 0,
+                0, // Nonce
                 {
                     type: 'like_milestone',
                     like_count: likeCount,
@@ -135,6 +138,7 @@ export class RewardEngine {
             TransactionType.REWARD,
             this.rules.comment,
             0,
+            0, // Nonce
             {
                 type: 'comment',
                 timestamp: Date.now(),
@@ -154,6 +158,7 @@ export class RewardEngine {
             TransactionType.REWARD,
             this.rules.share,
             0,
+            0, // Nonce
             {
                 type: 'share',
                 timestamp: Date.now(),
@@ -176,6 +181,7 @@ export class RewardEngine {
             TransactionType.MESSAGE_PAYMENT,
             this.spendingRules.messagePayment,
             0,
+            0, // Nonce
             {
                 type: 'message_payment',
                 timestamp: Date.now(),

@@ -71,7 +71,8 @@ async function runTest() {
             });
             innerTx.signature = KeyManager.sign(signableData, keyPair.privateKey);
 
-            const fetch = (await import('node-fetch')).default;
+            // Using native fetch (Node 20+)
+            // const fetch = (await import('node-fetch')).default;
 
             const postRes = await fetch(`http://localhost:${port}/api/messaging/pool`, {
                 method: 'POST',

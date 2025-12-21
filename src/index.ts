@@ -136,8 +136,6 @@ class BlockchainNode {
         this.rpcServer = new RPCServer(
             this.blockchain,
             this.mempool,
-            this.blockchain,
-            this.mempool,
             this.messagePool,
             this.walletService,
             this.validatorPool,

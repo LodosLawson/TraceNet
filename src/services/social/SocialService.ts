@@ -68,6 +68,7 @@ export class SocialService {
             TransactionType.POST_ACTION,
             0,
             0,
+            (Date.now() % 1000000), // Nonce
             {
                 post_id,
                 content_text: input.content_text,
@@ -153,6 +154,7 @@ export class SocialService {
             TransactionType.LIKE,
             0,
             0,
+            (Date.now() % 1000000), // Nonce
             {
                 post_id,
                 like_id,
@@ -264,6 +266,7 @@ export class SocialService {
             TransactionType.FOLLOW,
             0,
             0,
+            (Date.now() % 1000000), // Nonce
             {
                 follow_id,
                 follower_id,

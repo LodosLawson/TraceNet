@@ -93,6 +93,7 @@ export class ContentService {
             TransactionType.POST_CONTENT,
             0, // No transfer amount for posting
             0, // No fee for posting content
+            (Date.now() % 1000000), // Nonce
             {
                 content: contentModel.toJSON(),
             }

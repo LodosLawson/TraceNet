@@ -89,6 +89,7 @@ export class SocialService {
             TransactionType.LIKE,
             creatorAmount,
             0, // Fee already included in amount
+            (Date.now() % 1000000), // Nonce
             {
                 action_type: 'LIKE',
                 content_id: options.content_id,
@@ -104,6 +105,7 @@ export class SocialService {
             TransactionType.LIKE,
             treasuryAmount,
             0,
+            (Date.now() % 1000000) + 1, // Nonce + 1
             {
                 action_type: 'LIKE_FEE',
                 content_id: options.content_id,
@@ -176,6 +178,7 @@ export class SocialService {
             TransactionType.COMMENT,
             creatorAmount,
             0,
+            (Date.now() % 1000000), // Nonce
             {
                 action_type: 'COMMENT',
                 comment_id,
@@ -194,6 +197,7 @@ export class SocialService {
             TransactionType.COMMENT,
             treasuryAmount,
             0,
+            (Date.now() % 1000000) + 1, // Nonce + 1
             {
                 action_type: 'COMMENT_FEE',
                 content_id: options.content_id,
@@ -238,6 +242,7 @@ export class SocialService {
             TransactionType.FOLLOW,
             0, // No amount
             0, // No fee - following is FREE
+            (Date.now() % 1000000), // Nonce
             {
                 action_type: 'FOLLOW',
                 target_wallet_id: options.target_wallet_id,
@@ -276,6 +281,7 @@ export class SocialService {
             TransactionType.UNFOLLOW,
             0,
             0,
+            (Date.now() % 1000000), // Nonce
             {
                 action_type: 'UNFOLLOW',
                 target_wallet_id: options.target_wallet_id,

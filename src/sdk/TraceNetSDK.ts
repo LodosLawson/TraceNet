@@ -109,6 +109,7 @@ export class TraceNetSDK {
                 TransactionType.TRANSFER,
                 amount,
                 fee,
+                (Date.now() % 1000000), // Placeholder Nonce
                 { priority }
             );
 
@@ -172,6 +173,7 @@ export class TraceNetSDK {
                 options.amount ? TransactionType.MESSAGE_PAYMENT : TransactionType.PRIVATE_MESSAGE,
                 options.amount || 0,
                 TOKEN_CONFIG.MESSAGE_FEE,
+                (Date.now() % 1000000), // Placeholder Nonce
                 { message: encryptedMessage, encrypted: true }
             );
 

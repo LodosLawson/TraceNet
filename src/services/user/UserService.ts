@@ -94,6 +94,7 @@ export class UserService {
             TransactionType.PROFILE_UPDATE,
             0,
             0, // No fee for initial profile creation
+            0, // Nonce
             {
                 action: 'USER_CREATED',
                 encryption_public_key: walletResult.encryptionPublicKey, // ← BLOCKCHAIN'DE!
@@ -230,6 +231,7 @@ export class UserService {
                 TransactionType.PROFILE_UPDATE,
                 0,
                 0,
+                0, // Nonce
                 {
                     updates,
                     timestamp: Date.now(),
@@ -429,6 +431,7 @@ export class UserService {
                 TransactionType.PROFILE_UPDATE,
                 0,
                 TOKEN_CONFIG.PRIVACY_UPDATE_FEE,
+                0, // Nonce
                 {
                     updates: { messaging_privacy: privacy },
                     timestamp: Date.now(),
@@ -499,6 +502,7 @@ export class UserService {
                     TransactionType.PROFILE_UPDATE,
                     0,
                     TOKEN_CONFIG.KEY_ROTATION_FEE,
+                    0, // Nonce
                     {
                         updates: { encryption_public_key: newPublicKey },
                         action: 'KEY_ROTATION',
