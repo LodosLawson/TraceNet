@@ -39,6 +39,7 @@ export class UserService {
         user: User;
         wallet: any;
         mnemonic: string;
+        airdropAmount?: number;
     }> {
         // Optional validation: Check if nickname already exists (if provided)
         if (input.nickname && this.nicknameIndex.has(input.nickname)) {
@@ -135,6 +136,7 @@ export class UserService {
             user,
             wallet: walletResult.wallet,
             mnemonic: walletResult.mnemonic,
+            airdropAmount: this.airdropService['airdropAmount'] // Access private property or add getter - strictly for this fix
         };
     }
 

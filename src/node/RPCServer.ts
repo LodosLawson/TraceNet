@@ -875,10 +875,13 @@ export class RPCServer {
                     wallet_id: result.wallet.wallet_id,
                     public_key: result.wallet.public_key,
                     created_at: result.wallet.created_at,
+                    // Optimistic balance (atomic units)
+                    balance: result.airdropAmount || 0
                 },
                 mnemonic: result.mnemonic,
-                // Airdrop logic handled internally by UserService now, usually returns wallet with balance
-                airdrop_amount: '0.00625 LT',
+                // Airdrop logic handled internally
+                airdrop_amount: result.airdropAmount ? `${result.airdropAmount / 100000000} LT` : '0 LT',
+                amount: result.airdropAmount || 0 // Atomic units for standard parsing
             });
         } catch (error) {
             res.status(400).json({
