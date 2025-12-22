@@ -251,429 +251,428 @@ export class UserService {
                     updates,
                     timestamp: Date.now(),
                 }
-                }
             );
 
-        // Sign the transaction
-        const signableData = profileUpdateTx.getSignableData();
-        const signature = this.walletService.signData(user.wallet_ids[0], signableData);
+            // Sign the transaction
+            const signableData = profileUpdateTx.getSignableData();
+            const signature = this.walletService.signData(user.wallet_ids[0], signableData);
 
-        if (signature) {
-            profileUpdateTx.sender_signature = signature;
-            // We need to fetch the wallet to get the public key, or store it on user?
-            // User model doesn't strictly store signing public key (only encryption public key).
-            // But WalletService has it.
-            const wallet = this.walletService.getWallet(user.wallet_ids[0]);
-            if (wallet) {
-                profileUpdateTx.sender_public_key = wallet.public_key;
+            if (signature) {
+                profileUpdateTx.sender_signature = signature;
+                // We need to fetch the wallet to get the public key, or store it on user?
+                // User model doesn't strictly store signing public key (only encryption public key).
+                // But WalletService has it.
+                const wallet = this.walletService.getWallet(user.wallet_ids[0]);
+                if (wallet) {
+                    profileUpdateTx.sender_public_key = wallet.public_key;
+                }
+            } else {
+                console.warn(`Failed to sign profile update transaction for ${user.wallet_ids[0]}`);
             }
-        } else {
-            console.warn(`Failed to sign profile update transaction for ${user.wallet_ids[0]}`);
-        }
 
-        tx_id = profileUpdateTx.tx_id;
-        // In production, submit to blockchain node here
-        const result = this.mempool.addTransaction(profileUpdateTx);
-        if (!result.success) {
-            console.error(`Failed to add profile update transaction: ${result.error}`);
-        } else {
-            console.log(`Profile update transaction added: ${profileUpdateTx.tx_id}`);
+            tx_id = profileUpdateTx.tx_id;
+            // In production, submit to blockchain node here
+            const result = this.mempool.addTransaction(profileUpdateTx);
+            if (!result.success) {
+                console.error(`Failed to add profile update transaction: ${result.error}`);
+            } else {
+                console.log(`Profile update transaction added: ${profileUpdateTx.tx_id}`);
+            }
         }
-    }
 
         return { user: updatedUser, tx_id };
     }
 
-/**
- * Update user metadata (versioned)
- */
-updateMetadata(
-    system_id: string,
-    key: string,
-    value: any
-): User | undefined {
-    const user = this.users.get(system_id);
-    if (!user) {
-        return undefined;
+    /**
+     * Update user metadata (versioned)
+     */
+    updateMetadata(
+        system_id: string,
+        key: string,
+        value: any
+    ): User | undefined {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return undefined;
+        }
+
+        // Find existing metadata entry
+        const existingIndex = user.metadata.findIndex((m) => m.key === key);
+
+        if (existingIndex >= 0) {
+            // Update existing entry with new version
+            const currentVersion = user.metadata[existingIndex].version;
+            user.metadata[existingIndex] = {
+                key,
+                value,
+                version: currentVersion + 1,
+                updated_at: new Date(),
+            };
+        } else {
+            // Add new metadata entry
+            user.metadata.push({
+                key,
+                value,
+                version: 1,
+                updated_at: new Date(),
+            });
+        }
+
+        user.updated_at = new Date();
+        this.users.set(system_id, user);
+
+        return user;
     }
 
-    // Find existing metadata entry
-    const existingIndex = user.metadata.findIndex((m) => m.key === key);
+    /**
+     * Get metadata value
+     */
+    getMetadata(system_id: string, key: string): MetadataEntry | undefined {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return undefined;
+        }
 
-    if (existingIndex >= 0) {
-        // Update existing entry with new version
-        const currentVersion = user.metadata[existingIndex].version;
-        user.metadata[existingIndex] = {
-            key,
-            value,
-            version: currentVersion + 1,
-            updated_at: new Date(),
+        return user.metadata.find((m) => m.key === key);
+    }
+
+    /**
+     * Update user status
+     */
+    updateStatus(system_id: string, status: UserStatus): void {
+        const user = this.users.get(system_id);
+        if (user) {
+            user.status = status;
+            user.updated_at = new Date();
+            this.users.set(system_id, user);
+        }
+    }
+
+    /**
+     * Add role to user
+     */
+    addRole(system_id: string, role: UserRole): void {
+        const user = this.users.get(system_id);
+        if (user && !user.roles.includes(role)) {
+            user.roles.push(role);
+            user.updated_at = new Date();
+            this.users.set(system_id, user);
+        }
+    }
+
+    /**
+     * Remove role from user
+     */
+    removeRole(system_id: string, role: UserRole): void {
+        const user = this.users.get(system_id);
+        if (user) {
+            user.roles = user.roles.filter((r) => r !== role);
+            user.updated_at = new Date();
+            this.users.set(system_id, user);
+        }
+    }
+
+    /**
+     * Search users by nickname
+     */
+    searchUsers(query: string, limit: number = 20): User[] {
+        const results: User[] = [];
+        const lowerQuery = query.toLowerCase();
+
+        for (const user of this.users.values()) {
+            if (user.nickname.toLowerCase().includes(lowerQuery)) {
+                results.push(user);
+                if (results.length >= limit) break;
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Get all users (admin only)
+     */
+    getAllUsers(): User[] {
+        return Array.from(this.users.values());
+    }
+
+    /**
+     * Get user's encryption public key by identifier (user_id, nickname, or wallet_id)
+     */
+    getEncryptionPublicKey(identifier: string): {
+        user_id: string;
+        nickname: string;
+        wallet_id: string;
+        encryption_public_key: string;
+        messaging_privacy: string;
+    } | undefined {
+        // Try as user_id first
+        let user = this.users.get(identifier);
+
+        // Try as nickname
+        if (!user) {
+            user = this.getUserByNickname(identifier);
+        }
+
+        // Try as wallet_id
+        if (!user) {
+            for (const u of this.users.values()) {
+                if (u.wallet_ids.includes(identifier)) {
+                    user = u;
+                    break;
+                }
+            }
+        }
+
+        if (!user || !user.encryption_public_key || user.wallet_ids.length === 0) {
+            return undefined;
+        }
+
+        // Check privacy settings
+        if (user.messaging_privacy === 'private') {
+            return undefined;
+        }
+
+        // If 'followers', we should check if the requester is a follower.
+        // However, this method is often called to just get the key.
+        // The actual enforcement happens in 'canReceiveMessageFrom' or 'sendPrivateMessage'.
+        // But if privacy is 'private', we definitely shouldn't return the key.
+
+        return {
+            user_id: user.system_id,
+            nickname: user.nickname,
+            wallet_id: user.wallet_ids[0],
+            encryption_public_key: user.encryption_public_key,
+            messaging_privacy: user.messaging_privacy
         };
-    } else {
-        // Add new metadata entry
-        user.metadata.push({
-            key,
-            value,
-            version: 1,
-            updated_at: new Date(),
-        });
     }
 
-    user.updated_at = new Date();
-    this.users.set(system_id, user);
-
-    return user;
-}
-
-/**
- * Get metadata value
- */
-getMetadata(system_id: string, key: string): MetadataEntry | undefined {
-    const user = this.users.get(system_id);
-    if (!user) {
-        return undefined;
-    }
-
-    return user.metadata.find((m) => m.key === key);
-}
-
-/**
- * Update user status
- */
-updateStatus(system_id: string, status: UserStatus): void {
-    const user = this.users.get(system_id);
-    if(user) {
-        user.status = status;
-        user.updated_at = new Date();
-        this.users.set(system_id, user);
-    }
-}
-
-/**
- * Add role to user
- */
-addRole(system_id: string, role: UserRole): void {
-    const user = this.users.get(system_id);
-    if(user && !user.roles.includes(role)) {
-    user.roles.push(role);
-    user.updated_at = new Date();
-    this.users.set(system_id, user);
-}
-    }
-
-/**
- * Remove role from user
- */
-removeRole(system_id: string, role: UserRole): void {
-    const user = this.users.get(system_id);
-    if(user) {
-        user.roles = user.roles.filter((r) => r !== role);
-        user.updated_at = new Date();
-        this.users.set(system_id, user);
-    }
-}
-
-/**
- * Search users by nickname
- */
-searchUsers(query: string, limit: number = 20): User[] {
-    const results: User[] = [];
-    const lowerQuery = query.toLowerCase();
-
-    for (const user of this.users.values()) {
-        if (user.nickname.toLowerCase().includes(lowerQuery)) {
-            results.push(user);
-            if (results.length >= limit) break;
-        }
-    }
-
-    return results;
-}
-
-/**
- * Get all users (admin only)
- */
-getAllUsers(): User[] {
-    return Array.from(this.users.values());
-}
-
-/**
- * Get user's encryption public key by identifier (user_id, nickname, or wallet_id)
- */
-getEncryptionPublicKey(identifier: string): {
-    user_id: string;
-    nickname: string;
-    wallet_id: string;
-    encryption_public_key: string;
-    messaging_privacy: string;
-} | undefined {
-    // Try as user_id first
-    let user = this.users.get(identifier);
-
-    // Try as nickname
-    if (!user) {
-        user = this.getUserByNickname(identifier);
-    }
-
-    // Try as wallet_id
-    if (!user) {
-        for (const u of this.users.values()) {
-            if (u.wallet_ids.includes(identifier)) {
-                user = u;
-                break;
-            }
-        }
-    }
-
-    if (!user || !user.encryption_public_key || user.wallet_ids.length === 0) {
-        return undefined;
-    }
-
-    // Check privacy settings
-    if (user.messaging_privacy === 'private') {
-        return undefined;
-    }
-
-    // If 'followers', we should check if the requester is a follower.
-    // However, this method is often called to just get the key.
-    // The actual enforcement happens in 'canReceiveMessageFrom' or 'sendPrivateMessage'.
-    // But if privacy is 'private', we definitely shouldn't return the key.
-
-    return {
-        user_id: user.system_id,
-        nickname: user.nickname,
-        wallet_id: user.wallet_ids[0],
-        encryption_public_key: user.encryption_public_key,
-        messaging_privacy: user.messaging_privacy
-    };
-}
-
-/**
- * Update messaging privacy setting
- */
-updateMessagingPrivacy(system_id: string, privacy: 'public' | 'followers' | 'private'): boolean {
-    const user = this.users.get(system_id);
-    if (!user) {
-        return false;
-    }
-
-    user.messaging_privacy = privacy;
-    user.updated_at = new Date();
-    this.users.set(system_id, user);
-
-    // Create blockchain transaction for privacy update
-    if (user.wallet_ids.length > 0) {
-        const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
-        const privacyUpdateTx = TransactionModel.create(
-            user.wallet_ids[0],
-            user.wallet_ids[0], // Self-transaction
-            TransactionType.PROFILE_UPDATE,
-            0,
-            TOKEN_CONFIG.PRIVACY_UPDATE_FEE,
-            0, // Nonce
-            {
-                updates: { messaging_privacy: privacy },
-                timestamp: Date.now(),
-            }
-        );
-
-
-
-        // Sign the transaction
-        const signableData = privacyUpdateTx.getSignableData();
-        const signature = this.walletService.signData(user.wallet_ids[0], signableData);
-
-        if (signature) {
-            privacyUpdateTx.sender_signature = signature;
-            // Get public key from wallet service
-            const wallet = this.walletService.getWallet(user.wallet_ids[0]);
-            if (wallet) {
-                privacyUpdateTx.sender_public_key = wallet.public_key;
-            }
-        } else {
-            console.warn(`Failed to sign privacy update transaction for ${user.wallet_ids[0]}`);
+    /**
+     * Update messaging privacy setting
+     */
+    updateMessagingPrivacy(system_id: string, privacy: 'public' | 'followers' | 'private'): boolean {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return false;
         }
 
-        // Add to mempool
-        const result = this.mempool.addTransaction(privacyUpdateTx);
-        if (!result.success) {
-            console.error(`Failed to add privacy update transaction: ${result.error}`);
-            // In a real scenario, we might want to revert the local state change if tx fails
-            // But for now we keep it consistent with existing pattern
-        } else {
-            console.log(`Privacy update transaction added: ${privacyUpdateTx.tx_id}`);
-        }
-    }
-
-    return true;
-}
-
-/**
- * Rotate encryption key
- * Generates a new Curve25519 key pair and updates the user profile
- */
-rotateEncryptionKey(system_id: string, shredHistory: boolean = false, clientProvidedPublicKey ?: string): { success: boolean; newPublicKey ?: string; newPrivateKey ?: string; error ?: string } {
-    const user = this.users.get(system_id);
-    if (!user) {
-        return { success: false, error: 'User not found' };
-    }
-
-    try {
-        let newPublicKey: string;
-        let newPrivateKey: string | undefined;
-
-        if (clientProvidedPublicKey) {
-            // Client generated key pair - preferred for security
-            newPublicKey = clientProvidedPublicKey;
-            // Private key is unknown to server
-        } else {
-            // Server generated key pair (Legacy/Fallback)
-            const nacl = require('tweetnacl');
-            const util = require('tweetnacl-util');
-
-            const newKeyPair = nacl.box.keyPair();
-            newPublicKey = util.encodeBase64(newKeyPair.publicKey);
-            newPrivateKey = util.encodeBase64(newKeyPair.secretKey);
-        }
-
-        user.encryption_public_key = newPublicKey;
+        user.messaging_privacy = privacy;
         user.updated_at = new Date();
         this.users.set(system_id, user);
 
-        // Crypto-Shredding Logic
-        if (shredHistory && user.wallet_ids.length > 0) {
-            for (const walletId of user.wallet_ids) {
-                this.walletService.deleteMnemonic(walletId);
-            }
-            console.log(`[Crypto-Shredding] Mnemonic deleted for user ${system_id}`);
-        }
-
-
-        // Create blockchain transaction for key rotation
+        // Create blockchain transaction for privacy update
         if (user.wallet_ids.length > 0) {
             const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
-            const keyRotationTx = TransactionModel.create(
+            const privacyUpdateTx = TransactionModel.create(
                 user.wallet_ids[0],
-                user.wallet_ids[0],
+                user.wallet_ids[0], // Self-transaction
                 TransactionType.PROFILE_UPDATE,
                 0,
-                TOKEN_CONFIG.KEY_ROTATION_FEE,
+                TOKEN_CONFIG.PRIVACY_UPDATE_FEE,
                 0, // Nonce
                 {
-                    updates: { encryption_public_key: newPublicKey },
-                    action: 'KEY_ROTATION',
+                    updates: { messaging_privacy: privacy },
                     timestamp: Date.now(),
                 }
             );
 
+
+
             // Sign the transaction
-            const signableData = keyRotationTx.getSignableData();
+            const signableData = privacyUpdateTx.getSignableData();
             const signature = this.walletService.signData(user.wallet_ids[0], signableData);
 
             if (signature) {
-                keyRotationTx.sender_signature = signature;
+                privacyUpdateTx.sender_signature = signature;
+                // Get public key from wallet service
                 const wallet = this.walletService.getWallet(user.wallet_ids[0]);
                 if (wallet) {
-                    keyRotationTx.sender_public_key = wallet.public_key;
+                    privacyUpdateTx.sender_public_key = wallet.public_key;
                 }
             } else {
-                console.warn(`Failed to sign key rotation transaction for ${user.wallet_ids[0]}`);
+                console.warn(`Failed to sign privacy update transaction for ${user.wallet_ids[0]}`);
             }
 
-            const result = this.mempool.addTransaction(keyRotationTx);
+            // Add to mempool
+            const result = this.mempool.addTransaction(privacyUpdateTx);
             if (!result.success) {
-                console.error(`Failed to add key rotation transaction: ${result.error}`);
+                console.error(`Failed to add privacy update transaction: ${result.error}`);
+                // In a real scenario, we might want to revert the local state change if tx fails
+                // But for now we keep it consistent with existing pattern
             } else {
-                console.log(`Key rotation transaction added: ${keyRotationTx.tx_id}`);
+                console.log(`Privacy update transaction added: ${privacyUpdateTx.tx_id}`);
             }
         }
 
-        return {
-            success: true,
-            newPublicKey,
-            // We return the private key here so the user can update their local storage
-            // In a real app, this response would be sent over a secure channel
-            // and the user would be prompted to save it immediately.
-            // @ts-ignore - Adding dynamic property for return
-            newPrivateKey
-        };
-    } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-    }
-}
-
-/**
- * Check if a user can receive messages from a specific wallet
- */
-canReceiveMessageFrom(system_id: string, senderWallet: string): boolean {
-    const user = this.users.get(system_id);
-    if (!user) {
-        return false;
-    }
-
-    // Check privacy setting
-    if (user.messaging_privacy === 'public') {
         return true;
     }
 
-    if (user.messaging_privacy === 'private') {
+    /**
+     * Rotate encryption key
+     * Generates a new Curve25519 key pair and updates the user profile
+     */
+    rotateEncryptionKey(system_id: string, shredHistory: boolean = false, clientProvidedPublicKey?: string): { success: boolean; newPublicKey?: string; newPrivateKey?: string; error?: string } {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return { success: false, error: 'User not found' };
+        }
+
+        try {
+            let newPublicKey: string;
+            let newPrivateKey: string | undefined;
+
+            if (clientProvidedPublicKey) {
+                // Client generated key pair - preferred for security
+                newPublicKey = clientProvidedPublicKey;
+                // Private key is unknown to server
+            } else {
+                // Server generated key pair (Legacy/Fallback)
+                const nacl = require('tweetnacl');
+                const util = require('tweetnacl-util');
+
+                const newKeyPair = nacl.box.keyPair();
+                newPublicKey = util.encodeBase64(newKeyPair.publicKey);
+                newPrivateKey = util.encodeBase64(newKeyPair.secretKey);
+            }
+
+            user.encryption_public_key = newPublicKey;
+            user.updated_at = new Date();
+            this.users.set(system_id, user);
+
+            // Crypto-Shredding Logic
+            if (shredHistory && user.wallet_ids.length > 0) {
+                for (const walletId of user.wallet_ids) {
+                    this.walletService.deleteMnemonic(walletId);
+                }
+                console.log(`[Crypto-Shredding] Mnemonic deleted for user ${system_id}`);
+            }
+
+
+            // Create blockchain transaction for key rotation
+            if (user.wallet_ids.length > 0) {
+                const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
+                const keyRotationTx = TransactionModel.create(
+                    user.wallet_ids[0],
+                    user.wallet_ids[0],
+                    TransactionType.PROFILE_UPDATE,
+                    0,
+                    TOKEN_CONFIG.KEY_ROTATION_FEE,
+                    0, // Nonce
+                    {
+                        updates: { encryption_public_key: newPublicKey },
+                        action: 'KEY_ROTATION',
+                        timestamp: Date.now(),
+                    }
+                );
+
+                // Sign the transaction
+                const signableData = keyRotationTx.getSignableData();
+                const signature = this.walletService.signData(user.wallet_ids[0], signableData);
+
+                if (signature) {
+                    keyRotationTx.sender_signature = signature;
+                    const wallet = this.walletService.getWallet(user.wallet_ids[0]);
+                    if (wallet) {
+                        keyRotationTx.sender_public_key = wallet.public_key;
+                    }
+                } else {
+                    console.warn(`Failed to sign key rotation transaction for ${user.wallet_ids[0]}`);
+                }
+
+                const result = this.mempool.addTransaction(keyRotationTx);
+                if (!result.success) {
+                    console.error(`Failed to add key rotation transaction: ${result.error}`);
+                } else {
+                    console.log(`Key rotation transaction added: ${keyRotationTx.tx_id}`);
+                }
+            }
+
+            return {
+                success: true,
+                newPublicKey,
+                // We return the private key here so the user can update their local storage
+                // In a real app, this response would be sent over a secure channel
+                // and the user would be prompted to save it immediately.
+                // @ts-ignore - Adding dynamic property for return
+                newPrivateKey
+            };
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
+    }
+
+    /**
+     * Check if a user can receive messages from a specific wallet
+     */
+    canReceiveMessageFrom(system_id: string, senderWallet: string): boolean {
+        const user = this.users.get(system_id);
+        if (!user) {
+            return false;
+        }
+
+        // Check privacy setting
+        if (user.messaging_privacy === 'public') {
+            return true;
+        }
+
+        if (user.messaging_privacy === 'private') {
+            return false;
+        }
+
+        // For 'followers' privacy, would need to check follow relationship
+        // Simplified for now - return false
         return false;
     }
 
-    // For 'followers' privacy, would need to check follow relationship
-    // Simplified for now - return false
-    return false;
-}
+    /**
+     * Generate QR code data for messaging
+     */
+    generateQRCodeData(system_id: string): {
+        type: string;
+        nickname: string;
+        wallet_id: string;
+        encryption_public_key: string;
+        messaging_privacy: string;
+    } | undefined {
+        const user = this.users.get(system_id);
+        if (!user || !user.encryption_public_key || user.wallet_ids.length === 0) {
+            return undefined;
+        }
 
-/**
- * Generate QR code data for messaging
- */
-generateQRCodeData(system_id: string): {
-    type: string;
-    nickname: string;
-    wallet_id: string;
-    encryption_public_key: string;
-    messaging_privacy: string;
-} | undefined {
-    const user = this.users.get(system_id);
-    if (!user || !user.encryption_public_key || user.wallet_ids.length === 0) {
-        return undefined;
+        return {
+            type: 'tracenet_messaging',
+            nickname: user.nickname,
+            wallet_id: user.wallet_ids[0],
+            encryption_public_key: user.encryption_public_key,
+            messaging_privacy: user.messaging_privacy
+        };
     }
 
-    return {
-        type: 'tracenet_messaging',
-        nickname: user.nickname,
-        wallet_id: user.wallet_ids[0],
-        encryption_public_key: user.encryption_public_key,
-        messaging_privacy: user.messaging_privacy
-    };
-}
-
-/**
- * Export users to JSON
- */
-toJSON(): User[] {
-    return Array.from(this.users.values());
-}
-
-/**
- * Import users from JSON
- */
-loadFromJSON(data: User[]): void {
-    this.users.clear();
-    this.emailIndex.clear();
-    this.nicknameIndex.clear();
-
-    for(const user of data) {
-        this.users.set(user.system_id, user);
-        this.emailIndex.set(user.email, user.system_id);
-        this.nicknameIndex.set(user.nickname, user.system_id);
+    /**
+     * Export users to JSON
+     */
+    toJSON(): User[] {
+        return Array.from(this.users.values());
     }
-}
-/**
- * Check if nickname is available
- */
-isNicknameAvailable(nickname: string): boolean {
-    return !this.nicknameIndex.has(nickname);
-}
+
+    /**
+     * Import users from JSON
+     */
+    loadFromJSON(data: User[]): void {
+        this.users.clear();
+        this.emailIndex.clear();
+        this.nicknameIndex.clear();
+
+        for (const user of data) {
+            this.users.set(user.system_id, user);
+            this.emailIndex.set(user.email, user.system_id);
+            this.nicknameIndex.set(user.nickname, user.system_id);
+        }
+    }
+    /**
+     * Check if nickname is available
+     */
+    isNicknameAvailable(nickname: string): boolean {
+        return !this.nicknameIndex.has(nickname);
+    }
 }
