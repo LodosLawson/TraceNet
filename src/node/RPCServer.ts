@@ -576,6 +576,7 @@ export class RPCServer {
                 user_id: wallet.user_id,
                 public_key: wallet.public_key,
                 balance,
+                nonce: (this.blockchain.getAccountState(walletId) || { nonce: 0 }).nonce,
                 is_first_wallet: wallet.is_first_wallet,
                 created_at: wallet.created_at,
             });
