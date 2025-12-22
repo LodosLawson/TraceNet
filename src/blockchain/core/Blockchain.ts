@@ -448,7 +448,9 @@ export class Blockchain extends EventEmitter {
         const totalRate = baseRate + priorityRate;
 
         // Calculate fee
-        return Math.ceil(amount * totalRate);
+        // Use floating point for TRN fees (since Decimals = 8)
+        // Avoid Math.ceil which rounds up to next integer (1.0)
+        return parseFloat((amount * totalRate).toFixed(8));
     }
 
     /**
@@ -491,7 +493,7 @@ export class Blockchain extends EventEmitter {
         if (tx.valid_until && Date.now() > tx.valid_until) {
             return {
                 success: false,
-                error: `Transaction expired. Valid until: ${tx.valid_until}, Current time: ${Date.now()}`
+                error: `Transaction expired.Valid until: ${tx.valid_until}, Current time: ${Date.now()} `
             };
         }
 
@@ -503,7 +505,7 @@ export class Blockchain extends EventEmitter {
         // The issue was calculateStateRoot CACHING it.
         // So checking is fine, as long as we haven't cached it yet.
         if (shouldCache && this.isTransactionDuplicate(tx.tx_id)) {
-            return { success: false, error: `Duplicate transaction ID: ${tx.tx_id}` };
+            return { success: false, error: `Duplicate transaction ID: ${tx.tx_id} ` };
         }
 
         const fromAccount = state.get(tx.from_wallet) || {
@@ -524,7 +526,7 @@ export class Blockchain extends EventEmitter {
         if (tx.nonce !== fromAccount.nonce + 1) {
             return {
                 success: false,
-                error: `Invalid nonce. Expected ${fromAccount.nonce + 1}, got ${tx.nonce}`
+                error: `Invalid nonce.Expected ${fromAccount.nonce + 1}, got ${tx.nonce} `
             };
         }
 
@@ -556,11 +558,11 @@ export class Blockchain extends EventEmitter {
             if (tx.fee < FEE_FAST) {
                 if (tx.fee >= FEE_STANDARD) {
                     if (waitTime < WAIT_STANDARD) {
-                        return { success: false, error: `Time-Based Fee: Standard priority requires 10 min wait. Current: ${(waitTime / 1000).toFixed(1)}s` };
+                        return { success: false, error: `Time - Based Fee: Standard priority requires 10 min wait.Current: ${(waitTime / 1000).toFixed(1)} s` };
                     }
                 } else if (tx.fee >= FEE_LOW) {
                     if (waitTime < WAIT_LOW) {
-                        return { success: false, error: `Time-Based Fee: Low priority requires 1 hour wait. Current: ${(waitTime / 1000).toFixed(1)}s` };
+                        return { success: false, error: `Time - Based Fee: Low priority requires 1 hour wait.Current: ${(waitTime / 1000).toFixed(1)} s` };
                     }
                 } else {
                     return { success: false, error: 'Fee too low' };
@@ -580,7 +582,7 @@ export class Blockchain extends EventEmitter {
                 // Batch Size Limit
                 const MAX_BATCH_SIZE = 50; // Example limit
                 if (tx.payload.transactions.length > MAX_BATCH_SIZE) {
-                    return { success: false, error: `Batch size exceeds limit of ${MAX_BATCH_SIZE}` };
+                    return { success: false, error: `Batch size exceeds limit of ${MAX_BATCH_SIZE} ` };
                 }
 
                 // Verify batch signature (Validator signs the batch container, but we also need to check something?)
@@ -625,14 +627,14 @@ export class Blockchain extends EventEmitter {
                     if (!KeyManager.verify(signableData, innerTx.signature, innerTx.from_wallet)) {
                         // Fallback: try checking if from_wallet is a public key. 
                         // In this system, wallet address IS public key usually.
-                        return { success: false, error: `Invalid signature for inner tx from ${innerTx.from_wallet}` };
+                        return { success: false, error: `Invalid signature for inner tx from ${innerTx.from_wallet} ` };
                     }
 
                     // Check max_wait_time for inner tx (Expiry)
                     if (innerTx.max_wait_time) {
                         const innerWait = blockTimestamp - innerTx.timestamp;
                         if (innerWait > innerTx.max_wait_time && innerTx.max_wait_time > 0) {
-                            return { success: false, error: `Inner transaction expired (max_wait_time exceeded) for ${innerTx.from_wallet}` };
+                            return { success: false, error: `Inner transaction expired(max_wait_time exceeded) for ${innerTx.from_wallet}` };
                         }
                     }
 
@@ -704,7 +706,7 @@ export class Blockchain extends EventEmitter {
                 if (tx.fee < requiredFee) {
                     return {
                         success: false,
-                        error: `Insufficient fee. Required: ${requiredFee}, Provided: ${tx.fee}`
+                        error: `Insufficient fee.Required: ${requiredFee}, Provided: ${tx.fee} `
                     };
                 }
 
