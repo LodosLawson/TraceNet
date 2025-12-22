@@ -126,7 +126,8 @@ export class Blockchain extends EventEmitter {
     addBlock(
         transactions: Transaction[],
         validatorId: string,
-        signature: string
+        signature: string,
+        timestamp?: number
     ): { success: boolean; error?: string; block?: Block } {
         const latestBlock = this.getLatestBlock();
         const nextIndex = latestBlock.index + 1;
@@ -160,7 +161,9 @@ export class Blockchain extends EventEmitter {
             previousHash!,
             transactions,
             validatorId,
-            stateRoot
+            stateRoot,
+            undefined, // node_wallet
+            timestamp // Pass original timestamp to ensure signature matches
         );
         newBlock.setSignature(signature);
 
@@ -398,7 +401,7 @@ export class Blockchain extends EventEmitter {
     /**
      * Calculate state root hash
      */
-    private calculateStateRoot(transactions: Transaction[]): string {
+    public calculateStateRoot(transactions: Transaction[]): string {
         // Create a DEEP copy of current state to avoid modifying the actual state
         // AccountState objects are mutable, so we must clone them
         const tempState = new Map<string, AccountState>();
@@ -538,6 +541,8 @@ export class Blockchain extends EventEmitter {
         const FEE_STANDARD = 0.0000001;
         const FEE_LOW = 0.00000001;
 
+
+
         // Wait times (ms)
         const WAIT_STANDARD = 10 * 60 * 1000; // 10 minutes
         const WAIT_LOW = 60 * 60 * 1000;      // 1 hour
@@ -545,18 +550,21 @@ export class Blockchain extends EventEmitter {
         const waitTime = blockTimestamp - tx.timestamp;
 
         // Verify Time-Weighted Fees
-        // If fee is less than FAST, must wait
-        if (tx.fee < FEE_FAST) {
-            if (tx.fee >= FEE_STANDARD) {
-                if (waitTime < WAIT_STANDARD) {
-                    return { success: false, error: `Time-Based Fee: Standard priority requires 10 min wait. Current: ${(waitTime / 1000).toFixed(1)}s` };
+        // Skip for REWARD/PROFILE types
+        if (tx.type !== 'REWARD' && tx.type !== 'PROFILE_UPDATE') {
+            // If fee is less than FAST, must wait
+            if (tx.fee < FEE_FAST) {
+                if (tx.fee >= FEE_STANDARD) {
+                    if (waitTime < WAIT_STANDARD) {
+                        return { success: false, error: `Time-Based Fee: Standard priority requires 10 min wait. Current: ${(waitTime / 1000).toFixed(1)}s` };
+                    }
+                } else if (tx.fee >= FEE_LOW) {
+                    if (waitTime < WAIT_LOW) {
+                        return { success: false, error: `Time-Based Fee: Low priority requires 1 hour wait. Current: ${(waitTime / 1000).toFixed(1)}s` };
+                    }
+                } else {
+                    return { success: false, error: 'Fee too low' };
                 }
-            } else if (tx.fee >= FEE_LOW) {
-                if (waitTime < WAIT_LOW) {
-                    return { success: false, error: `Time-Based Fee: Low priority requires 1 hour wait. Current: ${(waitTime / 1000).toFixed(1)}s` };
-                }
-            } else {
-                return { success: false, error: 'Fee too low' };
             }
         }
 

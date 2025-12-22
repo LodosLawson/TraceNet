@@ -35,6 +35,16 @@ export class BlockProducer extends EventEmitter {
         this.productionInterval = null;
     }
 
+    // Store private keys for local validators (e.g. System Validator)
+    private localValidators: Map<string, string> = new Map();
+
+    /**
+     * Register a local validator key for signing blocks
+     */
+    registerLocalValidator(validatorId: string, privateKey: string): void {
+        this.localValidators.set(validatorId, privateKey);
+    }
+
     /**
      * Start block production (event-driven)
      */
@@ -133,8 +143,8 @@ export class BlockProducer extends EventEmitter {
                 return;
             }
 
-            // Calculate state root (will be done by blockchain)
-            const stateRoot = '0'.repeat(64); // Placeholder, blockchain will calculate
+            // Calculate state root
+            const stateRoot = this.blockchain.calculateStateRoot(transactions);
 
             // Create new block
             const newBlock = Block.create(
@@ -154,7 +164,8 @@ export class BlockProducer extends EventEmitter {
             const result = this.blockchain.addBlock(
                 transactions,
                 producer.validator_id,
-                signature
+                signature,
+                newBlock.timestamp, // Pass timestamp to ensure signature matches
             );
 
             if (result.success && result.block) {
@@ -188,8 +199,14 @@ export class BlockProducer extends EventEmitter {
      * Create block signature (placeholder - in production use actual private key)
      */
     private createBlockSignature(blockData: string, validatorId: string): string {
-        // In production, this would use the validator's private key
-        // For now, create a deterministic signature based on block data
+        // Check if we have the private key for this validator locally
+        const privateKey = this.localValidators.get(validatorId);
+
+        if (privateKey) {
+            return KeyManager.sign(blockData, privateKey);
+        }
+
+        // Fallback for simulation (Invalid in real verification if Blockchain enforces signatures)
         return KeyManager.hash(blockData + validatorId);
     }
 
@@ -229,7 +246,7 @@ export class BlockProducer extends EventEmitter {
                 };
             }
 
-            const stateRoot = '0'.repeat(64);
+            const stateRoot = this.blockchain.calculateStateRoot(transactions);
 
             const newBlock = Block.create(
                 nextIndex,
@@ -245,7 +262,8 @@ export class BlockProducer extends EventEmitter {
             const result = this.blockchain.addBlock(
                 transactions,
                 producer.validator_id,
-                signature
+                signature,
+                newBlock.timestamp
             );
 
             if (result.success && result.block) {

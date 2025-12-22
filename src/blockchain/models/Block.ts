@@ -81,9 +81,9 @@ export class Block {
         transactions: Transaction[],
         validator_id: string,
         state_root: string,
-        node_wallet?: string
+        node_wallet?: string,
+        timestamp: number = Date.now()
     ): Block {
-        const timestamp = Date.now();
         const merkle_root = this.calculateMerkleRoot(transactions);
 
         return new Block({

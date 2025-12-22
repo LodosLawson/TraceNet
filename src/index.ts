@@ -114,6 +114,8 @@ class BlockchainNode {
             blockTime,
             maxTxPerBlock
         );
+        // Register local system validator key for signing
+        this.blockProducer.registerLocalValidator(systemValidatorId, sysKeyPair.privateKey);
 
         const rewardConfig: RewardConfig = {
             blockReward: parseInt(process.env.BLOCK_REWARD || '0', 10), // Disabled - only airdrops count
