@@ -7,6 +7,9 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
+# Install build dependencies for native modules (bcrypt)
+RUN apk add --no-cache python3 make g++
+
 RUN npm ci
 
 # Copy source code
@@ -22,8 +25,10 @@ WORKDIR /app
 
 # Install production dependencies only
 COPY package*.json ./
-RUN npm ci --only=production && \
-  npm cache clean --force
+# Install build tools, install modules, then remove build tools to keep image small
+RUN apk add --no-cache python3 make g++ && \
+  npm ci --only=production && \
+  apk del python3 make g++
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
