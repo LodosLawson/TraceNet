@@ -46,7 +46,7 @@ export class AirdropService {
             TransactionType.REWARD,
             this.airdropAmount,
             0, // No fee for airdrops
-            0, // Nonce
+            1, // Nonce: Must be 1 (System account nonce presumed 0 if REWARD doesn't increment it)
             {
                 type: 'initial_airdrop',
                 user_id: userId,

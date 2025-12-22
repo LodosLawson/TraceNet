@@ -95,7 +95,7 @@ export class UserService {
             TransactionType.PROFILE_UPDATE,
             0,
             0, // No fee for initial profile creation
-            0, // Nonce
+            1, // Nonce: Must be 1 for new user (Account Nonce 0 -> Expected 1)
             {
                 action: 'USER_CREATED',
                 encryption_public_key: walletResult.encryptionPublicKey, // ← BLOCKCHAIN'DE!
