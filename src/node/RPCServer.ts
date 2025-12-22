@@ -1845,11 +1845,19 @@ export class RPCServer {
                     message: 'Block mined successfully'
                 });
             } else {
-                res.status(400).json({
-                    success: false,
-                    error: result.error || 'Mining failed',
-                    message: 'Unable to mine block'
-                });
+                // Treat empty mempool as success (idempotent mining)
+                if (result.error === 'No transactions in mempool') {
+                    res.json({
+                        success: true,
+                        message: 'No transactions to mine (Mempool empty)'
+                    });
+                } else {
+                    res.status(400).json({
+                        success: false,
+                        error: result.error || 'Mining failed',
+                        message: 'Unable to mine block'
+                    });
+                }
             }
         } catch (error) {
             res.status(500).json({
