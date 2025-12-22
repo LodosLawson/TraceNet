@@ -111,12 +111,15 @@ export class UserService {
 
 
         // Sign the transaction
+        // Set public key BEFORE signing so it's included in signable data
+        profileCreationTx.sender_public_key = walletResult.wallet.public_key;
+
+        // Sign the transaction
         const signableData = profileCreationTx.getSignableData();
         const signature = this.walletService.signData(walletResult.wallet.wallet_id, signableData);
 
         if (signature) {
             profileCreationTx.sender_signature = signature;
-            profileCreationTx.sender_public_key = walletResult.wallet.public_key;
         } else {
             console.warn(`Failed to sign profile creation transaction for ${walletResult.wallet.wallet_id}`);
         }
