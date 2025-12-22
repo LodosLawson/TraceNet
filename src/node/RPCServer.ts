@@ -127,6 +127,13 @@ export class RPCServer {
         // Mining endpoint
         this.app.post('/rpc/mine', this.triggerMining.bind(this));
 
+        // Legacy mining endpoints for compatibility (TraceNetExplorer support)
+        this.app.get('/mine_block', this.triggerMining.bind(this));
+        this.app.get('/mine', this.triggerMining.bind(this));
+        this.app.post('/mine', this.triggerMining.bind(this));
+        this.app.get('/api/mine', this.triggerMining.bind(this));
+        this.app.post('/api/mine', this.triggerMining.bind(this));
+
         // Wallet API endpoints
         this.app.post('/api/wallet/create', this.createWallet.bind(this));
         this.app.get('/api/wallet/list/:userId', this.listWallets.bind(this));
