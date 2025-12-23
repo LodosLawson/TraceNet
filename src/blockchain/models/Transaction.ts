@@ -39,6 +39,7 @@ export interface InnerTransaction {
     timestamp: number;
     nonce: number;
     signature: string; // Sender's signature for this specific inner message
+    sender_public_key?: string; // Sender's public key (required for verification)
     max_wait_time?: number; // Anti-censorship: Max time to wait before upgrading lane
 }
 

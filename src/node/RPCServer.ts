@@ -211,6 +211,21 @@ export class RPCServer {
                 return;
             }
 
+            // CRITICAL: Verify Signature
+            if (!transaction.sender_signature || !transaction.sender_public_key) {
+                res.status(400).json({ error: 'Missing sender signature or public key' });
+                return;
+            }
+
+            // Reconstruct signable data
+            const signableData = txModel.getSignableData();
+            const isValid = KeyManager.verify(signableData, transaction.sender_signature, transaction.sender_public_key);
+
+            if (!isValid) {
+                res.status(400).json({ error: 'Invalid signature' });
+                return;
+            }
+
             // Add to mempool
             const result = this.mempool.addTransaction(transaction);
 
@@ -396,10 +411,10 @@ export class RPCServer {
             };
 
             // Calculate fee using blockchain's method
-            const fee = (this.blockchain as any).calculateTransferFee(recipientAccount, amount, priority || 'STANDARD');
+            const fee = (this.blockchain as any).calculateTransferFee(recipient_address, amount, priority || 'STANDARD');
 
             // Get fee breakdown
-            const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
+            const { TOKEN_CONFIG } = require('../economy/TokenConfig');
             const feeConfig = TOKEN_CONFIG.DYNAMIC_TRANSFER_FEES;
             const count = recipientAccount.incomingTransferCount || 0;
 
@@ -1042,65 +1057,6 @@ export class RPCServer {
      */
     setContentService(contentService: ContentService): void {
         this.contentService = contentService;
-    }
-
-    /**
-     * Submit message to Message Pool
-     * POST /api/messaging/pool
-     */
-    private async submitToMessagePool(req: Request, res: Response): Promise<void> {
-        try {
-            const innerTx: InnerTransaction = req.body;
-
-            // Validate basic fields
-            if (!innerTx.from_wallet || !innerTx.to_wallet || !innerTx.payload || !innerTx.signature) {
-                res.status(400).json({ error: 'Missing required fields for InnerTransaction' });
-                return;
-            }
-
-            // Verify signature (lightweight check before adding to pool)
-            const signableData = JSON.stringify({
-                type: innerTx.type,
-                from_wallet: innerTx.from_wallet,
-                to_wallet: innerTx.to_wallet,
-                amount: innerTx.amount,
-                payload: innerTx.payload,
-                timestamp: innerTx.timestamp,
-                nonce: innerTx.nonce,
-                max_wait_time: innerTx.max_wait_time
-            });
-
-            if (!KeyManager.verify(signableData, innerTx.signature, innerTx.from_wallet)) {
-                res.status(400).json({ error: 'Invalid signature' });
-                return;
-            }
-
-            // Check nonce against current state (prevent obvious replays)
-            const account = this.blockchain.getAllAccounts().find(a => a.address === innerTx.from_wallet);
-            const currentNonce = account ? account.nonce : 0;
-            if (innerTx.nonce <= currentNonce) {
-                res.status(400).json({ error: `Invalid nonce. Current: ${currentNonce}, Received: ${innerTx.nonce}` });
-                return;
-            }
-
-            // Add to pool
-            const result = this.messagePool.addMessage(innerTx);
-
-            if (!result.success) {
-                res.status(400).json({ error: result.error });
-                return;
-            }
-
-            res.json({
-                success: true,
-                message: 'Message added to pool for batching',
-                pool_id: `${innerTx.from_wallet}:${innerTx.nonce}`
-            });
-        } catch (error) {
-            res.status(500).json({
-                error: error instanceof Error ? error.message : 'Unknown error',
-            });
-        }
     }
 
     /**
@@ -1863,6 +1819,82 @@ export class RPCServer {
             res.status(500).json({
                 error: error instanceof Error ? error.message : 'Unknown error',
                 message: 'Mining trigger failed'
+            });
+        }
+    }
+
+    /**
+     * Submit inner message to pool
+     */
+    private async submitToMessagePool(req: Request, res: Response): Promise<void> {
+        try {
+            const innerTx: InnerTransaction = req.body;
+
+            // Validate inner transaction
+            if (!innerTx.signature || !innerTx.from_wallet || !innerTx.payload) {
+                res.status(400).json({ error: 'Missing required fields' });
+                return;
+            }
+
+            // Verify inner signature
+            // Verify inner signature
+            const signableData = JSON.stringify({
+                type: innerTx.type,
+                from_wallet: innerTx.from_wallet,
+                to_wallet: innerTx.to_wallet,
+                amount: innerTx.amount,
+                payload: innerTx.payload,
+                timestamp: innerTx.timestamp,
+                nonce: innerTx.nonce,
+                max_wait_time: innerTx.max_wait_time,
+                sender_public_key: innerTx.sender_public_key // Include in signable data if part of signatures
+            });
+
+            // Note: signableData usually excludes the signature/public key if they are appended later.
+            // But if we want to verify the PAYLOAD, we verify the data + public key? 
+            // NO. We verify the data against the public key.
+            // The InnerTransaction structure in verification matches client's signing.
+            const dataToVerify = JSON.stringify({
+                type: innerTx.type,
+                from_wallet: innerTx.from_wallet,
+                to_wallet: innerTx.to_wallet,
+                amount: innerTx.amount,
+                payload: innerTx.payload,
+                timestamp: innerTx.timestamp,
+                nonce: innerTx.nonce,
+                max_wait_time: innerTx.max_wait_time
+            });
+
+            console.log(`[RPC] submitToMessagePool SignableData: ${dataToVerify}`);
+            console.log(`[RPC] Signature: ${innerTx.signature}`);
+            console.log(`[RPC] PublicKey: ${innerTx.sender_public_key}`);
+
+            if (!innerTx.sender_public_key) {
+                res.status(400).json({ error: 'Missing sender_public_key' });
+                return;
+            }
+
+            // For verification we use KeyManager.verify
+            const isValid = KeyManager.verify(dataToVerify, innerTx.signature, innerTx.sender_public_key);
+            console.log(`[RPC] Signature Valid? ${isValid}`);
+
+            if (!isValid) {
+                res.json({ error: 'Invalid signature' });
+                return;
+            }
+
+            // Submit to pool
+            const result = this.messagePool.addMessage(innerTx);
+
+            if (result.success) {
+                res.json({ success: true, message: 'Message added to pool', pool_id: result.messageId });
+            } else {
+                res.status(400).json({ error: result.error });
+            }
+
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
             });
         }
     }

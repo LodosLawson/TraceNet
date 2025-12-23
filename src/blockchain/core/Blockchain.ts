@@ -2,6 +2,7 @@ import { Block, IBlock } from '../models/Block';
 import { Transaction, TransactionModel } from '../models/Transaction';
 import { KeyManager } from '../crypto/KeyManager';
 import { ValidatorPool } from '../../consensus/ValidatorPool';
+import { TOKEN_CONFIG } from '../../economy/TokenConfig';
 
 /**
  * Account state for balance tracking
@@ -424,34 +425,8 @@ export class Blockchain extends EventEmitter {
         return KeyManager.hash(stateString);
     }
 
-    /**
-     * Calculate transfer fee based on recipient's activity and priority
-     */
-    private calculateTransferFee(recipientAccount: AccountState, amount: number, priority: string = 'STANDARD'): number {
-        const { TOKEN_CONFIG } = require('../../economy/TokenConfig');
-        const feeConfig = TOKEN_CONFIG.DYNAMIC_TRANSFER_FEES;
 
-        // Determine base fee tier based on recipient's incoming transfer count
-        const count = recipientAccount.incomingTransferCount || 0;
-        let baseRate = feeConfig.BASE.TIER_0.rate;
 
-        if (count >= feeConfig.BASE.TIER_3.threshold) {
-            baseRate = feeConfig.BASE.TIER_3.rate;
-        } else if (count >= feeConfig.BASE.TIER_2.threshold) {
-            baseRate = feeConfig.BASE.TIER_2.rate;
-        } else if (count >= feeConfig.BASE.TIER_1.threshold) {
-            baseRate = feeConfig.BASE.TIER_1.rate;
-        }
-
-        // Add priority fee
-        const priorityRate = feeConfig.PRIORITY[priority] || 0;
-        const totalRate = baseRate + priorityRate;
-
-        // Calculate fee
-        // Use floating point for TRN fees (since Decimals = 8)
-        // Avoid Math.ceil which rounds up to next integer (1.0)
-        return parseFloat((amount * totalRate).toFixed(8));
-    }
 
     /**
      * Apply transactions to blockchain state
@@ -700,7 +675,7 @@ export class Blockchain extends EventEmitter {
 
                 // Calculate required fee based on recipient's incoming transfer count
                 const priority = tx.payload?.priority || 'STANDARD';
-                const requiredFee = this.calculateTransferFee(toAccount, tx.amount, priority);
+                const requiredFee = this.calculateTransferFee(tx.to_wallet, tx.amount, priority);
 
                 // Validate fee
                 if (tx.fee < requiredFee) {
@@ -905,6 +880,7 @@ export class Blockchain extends EventEmitter {
         }
     }
 
+
     /**
      * Get blockchain statistics
      */
@@ -949,5 +925,39 @@ export class Blockchain extends EventEmitter {
         blockchain.chain = data.map((blockData) => new Block(blockData));
         blockchain.rebuildState();
         return blockchain;
+    }
+
+    /**
+     * Calculate dynamic transfer fee
+     */
+    public calculateTransferFee(toAccount: string, amount: number, priority: 'STANDARD' | 'HIGH' | 'URGENT' = 'STANDARD'): number {
+        console.log(`[Blockchain] Calculating fee for ${toAccount}, amount: ${amount}, priority: ${priority}`);
+
+        // 1. Get recipient activity
+        const recipientState = this.state.get(toAccount);
+        const incomingCount = recipientState ? recipientState.incomingTransferCount || 0 : 0;
+
+        // 2. Base rate from config (Tiered)
+        const fees = TOKEN_CONFIG.DYNAMIC_TRANSFER_FEES;
+        let baseRate = fees.BASE.TIER_0.rate;
+
+        if (incomingCount >= fees.BASE.TIER_3.threshold) {
+            baseRate = fees.BASE.TIER_3.rate;
+        } else if (incomingCount >= fees.BASE.TIER_2.threshold) {
+            baseRate = fees.BASE.TIER_2.rate;
+        } else if (incomingCount >= fees.BASE.TIER_1.threshold) {
+            baseRate = fees.BASE.TIER_1.rate;
+        }
+
+        // 3. Priority Surcharge (Additive)
+        const priorityKey = priority === 'URGENT' ? 'HIGH' : priority;
+        const priorityRate = fees.PRIORITY[priorityKey] || 0;
+
+        console.log(`[Blockchain] BaseRate: ${baseRate}, PriorityRate: ${priorityRate}, IncomingCount: ${incomingCount}`);
+
+        const totalRate = baseRate + priorityRate;
+        const fee = parseFloat((amount * totalRate).toFixed(8));
+        console.log(`[Blockchain] TotalRate: ${totalRate}, Calculated Fee: ${fee}`);
+        return fee;
     }
 }
