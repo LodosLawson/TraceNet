@@ -146,13 +146,28 @@ export class BlockProducer extends EventEmitter {
             // Calculate state root
             const stateRoot = this.blockchain.calculateStateRoot(transactions);
 
+            // Calculate next timestamp
+            // Ensure strictly increasing timestamp (Monotonicity)
+            // If system time < previous block timestamp, we must push it forward.
+            // If system time > previous + blockTime, that's fine.
+            let nextTimestamp = Date.now();
+            if (nextTimestamp <= latestBlock.timestamp) {
+                nextTimestamp = latestBlock.timestamp + 1;
+                // Optional: warnings if drift is large
+                if (latestBlock.timestamp - Date.now() > 5000) {
+                    console.warn(`[BlockProducer] System clock lagging behind chain tip by ${latestBlock.timestamp - Date.now()}ms`);
+                }
+            }
+
             // Create new block
             const newBlock = Block.create(
                 nextIndex,
                 latestBlock.hash!,
                 transactions,
                 producer.validator_id,
-                stateRoot
+                stateRoot,
+                undefined, // node_wallet (can be added later if needed)
+                nextTimestamp // Explicitly pass the calculated timestamp
             );
 
             // Sign block (in production, this would use the producer's private key)
