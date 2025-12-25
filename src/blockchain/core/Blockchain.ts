@@ -641,7 +641,8 @@ export class Blockchain extends EventEmitter {
         // Also skip POST_CONTENT for now to allow free posting until frontend fee implementation is solid
         // Also skip FOLLOW/UNFOLLOW to ensure social graph updates are fast
         if (tx.type !== 'REWARD' && tx.type !== 'PROFILE_UPDATE'
-            && tx.type !== 'POST_CONTENT' && tx.type !== 'FOLLOW' && tx.type !== 'UNFOLLOW') {
+            && tx.type !== 'POST_CONTENT' && tx.type !== 'FOLLOW' && tx.type !== 'UNFOLLOW'
+            && tx.type !== 'LIKE' && tx.type !== 'COMMENT' && tx.type !== 'BATCH') {
             // If fee is less than FAST, must wait
             if (tx.fee < FEE_FAST) {
                 if (tx.fee >= FEE_STANDARD) {
