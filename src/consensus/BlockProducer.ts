@@ -159,6 +159,14 @@ export class BlockProducer extends EventEmitter {
                 }
             }
 
+            // Sort transactions by Nonce to ensure dependent transactions (chaining) work correctly
+            transactions.sort((a, b) => {
+                if (a.from_wallet === b.from_wallet) {
+                    return a.nonce - b.nonce;
+                }
+                return 0;
+            });
+
             // Create new block
             const newBlock = Block.create(
                 nextIndex,
@@ -283,6 +291,16 @@ export class BlockProducer extends EventEmitter {
                 };
             }
 
+            // Sort transactions by Nonce to ensure dependent transactions (chaining) work correctly
+            transactions.sort((a, b) => {
+                if (a.from_wallet === b.from_wallet) {
+                    return a.nonce - b.nonce;
+                }
+                return 0; // Relative order of different accounts doesn't matter (heuristically)
+            });
+
+            console.log('Sorted Transactions for Block: ', transactions.map(t => `${t.from_wallet.substr(0, 8)}:${t.nonce}`).join(', '));
+
             const stateRoot = this.blockchain.calculateStateRoot(transactions);
 
             const newBlock = Block.create(
@@ -290,7 +308,9 @@ export class BlockProducer extends EventEmitter {
                 latestBlock.hash!,
                 transactions,
                 producer.validator_id,
-                stateRoot
+                stateRoot,
+                undefined,
+                Date.now() // Use current time for triggered blocks
             );
 
             const blockData = newBlock.getSignableData();
@@ -318,6 +338,31 @@ export class BlockProducer extends EventEmitter {
 
                 return { success: true, block: result.block };
             } else {
+                console.error('Failed to trigger block:', result.error);
+
+                // Identify and remove invalid transactions to prevent stalling (Anti-Stall Fix)
+                console.log('Validating transactions to identify culprits...');
+                const invalidTxIds: string[] = [];
+
+                for (const tx of transactions) {
+                    // Use new validateTransaction method
+                    const validation = this.blockchain.validateTransaction(tx);
+                    if (!validation.valid) {
+                        console.warn(`Removing invalid transaction ${tx.tx_id}: ${validation.error}`);
+                        this.mempool.removeTransaction(tx.tx_id);
+                        invalidTxIds.push(tx.tx_id);
+                    }
+                }
+
+                if (invalidTxIds.length === 0) {
+                    // If all appear valid individually but block failed, it might be state mismatch or strictly order dependent
+                    // Clear batch to be safe
+                    console.warn('Clearing current batch from mempool to resolve stall (Block level failure).');
+                    for (const tx of transactions) {
+                        this.mempool.removeTransaction(tx.tx_id);
+                    }
+                }
+
                 return { success: false, error: result.error };
             }
         } catch (error) {

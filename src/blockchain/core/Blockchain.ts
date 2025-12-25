@@ -585,17 +585,25 @@ export class Blockchain extends EventEmitter {
             return { success: false, error: `Duplicate transaction ID: ${tx.tx_id} ` };
         }
 
-        const fromAccount = state.get(tx.from_wallet) || {
-            address: tx.from_wallet,
-            balance: 0,
-            nonce: 0,
-        };
+        let fromAccount = state.get(tx.from_wallet);
+        if (!fromAccount) {
+            fromAccount = {
+                address: tx.from_wallet,
+                balance: 0,
+                nonce: 0,
+            };
+        }
 
-        const toAccount = state.get(tx.to_wallet) || {
-            address: tx.to_wallet,
-            balance: 0,
-            nonce: 0,
-        };
+        let toAccount: AccountState;
+        if (tx.to_wallet === tx.from_wallet) {
+            toAccount = fromAccount;
+        } else {
+            toAccount = state.get(tx.to_wallet) || {
+                address: tx.to_wallet,
+                balance: 0,
+                nonce: 0,
+            };
+        }
 
         // Replay Protection: Check Nonce
         // Expected nonce is current nonce + 1
