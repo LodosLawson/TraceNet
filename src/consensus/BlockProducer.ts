@@ -167,11 +167,77 @@ export class BlockProducer extends EventEmitter {
                 return 0;
             });
 
+            // Filter out transactions that are not ready (Time-Based Fees)
+            // We do this AFTER getting them, so they stay in mempool but don't get into this block
+            const validTransactions: Transaction[] = [];
+            for (const tx of transactions) {
+                const validation = this.blockchain.validateTransaction(tx);
+                if (validation.valid) {
+                    validTransactions.push(tx);
+                } else if (validation.error && validation.error.includes('wait')) {
+                    // It's a "Wait" error, so we skip it for this block but keep in mempool
+                    console.log(`[BlockProducer] Skipping low-fee tx ${tx.tx_id.substring(0, 8)} (Waiting time not met)`);
+
+                    // IMPORTANT: If we skip a transaction (Nonce N), we must ALSO skip dependent transactions (Nonce N+1)
+                    // Since we sorted by nonce, if we skip Nonce N, Nonce N+1 will fail validation in addBlock anyway,
+                    // but it's cleaner to handle dependency here if possible. 
+                    // However, `validateTransaction` checks nonce against CURRENT state.
+                    // If we skip N, N+1 check against current state will fail (Gap)? No, N+1 check against current state (Nonce N-1)
+                    // If current state is Nonce K.
+                    // Tx N (K+1). Valid? Yes (except time).
+                    // Tx N+1 (K+2). Valid? NO, because gap.
+                    // So `validateTransaction` naturally handles dependencies?
+                    // YES. `validateTransaction` uses `applyTransactionToState`.
+                    // But `validateTransaction` acts on a COPY of state?
+                    // Actually `validateTransaction` uses the current state.
+                    // If we process sequentially:
+                    // Tx N: Fails time. Skipped.
+                    // Tx N+1: Checked against State (Nonce K). Expects K+1. Got K+2. Fails Nonce.
+                    // So Tx N+1 also gets skipped.
+                    // Wait, does Tx N+1 get "Removed from Mempool" as invalid?
+                    // Below, we only remove transactions that fail `addBlock`.
+                    // But we are constructing a `newBlock` with `validTransactions` ONLY.
+                    // So `addBlock` will likely succeed!
+                    // And the skipped transactions remain in `transactions` list but NOT in `validTransactions`.
+                    // Mempool removal only happens for `validTransactions` (lines 196-198).
+                    // So skipped transactions stay in mempool! CORRECT.
+                } else {
+                    // Invalid for other reasons? 
+                    // We can skip them here too.
+                    console.warn(`[BlockProducer] Skipping invalid tx ${tx.tx_id.substring(0, 8)}: ${validation.error}`);
+                    // Should we remove them from mempool immediately?
+                    // If we don't, they will block the queue?
+                    // Mempool.getTopTransactions returns them again.
+                    // So yes, we should probably remove "Hard Invalid" transactions here to clean up.
+                    // But `validateTransaction` might fail due to temporary reasons?
+                    // "Invalid Nonce" -> Might be future nonce? (Gap)
+                    // If it's a Gap, we should keep it.
+                    // If it's "Invalid Signature", remove it.
+                    // "Insufficient balance" -> Remove.
+
+                    // For safety, let's just skip them for this block.
+                    // The "Stall" protection is in the `else` block of `produceBlock` (if block add fails).
+                    // But if we filter them here, `addBlock` won't fail.
+                    // So we must manage mempool cleanup here or rely on expiration.
+                    // Let's rely on expiration for now to be safe, OR purge if clearly invalid.
+                    // Let's purge if it's NOT a nonce gap or time wait.
+                    if (validation.error && !validation.error.includes('wait') && !validation.error.includes('Invalid nonce')) {
+                        this.mempool.removeTransaction(tx.tx_id);
+                    }
+                }
+            }
+
+            // If no valid transactions remains
+            if (validTransactions.length === 0) {
+                // console.log('[BlockProducer] No valid transactions to mine.');
+                return;
+            }
+
             // Create new block
             const newBlock = Block.create(
                 nextIndex,
                 latestBlock.hash!,
-                transactions,
+                validTransactions, // Use filtered list
                 producer.validator_id,
                 stateRoot,
                 undefined, // node_wallet (can be added later if needed)
@@ -185,15 +251,15 @@ export class BlockProducer extends EventEmitter {
 
             // Add block to blockchain
             const result = this.blockchain.addBlock(
-                transactions,
+                validTransactions, // Use filtered list
                 producer.validator_id,
                 signature,
                 newBlock.timestamp, // Pass timestamp to ensure signature matches
             );
 
             if (result.success && result.block) {
-                // Remove transactions from mempool
-                for (const tx of transactions) {
+                // Remove mined transactions from mempool
+                for (const tx of validTransactions) {
                     this.mempool.removeTransaction(tx.tx_id);
                 }
 
@@ -204,11 +270,11 @@ export class BlockProducer extends EventEmitter {
                 this.emit('newBlock', {
                     block: result.block,
                     producer: producer.validator_id,
-                    transaction_count: transactions.length,
+                    transaction_count: validTransactions.length,
                 });
 
                 console.log(
-                    `Block ${result.block.index} produced by ${producer.validator_id} with ${transactions.length} transactions`
+                    `Block ${result.block.index} produced by ${producer.validator_id} with ${validTransactions.length} transactions`
                 );
             } else {
                 console.error('Failed to add block:', result.error);
@@ -217,7 +283,7 @@ export class BlockProducer extends EventEmitter {
                 console.log('Validating transactions to identify culprits...');
                 const invalidTxIds: string[] = [];
 
-                for (const tx of transactions) {
+                for (const tx of validTransactions) {
                     // Use new validateTransaction method
                     const validation = this.blockchain.validateTransaction(tx);
                     if (!validation.valid) {
@@ -230,7 +296,7 @@ export class BlockProducer extends EventEmitter {
                 if (invalidTxIds.length === 0) {
                     console.error('CRITICAL: Block failed but individual transactions appear valid. Possible state mismatch or block-level constraint?');
                     console.warn('Clearing current batch from mempool to resolve stall.');
-                    for (const tx of transactions) {
+                    for (const tx of transactions) { // Clear original batch
                         this.mempool.removeTransaction(tx.tx_id);
                     }
                 }
@@ -301,12 +367,31 @@ export class BlockProducer extends EventEmitter {
 
             console.log('Sorted Transactions for Block: ', transactions.map(t => `${t.from_wallet.substr(0, 8)}:${t.nonce}`).join(', '));
 
-            const stateRoot = this.blockchain.calculateStateRoot(transactions);
+            // Filter out transactions that are not ready (Time-Based Fees)
+            const validTransactions: Transaction[] = [];
+            for (const tx of transactions) {
+                const validation = this.blockchain.validateTransaction(tx);
+                if (validation.valid) {
+                    validTransactions.push(tx);
+                } else if (validation.error && validation.error.includes('wait')) {
+                    console.log(`[BlockProducer] Skipping low-fee tx ${tx.tx_id.substring(0, 8)} (Waiting time not met)`);
+                } else {
+                    if (validation.error && !validation.error.includes('wait') && !validation.error.includes('Invalid nonce')) {
+                        this.mempool.removeTransaction(tx.tx_id);
+                    }
+                }
+            }
+
+            if (validTransactions.length === 0) {
+                return { success: false, error: 'No valid transactions to mine (all waiting or invalid)' };
+            }
+
+            const stateRoot = this.blockchain.calculateStateRoot(validTransactions);
 
             const newBlock = Block.create(
                 nextIndex,
                 latestBlock.hash!,
-                transactions,
+                validTransactions, // Use filtered
                 producer.validator_id,
                 stateRoot,
                 undefined,
@@ -317,14 +402,14 @@ export class BlockProducer extends EventEmitter {
             const signature = this.createBlockSignature(blockData, producer.validator_id);
 
             const result = this.blockchain.addBlock(
-                transactions,
+                validTransactions,
                 producer.validator_id,
                 signature,
                 newBlock.timestamp
             );
 
             if (result.success && result.block) {
-                for (const tx of transactions) {
+                for (const tx of validTransactions) {
                     this.mempool.removeTransaction(tx.tx_id);
                 }
 
