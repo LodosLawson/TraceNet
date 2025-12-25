@@ -1837,32 +1837,18 @@ export class RPCServer {
             }
 
             // Verify inner signature
-            // Verify inner signature
-            const signableData = JSON.stringify({
-                type: innerTx.type,
-                from_wallet: innerTx.from_wallet,
-                to_wallet: innerTx.to_wallet,
-                amount: innerTx.amount,
-                payload: innerTx.payload,
-                timestamp: innerTx.timestamp,
-                nonce: innerTx.nonce,
-                max_wait_time: innerTx.max_wait_time,
-                sender_public_key: innerTx.sender_public_key // Include in signable data if part of signatures
-            });
-
-            // Note: signableData usually excludes the signature/public key if they are appended later.
-            // But if we want to verify the PAYLOAD, we verify the data + public key? 
-            // NO. We verify the data against the public key.
             // The InnerTransaction structure in verification matches client's signing.
+            // Client uses alphabetical order for JSON serialization
             const dataToVerify = JSON.stringify({
-                type: innerTx.type,
-                from_wallet: innerTx.from_wallet,
-                to_wallet: innerTx.to_wallet,
                 amount: innerTx.amount,
-                payload: innerTx.payload,
-                timestamp: innerTx.timestamp,
+                from_wallet: innerTx.from_wallet,
+                max_wait_time: innerTx.max_wait_time,
                 nonce: innerTx.nonce,
-                max_wait_time: innerTx.max_wait_time
+                payload: innerTx.payload,
+                sender_public_key: innerTx.sender_public_key, // Include in signable data to match client signing
+                timestamp: innerTx.timestamp,
+                to_wallet: innerTx.to_wallet,
+                type: innerTx.type
             });
 
             console.log(`[RPC] submitToMessagePool SignableData: ${dataToVerify}`);

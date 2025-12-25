@@ -303,6 +303,9 @@ export class BlockProducer extends EventEmitter {
             }
         } catch (error) {
             console.error('Error producing block:', error);
+            if (error instanceof Error) {
+                console.error(error.stack);
+            }
         }
     }
 
