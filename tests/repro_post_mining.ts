@@ -48,7 +48,7 @@ async function runTest() {
         userId,
         getTransactionType('POST_CONTENT'),
         0,
-        0.0000001, // FEE_STANDARD
+        0, // Fee 0
         2,
         { content: 'Hello World' }
     );

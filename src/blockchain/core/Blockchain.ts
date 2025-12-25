@@ -638,7 +638,8 @@ export class Blockchain extends EventEmitter {
 
         // Verify Time-Weighted Fees
         // Skip for REWARD/PROFILE types
-        if (tx.type !== 'REWARD' && tx.type !== 'PROFILE_UPDATE') {
+        // Also skip POST_CONTENT for now to allow free posting until frontend fee implementation is solid
+        if (tx.type !== 'REWARD' && tx.type !== 'PROFILE_UPDATE' && tx.type !== 'POST_CONTENT') {
             // If fee is less than FAST, must wait
             if (tx.fee < FEE_FAST) {
                 if (tx.fee >= FEE_STANDARD) {
