@@ -1838,8 +1838,8 @@ export class RPCServer {
 
             // Verify inner signature
             // The InnerTransaction structure in verification matches client's signing.
-            // Client uses alphabetical order for JSON serialization
-            const dataToVerify = JSON.stringify({
+            // Client uses RECURSIVE alphabetical order for JSON serialization
+            const rawData = {
                 amount: innerTx.amount,
                 from_wallet: innerTx.from_wallet,
                 max_wait_time: innerTx.max_wait_time,
@@ -1849,7 +1849,10 @@ export class RPCServer {
                 timestamp: innerTx.timestamp,
                 to_wallet: innerTx.to_wallet,
                 type: innerTx.type
-            });
+            };
+
+            const sortedData = this.sortObject(rawData);
+            const dataToVerify = JSON.stringify(sortedData);
 
             console.log(`[RPC] submitToMessagePool SignableData: ${dataToVerify}`);
             console.log(`[RPC] Signature: ${innerTx.signature}`);
@@ -1865,7 +1868,14 @@ export class RPCServer {
             console.log(`[RPC] Signature Valid? ${isValid}`);
 
             if (!isValid) {
-                res.json({ error: 'Invalid signature' });
+                console.error(`[RPC] Signature Verification Failed!`);
+                console.error(`[RPC] Server String: ${dataToVerify}`);
+                console.error(`[RPC] Client Sig: ${innerTx.signature}`);
+                res.status(400).json({
+                    error: 'Invalid signature',
+                    details: 'Server verification failed',
+                    server_string: dataToVerify
+                });
                 return;
             }
 
@@ -1883,5 +1893,20 @@ export class RPCServer {
                 error: error instanceof Error ? error.message : 'Unknown error',
             });
         }
+    }
+
+    /**
+     * Helper to sort object keys recursively for canonical JSON
+     */
+    private sortObject(obj: any): any {
+        if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+            return obj;
+        }
+        return Object.keys(obj)
+            .sort()
+            .reduce((result: any, key) => {
+                result[key] = this.sortObject(obj[key]);
+                return result;
+            }, {});
     }
 }
