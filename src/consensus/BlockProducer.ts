@@ -204,6 +204,28 @@ export class BlockProducer extends EventEmitter {
                 );
             } else {
                 console.error('Failed to add block:', result.error);
+
+                // Identify and remove invalid transactions to prevent stalling
+                console.log('Validating transactions to identify culprits...');
+                const invalidTxIds: string[] = [];
+
+                for (const tx of transactions) {
+                    // Use new validateTransaction method
+                    const validation = this.blockchain.validateTransaction(tx);
+                    if (!validation.valid) {
+                        console.warn(`Removing invalid transaction ${tx.tx_id}: ${validation.error}`);
+                        this.mempool.removeTransaction(tx.tx_id);
+                        invalidTxIds.push(tx.tx_id);
+                    }
+                }
+
+                if (invalidTxIds.length === 0) {
+                    console.error('CRITICAL: Block failed but individual transactions appear valid. Possible state mismatch or block-level constraint?');
+                    console.warn('Clearing current batch from mempool to resolve stall.');
+                    for (const tx of transactions) {
+                        this.mempool.removeTransaction(tx.tx_id);
+                    }
+                }
             }
         } catch (error) {
             console.error('Error producing block:', error);

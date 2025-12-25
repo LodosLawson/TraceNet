@@ -24,6 +24,7 @@ import { KeyManager } from './blockchain/crypto/KeyManager';
 import crypto from 'crypto';
 import express from 'express';
 import path from 'path';
+import { LocalDatabase } from './database/LocalDatabase';
 
 
 // Load environment variables
@@ -53,6 +54,7 @@ class BlockchainNode {
     private userService: UserService;
     private contentService: ContentService;
     private socialService: SocialService;
+    private localDb: LocalDatabase;
 
     constructor() {
         console.log('Initializing Blockchain Node...');
@@ -88,6 +90,21 @@ class BlockchainNode {
         // Initialize core components IN ORDER with correct parameters
         const genesisValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
         this.blockchain = new Blockchain(genesisValidatorId, this.validatorPool);
+
+        // Initialize Local Database and Restore Chain
+        this.localDb = new LocalDatabase();
+        const savedChain = this.localDb.loadChain();
+        if (savedChain && savedChain.length > 0) {
+            console.log(`[Persistence] Found saved chain with ${savedChain.length} blocks.`);
+            const success = this.blockchain.restoreChain(savedChain);
+            if (success) {
+                console.log('[Persistence] Chain successfully restored.');
+            } else {
+                console.warn('[Persistence] Failed to restore chain. Starting from Genesis.');
+            }
+        } else {
+            console.log('[Persistence] No saved chain found. Starting fresh.');
+        }
 
         // Keep system validator online
         setInterval(() => {
@@ -213,6 +230,10 @@ class BlockchainNode {
         // Handle new blocks
         this.blockProducer.on('newBlock', (data: any) => {
             console.log(`New block produced: ${data.block.index}`);
+
+            // Persist chain to local database
+            // Note: In production we'd append, but for prototype saving full chain is safer/easier
+            this.localDb.saveChain(this.blockchain.getChain());
 
             // Broadcast via WebSocket
             this.wsServer.broadcastNewBlock(data.block, data.producer, data.transaction_count);

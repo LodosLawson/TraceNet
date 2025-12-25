@@ -428,6 +428,108 @@ export class Blockchain extends EventEmitter {
 
 
 
+
+
+    /**
+     * Restore chain from persisted blocks
+     */
+    restoreChain(blocks: Block[]): boolean {
+        if (!blocks || blocks.length === 0) return false;
+
+        console.log(`[Blockchain] Restoring chain of length ${blocks.length}...`);
+
+        // Reset state
+        this.chain = [];
+        this.state.clear();
+        this.recentTxIds.clear();
+
+        try {
+            for (const block of blocks) {
+                // Verify link if not genesis
+                if (this.chain.length > 0) {
+                    const prev = this.chain[this.chain.length - 1];
+                    if (block.previous_hash !== prev.hash) {
+                        console.error(`Restore failed: Hash mismatch at index ${block.index}`);
+                        return false;
+                    }
+                    if (block.index !== prev.index + 1) {
+                        console.error(`Restore failed: Index gap at ${block.index}`);
+                        return false;
+                    }
+                } else {
+                    // This is genesis, usually index 0
+                    if (block.index !== 0) {
+                        console.error(`Restore failed: First block is not index 0 (Got ${block.index})`);
+                        return false;
+                    }
+                }
+
+                // Apply transactions to state
+                // Note: We bypass signature verification during restore for speed? 
+                // Or we keep it strictly valid. Let's keep strict for now to ensure integrity.
+                // Assuming applyTransactions uses applyTransactionToState.
+
+                const res = this.applyTransactions(
+                    block.transactions,
+                    block.validator_id,
+                    block.index,
+                    block.node_wallet
+                );
+
+                if (!res.success) {
+                    console.error(`Restore failed: Invalid block at index ${block.index}: ${res.error}`);
+                    return false;
+                }
+
+                this.chain.push(block);
+            }
+            console.log('[Blockchain] Restore successful.');
+            return true;
+        } catch (err) {
+            console.error('[Blockchain] Restore threw error:', err);
+            return false;
+        }
+    }
+
+    /**
+     * Validate a transaction without modifying state (Dry Run)
+     */
+    validateTransaction(tx: Transaction): { valid: boolean; error?: string } {
+        // Create temp state with deep copies of involved accounts
+        const tempState = new Map<string, AccountState>();
+
+        // Clone sender
+        const sender = this.state.get(tx.from_wallet);
+        if (sender) {
+            tempState.set(tx.from_wallet, { ...sender });
+        }
+
+        // Clone receiver
+        const receiver = this.state.get(tx.to_wallet);
+        if (receiver) {
+            tempState.set(tx.to_wallet, { ...receiver });
+        } else if (tx.to_wallet) {
+            // If receiver doesn't exist, we usually don't need to put it in tempState for basic checks 
+            // unless applyTransactionToState expects it.
+            // applyTransactionToState creates default if missing from state.get().
+            // But it uses the PASSED state map.
+            // So if we don't set it, applyTransactionToState will use default {balance:0} which is correct.
+        }
+
+        // Also buffer any other accounts if needed (e.g. for Batch txs)
+        if (tx.type === 'BATCH' || tx.type === 'CONVERSATION_BATCH') {
+            if (tx.payload && Array.isArray(tx.payload.transactions)) {
+                for (const inner of tx.payload.transactions) {
+                    const innerSender = this.state.get(inner.from_wallet);
+                    if (innerSender) tempState.set(inner.from_wallet, { ...innerSender });
+                }
+            }
+        }
+
+        const result = this.applyTransactionToState(tx, tempState, undefined, undefined, undefined, false);
+        return { valid: result.success, error: result.error };
+    }
+
     /**
      * Apply transactions to blockchain state
      */
