@@ -16,14 +16,23 @@ export interface AirdropRecord {
  * Airdrop service for automatic token distribution
  */
 export class AirdropService {
-    private airdrops: Map<string, AirdropRecord>; // user_id -> airdrop record
+    private airdrops: Map<string, AirdropRecord>;
     private airdropAmount: number;
     private systemWalletId: string;
+    private blockchain?: any;
+    private systemKeyPair?: { publicKey: string; privateKey: string };
 
-    constructor(airdropAmount: number = 625000, systemWalletId: string = 'SYSTEM') {
+    constructor(
+        airdropAmount: number = 625000,
+        systemWalletId: string = 'SYSTEM',
+        blockchain?: any,
+        systemKeyPair?: { publicKey: string; privateKey: string }
+    ) {
         this.airdrops = new Map();
         this.airdropAmount = airdropAmount;
         this.systemWalletId = systemWalletId;
+        this.blockchain = blockchain;
+        this.systemKeyPair = systemKeyPair;
     }
 
     /**
@@ -39,6 +48,13 @@ export class AirdropService {
             return null;
         }
 
+        // Determine nonce
+        let nonce = 1;
+        if (this.blockchain) {
+            const systemAccount = this.blockchain.getAccountState(this.systemWalletId);
+            nonce = (systemAccount ? systemAccount.nonce : 0) + 1;
+        }
+
         // Create REWARD transaction
         const airdropTx = TransactionModel.create(
             this.systemWalletId,
@@ -46,13 +62,32 @@ export class AirdropService {
             TransactionType.REWARD,
             this.airdropAmount,
             0, // No fee for airdrops
-            1, // Nonce: Must be 1 (System account nonce presumed 0 if REWARD doesn't increment it)
+            nonce,
             {
                 type: 'initial_airdrop',
                 user_id: userId,
                 description: 'Welcome bonus for first wallet',
             }
         );
+
+        // Sign transaction if keys available
+        if (this.systemKeyPair) {
+            const nacl = require('tweetnacl');
+            // tweetnacl-util not needed, using Buffer
+
+            airdropTx.sender_public_key = this.systemKeyPair.publicKey;
+            const signableData = airdropTx.getSignableData();
+
+            // Decode private key if it's base64 or hex? KeyManager.generateKeyPair returns Uint8Array or similar?
+            // index.ts: KeyManager.generateKeyPair() -> { publicKey: string(hex), privateKey: string(hex) } usually.
+            // Let's assume hex strings as per KeyManager.ts standard.
+
+            const privKeyBuffer = Buffer.from(this.systemKeyPair.privateKey, 'hex');
+            const dataBuffer = Buffer.from(signableData); // or TextEncoder
+
+            const signature = nacl.sign.detached(new Uint8Array(dataBuffer), new Uint8Array(privKeyBuffer));
+            airdropTx.sender_signature = Buffer.from(signature).toString('hex');
+        }
 
         // Record airdrop
         const record: AirdropRecord = {

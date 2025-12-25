@@ -70,9 +70,8 @@ class BlockchainNode {
         const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
         this.walletService = new WalletService(encryptionKey);
 
-        const airdropAmount = parseInt(process.env.AIRDROP_AMOUNT || '625000', 10);
+        // AirdropService initialized later after Blockchain
         const systemWalletId = 'SYSTEM';
-        this.airdropService = new AirdropService(airdropAmount, systemWalletId);
 
         this.validatorPool = new ValidatorPool();
 
@@ -116,6 +115,15 @@ class BlockchainNode {
         );
         // Register local system validator key for signing
         this.blockProducer.registerLocalValidator(systemValidatorId, sysKeyPair.privateKey);
+
+        // Initialize AirdropService with Blockchain and System Keys
+        const airdropAmount = parseInt(process.env.AIRDROP_AMOUNT || '625000', 10);
+        this.airdropService = new AirdropService(
+            airdropAmount,
+            systemWalletId,
+            this.blockchain,
+            { publicKey: sysKeyPair.publicKey, privateKey: sysKeyPair.privateKey }
+        );
 
         const rewardConfig: RewardConfig = {
             blockReward: parseInt(process.env.BLOCK_REWARD || '0', 10), // Disabled - only airdrops count
