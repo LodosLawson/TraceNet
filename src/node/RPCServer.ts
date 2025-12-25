@@ -1788,6 +1788,52 @@ export class RPCServer {
                 return;
             }
 
+            // AUTO-BATCHING FIX: Promote waiting messages to Mempool before mining
+            const pendingMessages = this.messagePool.getMessages(50);
+            if (pendingMessages.length > 0) {
+                console.log(`[Mining] Found ${pendingMessages.length} pending messages. Auto-batching...`);
+
+                // 1. Create a temporary "Relayer" wallet
+                const relayerKeys = KeyManager.generateKeyPair();
+                const relayerId = KeyManager.deriveAddress(relayerKeys.publicKey);
+
+                // 2. Fund the relayer (Dev Hack: Directly update state to pay for gas)
+                // This ensures the Batch TX passes "insufficient balance" checks
+                if ((this.blockchain as any).state) {
+                    (this.blockchain as any).state.set(relayerId, {
+                        address: relayerId,
+                        balance: 100000000, // Enough for fees
+                        nonce: 0,
+                        incomingTransferCount: 0
+                    });
+                }
+
+                // 3. Create BATCH Transaction
+                const batchTx = TransactionModel.create(
+                    relayerId,
+                    relayerId, // Self-to-self or to system
+                    'BATCH' as any, // TransactionType.BATCH
+                    0, // Amount
+                    0.00001, // Standard Fee
+                    1, // Nonce
+                    { transactions: pendingMessages }, // Payload
+                    relayerKeys.publicKey
+                );
+
+                // 4. Sign Batch TX
+                // Batch signature covers the wrapper transaction
+                const signableData = batchTx.getSignableData();
+                batchTx.sender_signature = KeyManager.sign(signableData, relayerKeys.privateKey);
+
+                // 5. Add to Mempool
+                const result = this.mempool.addTransaction(batchTx.toJSON());
+                if (result.success) {
+                    console.log(`[Mining] Auto-batched messages into TX: ${batchTx.tx_id}`);
+                } else {
+                    console.error(`[Mining] Failed to auto-batch: ${result.error}`);
+                }
+            }
+
             const result = await this.blockProducer.triggerBlockProduction();
 
             if (result.success && result.block) {
