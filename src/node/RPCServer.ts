@@ -1781,94 +1781,104 @@ export class RPCServer {
      */
     private async triggerMining(req: Request, res: Response): Promise<void> {
         try {
-            if (!this.blockProducer) {
-                res.status(503).json({
-                    error: 'Block producer not available',
-                    message: 'Mining system not initialized'
-                });
-                return;
-            }
+            const result = await this.processMiningCycle();
 
-            // AUTO-BATCHING FIX: Promote waiting messages to Mempool before mining
-            const pendingMessages = this.messagePool.getMessages(50);
-            if (pendingMessages.length > 0) {
-                console.log(`[Mining] Found ${pendingMessages.length} pending messages. Auto-batching...`);
-
-                // 1. Create a temporary "Relayer" wallet
-                const relayerKeys = KeyManager.generateKeyPair();
-                const relayerId = KeyManager.deriveAddress(relayerKeys.publicKey);
-
-                // 2. Fund the relayer (Dev Hack: Directly update state to pay for gas)
-                // This ensures the Batch TX passes "insufficient balance" checks
-                if ((this.blockchain as any).state) {
-                    (this.blockchain as any).state.set(relayerId, {
-                        address: relayerId,
-                        balance: 100000000, // Enough for fees
-                        nonce: 0,
-                        incomingTransferCount: 0
-                    });
-                }
-
-                // 3. Create BATCH Transaction
-                const batchTx = TransactionModel.create(
-                    relayerId,
-                    relayerId, // Self-to-self or to system
-                    'BATCH' as any, // TransactionType.BATCH
-                    0, // Amount
-                    0.00001, // Standard Fee
-                    1, // Nonce
-                    { transactions: pendingMessages }, // Payload
-                    relayerKeys.publicKey
-                );
-
-                // 4. Sign Batch TX
-                // Batch signature covers the wrapper transaction
-                const signableData = batchTx.getSignableData();
-                batchTx.sender_signature = KeyManager.sign(signableData, relayerKeys.privateKey);
-
-                // 5. Add to Mempool
-                const result = this.mempool.addTransaction(batchTx.toJSON());
-                if (result.success) {
-                    console.log(`[Mining] Auto-batched messages into TX: ${batchTx.tx_id}`);
-                } else {
-                    console.error(`[Mining] Failed to auto-batch: ${result.error}`);
-                }
-            }
-
-            const result = await this.blockProducer.triggerBlockProduction();
-
-            if (result.success && result.block) {
-                res.json({
-                    success: true,
-                    block: {
-                        index: result.block.index,
-                        hash: result.block.hash,
-                        transaction_count: result.block.transactions.length
-                    },
-                    message: 'Block mined successfully'
-                });
+            if (result.success) {
+                res.json(result);
             } else {
-                // Treat empty mempool or all-waiting as success (idempotent mining)
-                if (result.error === 'No transactions in mempool' ||
-                    (result.error && result.error.includes('No valid transactions'))) {
-                    res.json({
-                        success: true,
-                        message: 'Mining cycle completed. No ready transactions to mine (transactions may be time-locked).'
-                    });
-                } else {
-                    res.status(400).json({
-                        success: false,
-                        error: result.error || 'Mining failed',
-                        message: 'Unable to mine block'
-                    });
-                }
+                res.status(400).json(result);
             }
-
         } catch (error) {
             res.status(500).json({
                 error: error instanceof Error ? error.message : 'Unknown error',
                 message: 'Mining trigger failed'
             });
+        }
+    }
+
+    /**
+     * Core Mining Cycle Logic (Refactored for reuse)
+     */
+    public async processMiningCycle(): Promise<any> {
+        if (!this.blockProducer) {
+            return {
+                success: false,
+                error: 'Block producer not available',
+                message: 'Mining system not initialized'
+            };
+        }
+
+        // AUTO-BATCHING FIX: Promote waiting messages to Mempool before mining
+        const pendingMessages = this.messagePool.getMessages(50);
+        if (pendingMessages.length > 0) {
+            console.log(`[Mining] Found ${pendingMessages.length} pending messages. Auto-batching...`);
+
+            // 1. Create a temporary "Relayer" wallet
+            const relayerKeys = KeyManager.generateKeyPair();
+            const relayerId = KeyManager.deriveAddress(relayerKeys.publicKey);
+
+            // 2. Fund the relayer (Dev Hack: Directly update state to pay for gas)
+            if ((this.blockchain as any).state) {
+                (this.blockchain as any).state.set(relayerId, {
+                    address: relayerId,
+                    balance: 100000000,
+                    nonce: 0,
+                    incomingTransferCount: 0
+                });
+            }
+
+            // 3. Create BATCH Transaction
+            const batchTx = TransactionModel.create(
+                relayerId,
+                relayerId,
+                'BATCH' as any,
+                0,
+                0.00001,
+                1,
+                { transactions: pendingMessages },
+                relayerKeys.publicKey
+            );
+
+            // 4. Sign Batch TX
+            const signableData = batchTx.getSignableData();
+            batchTx.sender_signature = KeyManager.sign(signableData, relayerKeys.privateKey);
+
+            // 5. Add to Mempool
+            const result = this.mempool.addTransaction(batchTx.toJSON());
+            if (result.success) {
+                console.log(`[Mining] Auto-batched messages into TX: ${batchTx.tx_id}`);
+            } else {
+                console.error(`[Mining] Failed to auto-batch: ${result.error}`);
+            }
+        }
+
+        const result = await this.blockProducer.triggerBlockProduction();
+
+        if (result.success && result.block) {
+            return {
+                success: true,
+                block: {
+                    index: result.block.index,
+                    hash: result.block.hash,
+                    transaction_count: result.block.transactions.length
+                },
+                message: 'Block mined successfully'
+            };
+        } else {
+            // Treat empty mempool or all-waiting as success (idempotent mining)
+            if (result.error === 'No transactions in mempool' ||
+                (result.error && result.error.includes('No valid transactions'))) {
+                return {
+                    success: true,
+                    message: 'Mining cycle completed. No ready transactions to mine (transactions may be time-locked).'
+                };
+            } else {
+                return {
+                    success: false,
+                    error: result.error || 'Mining failed',
+                    message: 'Unable to mine block'
+                };
+            }
         }
     }
 
@@ -1886,15 +1896,13 @@ export class RPCServer {
             }
 
             // Verify inner signature
-            // The InnerTransaction structure in verification matches client's signing.
-            // Client uses RECURSIVE alphabetical order for JSON serialization
             const rawData = {
                 amount: innerTx.amount,
                 from_wallet: innerTx.from_wallet,
                 max_wait_time: innerTx.max_wait_time,
                 nonce: innerTx.nonce,
                 payload: innerTx.payload,
-                sender_public_key: innerTx.sender_public_key, // Include in signable data to match client signing
+                sender_public_key: innerTx.sender_public_key,
                 timestamp: innerTx.timestamp,
                 to_wallet: innerTx.to_wallet,
                 type: innerTx.type
@@ -1903,23 +1911,15 @@ export class RPCServer {
             const sortedData = this.sortObject(rawData);
             const dataToVerify = JSON.stringify(sortedData);
 
-            console.log(`[RPC] submitToMessagePool SignableData: ${dataToVerify}`);
-            console.log(`[RPC] Signature: ${innerTx.signature}`);
-            console.log(`[RPC] PublicKey: ${innerTx.sender_public_key}`);
-
             if (!innerTx.sender_public_key) {
                 res.status(400).json({ error: 'Missing sender_public_key' });
                 return;
             }
 
-            // For verification we use KeyManager.verify
             const isValid = KeyManager.verify(dataToVerify, innerTx.signature, innerTx.sender_public_key);
-            console.log(`[RPC] Signature Valid? ${isValid}`);
 
             if (!isValid) {
                 console.error(`[RPC] Signature Verification Failed!`);
-                console.error(`[RPC] Server String: ${dataToVerify}`);
-                console.error(`[RPC] Client Sig: ${innerTx.signature}`);
                 res.status(400).json({
                     error: 'Invalid signature',
                     details: 'Server verification failed',
@@ -1933,6 +1933,15 @@ export class RPCServer {
 
             if (result.success) {
                 res.json({ success: true, message: 'Message added to pool', pool_id: result.messageId });
+
+                // OPTIMIZATION: Instant Mining for FAST messages
+                // If fee is high enough (FAST_LANE), trigger mining immediately
+                if (innerTx.amount >= 0.00001) {
+                    console.log(`[RPC] Fast Message detected (Fee: ${innerTx.amount}). Triggering instant mining...`);
+                    // floating promise - don't await so we don't delay the response
+                    this.processMiningCycle().catch(err => console.error("[RPC] Instant mining failed:", err));
+                }
+
             } else {
                 res.status(400).json({ error: result.error });
             }
