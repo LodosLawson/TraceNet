@@ -178,6 +178,7 @@ export class RPCServer {
 
         // NEW: Message Pool Endpoints (Optimized Batching)
         this.app.post('/api/messaging/pool', this.submitToMessagePool.bind(this));
+        this.app.get('/api/messaging/pool', this.getMessagePoolMessages.bind(this)); // Added GET
         this.app.get('/api/validator/messages', this.getMessagesForBatching.bind(this));
 
         this.app.get('/api/messaging/inbox/:walletId', this.getMessages.bind(this));
@@ -1847,11 +1848,12 @@ export class RPCServer {
                     message: 'Block mined successfully'
                 });
             } else {
-                // Treat empty mempool as success (idempotent mining)
-                if (result.error === 'No transactions in mempool') {
+                // Treat empty mempool or all-waiting as success (idempotent mining)
+                if (result.error === 'No transactions in mempool' ||
+                    (result.error && result.error.includes('No valid transactions'))) {
                     res.json({
                         success: true,
-                        message: 'No transactions to mine (Mempool empty)'
+                        message: 'Mining cycle completed. No ready transactions to mine (transactions may be time-locked).'
                     });
                 } else {
                     res.status(400).json({
@@ -1861,6 +1863,7 @@ export class RPCServer {
                     });
                 }
             }
+
         } catch (error) {
             res.status(500).json({
                 error: error instanceof Error ? error.message : 'Unknown error',
@@ -1934,6 +1937,26 @@ export class RPCServer {
                 res.status(400).json({ error: result.error });
             }
 
+        } catch (error) {
+            res.status(500).json({
+                error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    }
+
+    /**
+     * Get messages in pool (for debugging)
+     */
+    private async getMessagePoolMessages(req: Request, res: Response): Promise<void> {
+        try {
+            const stats = this.messagePool.getStats();
+            const messages = this.messagePool.getMessages(100); // Limit to 100 for view
+
+            res.json({
+                success: true,
+                stats,
+                messages
+            });
         } catch (error) {
             res.status(500).json({
                 error: error instanceof Error ? error.message : 'Unknown error',
