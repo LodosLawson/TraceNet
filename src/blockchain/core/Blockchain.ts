@@ -44,6 +44,8 @@ export class Blockchain extends EventEmitter {
     private recentTxIds: Set<string> = new Set();
     private RECENT_TX_CACHE_SIZE = 1000;
 
+
+
     constructor(genesisValidatorId: string, validatorPool?: ValidatorPool) {
         super();
         this.chain = [];
@@ -51,6 +53,13 @@ export class Blockchain extends EventEmitter {
         this.genesisValidatorId = genesisValidatorId;
         this.validatorPool = validatorPool;
         this.initializeGenesis();
+    }
+
+    /**
+     * DEV ONLY: Force set account state (for Relayer/Testing)
+     */
+    public forceSetAccountState(address: string, accountState: AccountState): void {
+        this.state.set(address, accountState);
     }
 
     /**

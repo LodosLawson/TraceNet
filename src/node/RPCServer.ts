@@ -1937,14 +1937,13 @@ export class RPCServer {
             const relayerId = KeyManager.deriveAddress(relayerKeys.publicKey);
 
             // 2. Fund the relayer (Dev Hack)
-            if ((this.blockchain as any).state) {
-                (this.blockchain as any).state.set(relayerId, {
-                    address: relayerId,
-                    balance: 100000000,
-                    nonce: 0,
-                    incomingTransferCount: 0
-                });
-            }
+            // 2. Fund the relayer (Dev Hack)
+            this.blockchain.forceSetAccountState(relayerId, {
+                address: relayerId,
+                balance: 100000000,
+                nonce: 0,
+                incomingTransferCount: 0
+            });
 
             // 3. Create BATCH Transaction
             const batchTx = TransactionModel.create(
