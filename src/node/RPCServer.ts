@@ -2105,6 +2105,49 @@ export class RPCServer {
     }
 
     /**
+     * Start Auto-Miner for Single-Node / Dev Environments
+     */
+    public startAutoMiner(): void {
+        console.log('[AutoMiner] Checking if Auto-Miner is required...');
+
+        // Check validator count directly from pool
+        const stats = this.validatorPool.getStats();
+        const shouldAutoMine = stats.totalValidators <= 1;
+
+        if (shouldAutoMine) {
+            console.log(`[AutoMiner] Single node detected (${stats.totalValidators} validator). Starting Auto-Miner Service 🛠️`);
+
+            setInterval(async () => {
+                try {
+                    // Check if there is anything to mine
+                    const pendingMsgs = this.messagePool.getMessages().length;
+                    const mempoolSize = this.mempool.getSize();
+
+                    if (pendingMsgs > 0 || mempoolSize > 0) {
+                        console.log(`[AutoMiner] Details - Pending Msg: ${pendingMsgs}, Mempool: ${mempoolSize}`);
+                        console.log('[AutoMiner] Triggering mining cycle...');
+
+                        const result = await this.processMiningCycle();
+                        if (result.success) {
+                            if (result.block) {
+                                console.log(`[AutoMiner] ✅ Block Mined! Hash: ${result.block.hash}`);
+                            } else {
+                                console.log(`[AutoMiner] ℹ️  Mining cycle completed (No block produced).`);
+                            }
+                        } else {
+                            console.error(`[AutoMiner] ❌ Mining failed: ${result.error}`);
+                        }
+                    }
+                } catch (err) {
+                    console.error('[AutoMiner] Error in loop:', err);
+                }
+            }, 10000); // Check every 10 seconds
+        } else {
+            console.log(`[AutoMiner] Multiple validators detected (${stats.totalValidators}). Auto-Miner DISABLED.`);
+        }
+    }
+
+    /**
      * Helper to sort object keys recursively for canonical JSON
      */
     private sortObject(obj: any): any {

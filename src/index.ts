@@ -323,6 +323,9 @@ class BlockchainNode {
             console.log(`👥 Validator Threshold: ${process.env.VALIDATOR_THRESHOLD_PERCENT || 66}%`);
             console.log(`${'='.repeat(60)}\n`);
             console.log(`✅ Server is ready to accept connections on port ${port}`);
+
+            // Start Auto-Miner if needed
+            this.rpcServer.startAutoMiner();
         });
 
         // Handle server errors
