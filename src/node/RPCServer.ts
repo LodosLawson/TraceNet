@@ -1992,7 +1992,7 @@ export class RPCServer {
                 max_wait_time: innerTx.max_wait_time,
                 nonce: innerTx.nonce,
                 payload: innerTx.payload,
-                // sender_public_key: innerTx.sender_public_key, // EXCLUDED from signature payload
+                sender_public_key: innerTx.sender_public_key, // Include in signable data to match client signing
                 timestamp: innerTx.timestamp,
                 to_wallet: innerTx.to_wallet,
                 type: innerTx.type
