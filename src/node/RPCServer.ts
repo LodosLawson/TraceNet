@@ -171,6 +171,9 @@ export class RPCServer {
         this.app.get('/api/mine', this.triggerMining.bind(this));
         this.app.post('/api/mine', this.triggerMining.bind(this));
 
+        // Debug endpoints
+        this.app.get('/api/debug/pool-dump', this.debugDumpPool.bind(this));
+
         // Wallet API endpoints
         this.app.post('/api/wallet/create', this.createWallet.bind(this));
         this.app.get('/api/wallet/list/:userId', this.listWallets.bind(this));
@@ -1937,7 +1940,6 @@ export class RPCServer {
             const relayerId = KeyManager.deriveAddress(relayerKeys.publicKey);
 
             // 2. Fund the relayer (Dev Hack)
-            // 2. Fund the relayer (Dev Hack)
             this.blockchain.forceSetAccountState(relayerId, {
                 address: relayerId,
                 balance: 100000000,
@@ -2070,6 +2072,27 @@ export class RPCServer {
             res.status(500).json({
                 error: error instanceof Error ? error.message : 'Unknown error',
             });
+        }
+    }
+
+    /**
+     * DEBUG: Dump entire pool state
+     */
+    private async debugDumpPool(req: Request, res: Response): Promise<void> {
+        try {
+            const allMessages = this.messagePool.getMessages(1000, 0);
+            res.json({
+                count: allMessages.length,
+                fast_threshold: FAST_LANE_FEE,
+                messages: allMessages.map((m: any) => ({
+                    id: `${m.from_wallet}:${m.nonce}`,
+                    amount: m.amount,
+                    is_fast: m.amount >= FAST_LANE_FEE,
+                    age_ms: Date.now() - m.timestamp
+                }))
+            });
+        } catch (error) {
+            res.status(500).json({ error: 'Debug dump failed' });
         }
     }
 
