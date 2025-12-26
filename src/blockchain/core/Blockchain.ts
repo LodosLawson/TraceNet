@@ -732,7 +732,8 @@ export class Blockchain extends EventEmitter {
                         payload: innerTx.payload,
                         timestamp: innerTx.timestamp,
                         nonce: innerTx.nonce,
-                        max_wait_time: innerTx.max_wait_time
+                        max_wait_time: innerTx.max_wait_time,
+                        sender_public_key: innerTx.sender_public_key // FIX: Must verify against the key used for signing
                     };
                     const sortedInner = this.sortObject(rawInner);
                     const signableData = JSON.stringify(sortedInner);

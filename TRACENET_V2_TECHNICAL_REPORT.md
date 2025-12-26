@@ -75,6 +75,18 @@ Users can opt for faster processing by paying specific priority rates:
 | **MEDIUM** | +0.60% |
 | **HIGH** | +1.00% |
 
+### 3.4 Messaging Fee Schedule (Time-Locks)
+Unlike coin transfers, data messages follows a strict "Time-Weighted" priority system to prevent spam and network bloat.
+
+| Tier | Fee Requirement (LT) | Time-Lock (System Wait) |
+| :--- | :--- | :--- |
+| **🚀 Fast Lane** | `>= 0.00001` | **0 Seconds** (Instant Mining) |
+| **⏳ Normal** | `>= 0.000005` | **10 Minutes** (Batch Delay) |
+| **🐢 Economy** | `< 0.000005` | **1 Hour** (Batch Delay) |
+
+> **Note:** "Saving Money = Spending Time". The network enforces these delays protocol-level. No validator can mine a "Normal" message before 10 minutes have passed.
+
+
 ## 4. Messaging Protocol V2
 
 ### 4.1 Flow
