@@ -1877,7 +1877,7 @@ export class RPCServer {
         }
 
         // AUTO-BATCHING: Promote waiting messages to Mempool before mining
-        this.promotePendingMessagesToMempool();
+        const promoteResult = this.promotePendingMessagesToMempool();
 
         const result = await this.blockProducer.triggerBlockProduction();
 
@@ -1889,7 +1889,8 @@ export class RPCServer {
                     hash: result.block.hash,
                     transaction_count: result.block.transactions.length
                 },
-                message: 'Block mined successfully'
+                message: 'Block mined successfully',
+                promotion: promoteResult
             };
         } else {
             // Treat empty mempool or all-waiting as success (idempotent mining)
@@ -1897,7 +1898,8 @@ export class RPCServer {
                 (result.error && result.error.includes('No valid transactions'))) {
                 return {
                     success: true,
-                    message: 'Mining cycle completed. No ready transactions to mine (transactions may be time-locked).'
+                    message: 'Mining cycle completed. No ready transactions to mine (transactions may be time-locked).',
+                    promotion: promoteResult
                 };
             } else {
                 return {
@@ -1912,8 +1914,10 @@ export class RPCServer {
     /**
      * Helper: Promote pending messages to Mempool as BATCH transactions
      */
-    private promotePendingMessagesToMempool(priorityFilter: 'FAST' | 'ALL' = 'ALL'): void {
+    private promotePendingMessagesToMempool(priorityFilter: 'FAST' | 'ALL' = 'ALL'): { count: number; error?: string; txId?: string } {
         const candidates = this.messagePool.getMessages(priorityFilter === 'FAST' ? 50 : 200);
+        console.log(`[RPC] promotePendingMessagesToMempool Candidate Count: ${candidates.length} (Filter: ${priorityFilter})`);
+
         const now = Date.now();
 
         const toBatch = candidates.filter((msg: InnerTransaction) => {
@@ -1970,10 +1974,14 @@ export class RPCServer {
                 // Remove from pool immediately to prevent double batching
                 const idsToRemove = toBatch.map((m: InnerTransaction) => `${m.from_wallet}:${m.nonce}`);
                 this.messagePool.removeMessages(idsToRemove);
+                return { count: toBatch.length, txId: batchTx.tx_id };
             } else {
                 console.error(`[RPC] Failed to auto-batch: ${result.error}`);
+                return { count: toBatch.length, error: result.error };
             }
         }
+
+        return { count: 0 };
     }
 
     /**
