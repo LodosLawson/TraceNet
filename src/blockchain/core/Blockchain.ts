@@ -853,8 +853,23 @@ export class Blockchain extends EventEmitter {
                     if (tx.payload.encryption_public_key) fromAccount.encryption_public_key = tx.payload.encryption_public_key;
                     if (tx.payload.nickname) fromAccount.nickname = tx.payload.nickname;
                 }
-            // Fallthrough to standard processing
-            // Fallthrough to standard processing
+                // Execute standard processing logic explicitly to avoid switch fallthrough error
+                if (tx.fee > 0) {
+                    if (fromAccount.balance < tx.fee) {
+                        return { success: false, error: 'Insufficient balance for fee' };
+                    }
+                    fromAccount.balance -= tx.fee;
+                    fromAccount.nonce = tx.nonce;
+                } else {
+                    // Even if fee is 0, we must increment nonce
+                    fromAccount.nonce = tx.nonce;
+                }
+
+                if (tx.amount > 0) {
+                    toAccount.balance += tx.amount;
+                }
+                break;
+
             case 'LIKE':
             case 'FOLLOW':
             case 'POST_CONTENT':
