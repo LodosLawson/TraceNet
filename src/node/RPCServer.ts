@@ -12,6 +12,15 @@ import { ContentService } from '../services/ContentService';
 import { SocialService } from '../services/SocialService';
 import { BlockProducer } from '../consensus/BlockProducer';
 
+
+
+
+
+/**
+ * Fee threshold for Fast Lane (Immediate Mining)
+ */
+const FAST_LANE_FEE = 0.00001;
+
 /**
  * RPC Server for blockchain node
  */
@@ -1864,34 +1873,67 @@ export class RPCServer {
             };
         }
 
-        // AUTO-BATCHING FIX: Promote waiting messages to Mempool before mining
-        // Logic: 
-        // 1. FAST (>= 0.00001): Instant
-        // 2. NORMAL (>= 0.000005): Wait 10 mins
-        // 3. SLOW (< 0.000005): Wait 1 hour
+        // AUTO-BATCHING: Promote waiting messages to Mempool before mining
+        this.promotePendingMessagesToMempool();
 
-        // Get candidates (fetch more to allow filtering)
-        const candidates = this.messagePool.getMessages(200);
+        const result = await this.blockProducer.triggerBlockProduction();
+
+        if (result.success && result.block) {
+            return {
+                success: true,
+                block: {
+                    index: result.block.index,
+                    hash: result.block.hash,
+                    transaction_count: result.block.transactions.length
+                },
+                message: 'Block mined successfully'
+            };
+        } else {
+            // Treat empty mempool or all-waiting as success (idempotent mining)
+            if (result.error === 'No transactions in mempool' ||
+                (result.error && result.error.includes('No valid transactions'))) {
+                return {
+                    success: true,
+                    message: 'Mining cycle completed. No ready transactions to mine (transactions may be time-locked).'
+                };
+            } else {
+                return {
+                    success: false,
+                    error: result.error || 'Mining failed',
+                    message: 'Unable to mine block'
+                };
+            }
+        }
+    }
+
+    /**
+     * Helper: Promote pending messages to Mempool as BATCH transactions
+     */
+    private promotePendingMessagesToMempool(priorityFilter: 'FAST' | 'ALL' = 'ALL'): void {
+        const candidates = this.messagePool.getMessages(priorityFilter === 'FAST' ? 50 : 200);
         const now = Date.now();
 
-        const toBatch = candidates.filter(msg => {
-            // Priority Check
-            if (msg.amount >= 0.00001) return true; // FAST: Ready immediately
+        const toBatch = candidates.filter((msg: InnerTransaction) => {
+            // FAST logic
+            if (msg.amount >= FAST_LANE_FEE) return true;
 
-            const age = now - (msg.timestamp || now); // Wait time since creation
-            if (msg.amount >= 0.000005) return age >= 600000; // NORMAL: 10 Mins (600,000 ms)
+            // If we are only looking for FAST, skip others
+            if (priorityFilter === 'FAST') return false;
 
-            return age >= 3600000; // SLOW: 60 Mins (3,600,000 ms)
+            // NORMAL/SLOW logic
+            const age = now - (msg.timestamp || now);
+            if (msg.amount >= 0.000005) return age >= 600000;
+            return age >= 3600000;
         });
 
         if (toBatch.length > 0) {
-            console.log(`[Mining] Found ${toBatch.length} ready messages (out of ${candidates.length} pending). Batching...`);
+            console.log(`[RPC] Promoting ${toBatch.length} messages (${priorityFilter}) to Mempool...`);
 
             // 1. Create a temporary "Relayer" wallet
             const relayerKeys = KeyManager.generateKeyPair();
             const relayerId = KeyManager.deriveAddress(relayerKeys.publicKey);
 
-            // 2. Fund the relayer (Dev Hack: Directly update state to pay for gas)
+            // 2. Fund the relayer (Dev Hack)
             if ((this.blockchain as any).state) {
                 (this.blockchain as any).state.set(relayerId, {
                     address: relayerId,
@@ -1920,41 +1962,12 @@ export class RPCServer {
             // 5. Add to Mempool
             const result = this.mempool.addTransaction(batchTx.toJSON());
             if (result.success) {
-                console.log(`[Mining] Auto-batched messages into TX: ${batchTx.tx_id}`);
-                // CRITICAL: Remove batched messages from pool to prevent duplicates
-                const idsToRemove = toBatch.map(m => `${m.from_wallet}:${m.nonce}`);
+                console.log(`[RPC] Auto-batched into TX: ${batchTx.tx_id}`);
+                // Remove from pool immediately to prevent double batching
+                const idsToRemove = toBatch.map((m: InnerTransaction) => `${m.from_wallet}:${m.nonce}`);
                 this.messagePool.removeMessages(idsToRemove);
             } else {
-                console.error(`[Mining] Failed to auto-batch: ${result.error}`);
-            }
-        }
-
-        const result = await this.blockProducer.triggerBlockProduction();
-
-        if (result.success && result.block) {
-            return {
-                success: true,
-                block: {
-                    index: result.block.index,
-                    hash: result.block.hash,
-                    transaction_count: result.block.transactions.length
-                },
-                message: 'Block mined successfully'
-            };
-        } else {
-            // Treat empty mempool or all-waiting as success (idempotent mining)
-            if (result.error === 'No transactions in mempool' ||
-                (result.error && result.error.includes('No valid transactions'))) {
-                return {
-                    success: true,
-                    message: 'Mining cycle completed. No ready transactions to mine (transactions may be time-locked).'
-                };
-            } else {
-                return {
-                    success: false,
-                    error: result.error || 'Mining failed',
-                    message: 'Unable to mine block'
-                };
+                console.error(`[RPC] Failed to auto-batch: ${result.error}`);
             }
         }
     }
@@ -2012,15 +2025,16 @@ export class RPCServer {
                 res.json({ success: true, message: 'Message added to pool', pool_id: result.messageId });
 
                 // OPTIMIZATION: Instant Mining for FAST messages
-                // If fee is high enough (FAST_LANE), trigger mining immediately
-                if (innerTx.amount >= 0.00001) {
+                // If fee is high enough (FAST_LANE), trigger batching & mining immediately
+                if (innerTx.amount >= FAST_LANE_FEE) {
                     console.log(`[RPC] Fast Message detected (Fee: ${innerTx.amount}). Triggering instant mining...`);
-                    // floating promise - don't await so we don't delay the response
+
+                    // 1. Promote to Mempool immediately
+                    this.promotePendingMessagesToMempool('FAST');
+
+                    // 2. Trigger Mining (optional, but requested by user for "instant" feel)
                     this.processMiningCycle()
-                        .then(res => {
-                            if (!res.success) console.error("[RPC] Instant mining returned error:", res);
-                            else console.log("[RPC] Instant mining success.");
-                        })
+                        .then(res => console.log("[RPC] Instant mining result:", res.success))
                         .catch(err => console.error("[RPC] Instant mining failed:", err));
                 }
 
