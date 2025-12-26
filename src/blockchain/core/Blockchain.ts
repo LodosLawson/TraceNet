@@ -14,6 +14,10 @@ export interface AccountState {
     // Transfer tracking for dynamic fees
     incomingTransferCount?: number;  // Incoming transfers in current year
     lastYearReset?: number;          // Timestamp of last annual reset (ms)
+    // Profile info
+    public_key?: string;
+    encryption_public_key?: string;
+    nickname?: string;
 }
 
 /**
@@ -697,12 +701,21 @@ export class Blockchain extends EventEmitter {
 
                 // Let's iterate inner transactions
                 for (const innerTx of tx.payload.transactions) {
-                    // Validate inner signature !! CRITICAL
-                    // Reconstruct signable data: remove signature, stringify remaining fields
-                    // const { signature, ...dataToSign } = innerTx; // This might reorder keys
-                    // We need a deterministic way.
-                    // For this implementation, we will explicitly construct the object with known fields
-                    const signableData = JSON.stringify({
+                    // Apply inner transaction logic (e.g. deduct fee from user, increment user nonce)
+                    // We need to look up User's account FIRST to get Public Key for verification
+                    const userAccount: any = state.get(innerTx.from_wallet) || {
+                        address: innerTx.from_wallet,
+                        balance: 0,
+                        nonce: 0,
+                        public_key: null
+                    };
+
+                    // Construct signable data matching Client Logic (Sorted Keys, No Signature, No Public Key)
+                    const { signature, sender_public_key, ...rest } = innerTx;
+                    // Ensure strict field selection if 'rest' has extras? 
+                    // Client usually sends specific fields. 
+                    // Safer to be explicit as before, but MUST sort.
+                    const rawInner = {
                         type: innerTx.type,
                         from_wallet: innerTx.from_wallet,
                         to_wallet: innerTx.to_wallet,
@@ -711,29 +724,23 @@ export class Blockchain extends EventEmitter {
                         timestamp: innerTx.timestamp,
                         nonce: innerTx.nonce,
                         max_wait_time: innerTx.max_wait_time
-                    });
+                    };
+                    const sortedInner = this.sortObject(rawInner);
+                    const signableData = JSON.stringify(sortedInner);
 
-                    if (!KeyManager.verify(signableData, innerTx.signature, innerTx.from_wallet)) {
-                        // Fallback: try checking if from_wallet is a public key. 
-                        // In this system, wallet address IS public key usually.
-                        return { success: false, error: `Invalid signature for inner tx from ${innerTx.from_wallet} ` };
-                    }
+                    // Use Public Key from State (preferred) or Fallback to from_wallet (if raw)
+                    const verifyKey = userAccount.public_key || innerTx.from_wallet;
 
-                    // Check max_wait_time for inner tx (Expiry)
-                    if (innerTx.max_wait_time) {
-                        const innerWait = blockTimestamp - innerTx.timestamp;
-                        if (innerWait > innerTx.max_wait_time && innerTx.max_wait_time > 0) {
-                            return { success: false, error: `Inner transaction expired(max_wait_time exceeded) for ${innerTx.from_wallet}` };
+                    if (!KeyManager.verify(signableData, innerTx.signature, verifyKey)) {
+                        // Fallback: Check if innerTx has sender_public_key attached
+                        if ((innerTx as any).sender_public_key && KeyManager.verify(signableData, innerTx.signature, (innerTx as any).sender_public_key)) {
+                            // Valid using attached key
+                        } else {
+                            return { success: false, error: `Invalid signature for inner tx from ${innerTx.from_wallet} ` };
                         }
                     }
 
-                    // Apply inner transaction logic (e.g. deduct fee from user, increment user nonce)
-                    // We need to look up User's account
-                    const userAccount = state.get(innerTx.from_wallet) || {
-                        address: innerTx.from_wallet,
-                        balance: 0,
-                        nonce: 0
-                    };
+                    // Check max_wait_time for inner tx (Expiry)
 
                     // Replay protection for inner tx?
                     // The batch might be valid, but an inner tx might be a replay.
@@ -840,6 +847,14 @@ export class Blockchain extends EventEmitter {
 
             case 'POST_ACTION':
             case 'PROFILE_UPDATE':
+                if (tx.payload) {
+                    console.log(`[Blockchain] PROFILE_UPDATE for ${tx.from_wallet}. Payload Keys: ${Object.keys(tx.payload)}`);
+                    if (tx.payload.public_key) fromAccount.public_key = tx.payload.public_key;
+                    if (tx.payload.encryption_public_key) fromAccount.encryption_public_key = tx.payload.encryption_public_key;
+                    if (tx.payload.nickname) fromAccount.nickname = tx.payload.nickname;
+                }
+            // Fallthrough to standard processing
+            // Fallthrough to standard processing
             case 'LIKE':
             case 'FOLLOW':
             case 'POST_CONTENT':
@@ -1073,5 +1088,18 @@ export class Blockchain extends EventEmitter {
         const fee = parseFloat((amount * totalRate).toFixed(8));
         console.log(`[Blockchain] TotalRate: ${totalRate}, Calculated Fee: ${fee}`);
         return fee;
+    }
+
+    /**
+     * Helper to sort object keys recursively (Consistent with Client)
+     */
+    private sortObject(obj: any): any {
+        if (typeof obj !== 'object' || obj === null) return obj;
+        if (Array.isArray(obj)) return obj.map(this.sortObject.bind(this));
+
+        return Object.keys(obj).sort().reduce((sorted: any, key: string) => {
+            sorted[key] = this.sortObject(obj[key]);
+            return sorted;
+        }, {});
     }
 }

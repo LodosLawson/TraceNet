@@ -98,6 +98,7 @@ export class UserService {
             1, // Nonce: Must be 1 for new user (Account Nonce 0 -> Expected 1)
             {
                 action: 'USER_CREATED',
+                public_key: walletResult.wallet.public_key, // 🆕 Add Public Key to State
                 encryption_public_key: walletResult.encryptionPublicKey, // ← BLOCKCHAIN'DE!
                 nickname: input.nickname,
                 email: input.email,

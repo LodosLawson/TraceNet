@@ -46,6 +46,34 @@ export class RPCServer {
 
         this.setupMiddleware();
         this.setupRoutes();
+        this.setupBlockchainListeners();
+    }
+
+    /**
+     * Listen for blockchain events
+     */
+    private setupBlockchainListeners(): void {
+        this.blockchain.on('blockAdded', (block) => {
+            const minedIds: string[] = [];
+
+            for (const tx of block.transactions) {
+                // Check for BATCH transactions
+                if (tx.type === 'BATCH' || tx.type === 'CONVERSATION_BATCH') {
+                    if (tx.payload && Array.isArray(tx.payload.transactions)) {
+                        for (const innerTx of tx.payload.transactions) {
+                            // Construct ID: from_wallet:nonce
+                            const id = `${innerTx.from_wallet}:${innerTx.nonce}`;
+                            minedIds.push(id);
+                        }
+                    }
+                }
+            }
+
+            if (minedIds.length > 0) {
+                console.log(`[RPC] Removing ${minedIds.length} mined messages from MessagePool`);
+                this.messagePool.removeMessages(minedIds);
+            }
+        });
     }
 
     /**
@@ -1554,9 +1582,11 @@ export class RPCServer {
      * Get messages for a wallet (Inbox)
      */
     private async getMessages(req: Request, res: Response): Promise<void> {
+        // console.log(`[InboxDebug] getMessages called for ${req.params.walletId}`); // Removed for performance
         try {
             const { walletId } = req.params;
-            const { limit = 50, offset = 0 } = req.query;
+            const limit = Number(req.query.limit) || 50;
+            const offset = Number(req.query.offset) || 0;
 
             if (!walletId) {
                 res.status(400).json({ error: 'Wallet ID is required' });
@@ -1565,11 +1595,31 @@ export class RPCServer {
 
             const chain = this.blockchain.getChain();
             const messages: any[] = [];
+            const targetCount = limit + offset;
 
             // Iterate backwards to get latest messages first
+            // OPTIMIZATION: Stop once we have enough messages
             for (let i = chain.length - 1; i >= 0; i--) {
+                if (messages.length >= targetCount) break; // Early Exit
+
                 const block = chain[i];
                 for (const tx of block.transactions) {
+                    if (tx.type === 'BATCH') {
+                        const innerTxs: any[] = tx.payload?.transactions || [];
+                        for (const inner of innerTxs) {
+                            if (inner.type === 'PRIVATE_MESSAGE' && inner.to_wallet === walletId) {
+                                messages.push({
+                                    tx_id: tx.tx_id, // Use Batch ID as container
+                                    from: inner.from_wallet,
+                                    timestamp: inner.timestamp || tx.timestamp,
+                                    encrypted_content: inner.payload.content || inner.payload.message || inner.payload.encrypted_content,
+                                    sender_public_key: (inner as any).sender_public_key,
+                                    sender_encryption_key: inner.payload.sender_encryption_key
+                                });
+                            }
+                        }
+                    }
+
                     if (tx.type === 'PRIVATE_MESSAGE' && tx.to_wallet === walletId) {
                         messages.push({
                             tx_id: tx.tx_id,
@@ -1577,22 +1627,22 @@ export class RPCServer {
                             timestamp: tx.timestamp,
                             encrypted_content: tx.payload.message || tx.payload.encrypted_content, // Support both formats
                             sender_public_key: tx.sender_public_key,
-                            sender_encryption_key: tx.payload.sender_encryption_key // Curve25519 public key for decryption
+                            sender_encryption_key: tx.payload.sender_encryption_key
                         });
                     }
                 }
             }
 
-            // Apply pagination
-            const start = Number(offset);
-            const end = start + Number(limit);
-            const paginatedMessages = messages.slice(start, end);
+            // Apply pagination efficiently
+            // We collected 'offset + limit' messages (latest first).
+            // So we just take the slice from 'offset'.
+            const paginatedMessages = messages.slice(offset, offset + limit);
 
             res.json({
                 success: true,
                 wallet_id: walletId,
                 messages: paginatedMessages,
-                total: messages.length
+                total: messages.length + (messages.length === targetCount ? "..." : "") // Approx total indication if truncated
             });
         } catch (error) {
             res.status(500).json({
@@ -1929,7 +1979,7 @@ export class RPCServer {
                 max_wait_time: innerTx.max_wait_time,
                 nonce: innerTx.nonce,
                 payload: innerTx.payload,
-                sender_public_key: innerTx.sender_public_key,
+                // sender_public_key: innerTx.sender_public_key, // EXCLUDED from signature payload
                 timestamp: innerTx.timestamp,
                 to_wallet: innerTx.to_wallet,
                 type: innerTx.type
@@ -1966,7 +2016,12 @@ export class RPCServer {
                 if (innerTx.amount >= 0.00001) {
                     console.log(`[RPC] Fast Message detected (Fee: ${innerTx.amount}). Triggering instant mining...`);
                     // floating promise - don't await so we don't delay the response
-                    this.processMiningCycle().catch(err => console.error("[RPC] Instant mining failed:", err));
+                    this.processMiningCycle()
+                        .then(res => {
+                            if (!res.success) console.error("[RPC] Instant mining returned error:", res);
+                            else console.log("[RPC] Instant mining success.");
+                        })
+                        .catch(err => console.error("[RPC] Instant mining failed:", err));
                 }
 
             } else {
