@@ -1759,6 +1759,12 @@ export class RPCServer {
     start(): void {
         this.app.listen(this.port, () => {
             console.log(`RPC Server listening on port ${this.port}`);
+
+            // Background Mining Loop for Batched Messages
+            console.log("Starting background mining loop (60s interval)...");
+            setInterval(() => {
+                this.processMiningCycle().catch(e => console.error("Background mining error:", e));
+            }, 60000); // Check every minute
         });
     }
 
@@ -1809,9 +1815,27 @@ export class RPCServer {
         }
 
         // AUTO-BATCHING FIX: Promote waiting messages to Mempool before mining
-        const pendingMessages = this.messagePool.getMessages(50);
-        if (pendingMessages.length > 0) {
-            console.log(`[Mining] Found ${pendingMessages.length} pending messages. Auto-batching...`);
+        // Logic: 
+        // 1. FAST (>= 0.00001): Instant
+        // 2. NORMAL (>= 0.000005): Wait 10 mins
+        // 3. SLOW (< 0.000005): Wait 1 hour
+
+        // Get candidates (fetch more to allow filtering)
+        const candidates = this.messagePool.getMessages(200);
+        const now = Date.now();
+
+        const toBatch = candidates.filter(msg => {
+            // Priority Check
+            if (msg.amount >= 0.00001) return true; // FAST: Ready immediately
+
+            const age = now - (msg.timestamp || now); // Wait time since creation
+            if (msg.amount >= 0.000005) return age >= 600000; // NORMAL: 10 Mins (600,000 ms)
+
+            return age >= 3600000; // SLOW: 60 Mins (3,600,000 ms)
+        });
+
+        if (toBatch.length > 0) {
+            console.log(`[Mining] Found ${toBatch.length} ready messages (out of ${candidates.length} pending). Batching...`);
 
             // 1. Create a temporary "Relayer" wallet
             const relayerKeys = KeyManager.generateKeyPair();
@@ -1835,7 +1859,7 @@ export class RPCServer {
                 0,
                 0.00001,
                 1,
-                { transactions: pendingMessages },
+                { transactions: toBatch },
                 relayerKeys.publicKey
             );
 
@@ -1847,6 +1871,9 @@ export class RPCServer {
             const result = this.mempool.addTransaction(batchTx.toJSON());
             if (result.success) {
                 console.log(`[Mining] Auto-batched messages into TX: ${batchTx.tx_id}`);
+                // CRITICAL: Remove batched messages from pool to prevent duplicates
+                const idsToRemove = toBatch.map(m => `${m.from_wallet}:${m.nonce}`);
+                this.messagePool.removeMessages(idsToRemove);
             } else {
                 console.error(`[Mining] Failed to auto-batch: ${result.error}`);
             }
