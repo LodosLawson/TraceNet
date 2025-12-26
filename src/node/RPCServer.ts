@@ -1915,7 +1915,10 @@ export class RPCServer {
 
         const toBatch = candidates.filter((msg: InnerTransaction) => {
             // FAST logic
-            if (msg.amount >= FAST_LANE_FEE) return true;
+            if (msg.amount >= FAST_LANE_FEE) {
+                console.log(`[RPC] Candidate MATCHED Fast Lane: ${msg.amount}`);
+                return true;
+            }
 
             // If we are only looking for FAST, skip others
             if (priorityFilter === 'FAST') return false;
@@ -2027,15 +2030,17 @@ export class RPCServer {
                 // OPTIMIZATION: Instant Mining for FAST messages
                 // If fee is high enough (FAST_LANE), trigger batching & mining immediately
                 if (innerTx.amount >= FAST_LANE_FEE) {
-                    console.log(`[RPC] Fast Message detected (Fee: ${innerTx.amount}). Triggering instant mining...`);
+                    console.log(`[RPC] Fast Message detected (Fee: ${innerTx.amount} >= ${FAST_LANE_FEE}). Promoting...`);
 
                     // 1. Promote to Mempool immediately
                     this.promotePendingMessagesToMempool('FAST');
 
                     // 2. Trigger Mining (optional, but requested by user for "instant" feel)
                     this.processMiningCycle()
-                        .then(res => console.log("[RPC] Instant mining result:", res.success))
+                        .then(res => console.log(`[RPC] Instant mining result: ${res.success} - ${res.message || 'No msg'}`))
                         .catch(err => console.error("[RPC] Instant mining failed:", err));
+                } else {
+                    console.log(`[RPC] Standard Message (Fee: ${innerTx.amount} < ${FAST_LANE_FEE}). Waiting in pool.`);
                 }
 
             } else {
