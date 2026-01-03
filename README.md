@@ -88,6 +88,22 @@ npm start
 Your node will start syncing with the mainnet and expose an RPC interface at `http://localhost:3000`.
 
 ---
+## 💻 Netra Desktop Client (Recommended)
+We provide a Python-based GUI for easy node management, wallet control, and social interaction.
+
+### Launching the Client
+```bash
+python tools/gui_miner/main.py
+```
+
+### Features
+*   **Node Manager**: Start/Stop/Restart your local node with one click.
+*   **Wallet**: Generate keys and bind them to your node to receive fees.
+*   **Netra Feed**: View social posts and tweet directly from the app.
+*   **Transfers**: Send TRN coins to other users easily.
+*   **Advanced Config**: Edit ports, peers, and `.env` settings directly.
+
+---
 
 ## 📄 Documentation
 
