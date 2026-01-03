@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TraceNet Network Map (3D)</title>
+    <script src="//unpkg.com/globe.gl"></script>
+    <style>
+        body { margin: 0; background-color: #000; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #globeViz { width: 100vw; height: 100vh; }
+        .overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            background: rgba(0,0,0,0.6);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        h1 { margin: 0 0 10px 0; font-size: 24px; color: #00f2ff; text-shadow: 0 0 10px rgba(0, 242, 255, 0.5); }
+        .stats { font-size: 14px; line-height: 1.6; }
+        .stat-item { display: flex; justify-content: space-between; min-width: 200px; }
+        .refresh-btn {
+            margin-top: 10px;
+            background: #00f2ff;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .refresh-btn:hover { background: #fff; box-shadow: 0 0 15px #00f2ff; }
+        
+        /* Tooltip customization */
+        .scene-tooltip {
+            background: rgba(0, 10, 30, 0.9) !important;
+            border: 1px solid #00f2ff !important;
+            border-radius: 4px;
+            padding: 10px !important;
+            color: #fff !important;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="globeViz"></div>
+    
+    <div class="overlay">
+        <h1>TraceNet Network</h1>
+        <div class="stats">
+            <div class="stat-item"><span>Active Nodes:</span> <span id="nodeCount">Scanning...</span></div>
+            <div class="stat-item"><span>Block Height:</span> <span id="blockHeight">-</span></div>
+            <div class="stat-item"><span>Network Status:</span> <span id="netStatus" style="color: #ffff00">Syncing</span></div>
+        </div>
+        <button class="refresh-btn" onclick="fetchNodes()">Refresh Network</button>
+    </div>
+
+    <script>
+        let world;
+        const NODE_REL_SIZE = 4; // Scale limit
+
+        // Initialize Globe
+        function initGlobe() {
+            const elem = document.getElementById('globeViz');
+            world = Globe()
+                (elem)
+                .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
+                .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
+                .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
+                .pointOfView({ lat: 20, lng: 0, altitude: 2.5 }) // Initial camera
+                .atmosphereColor('#00f2ff')
+                .atmosphereAltitude(0.15)
+                .pointPulseComponents(3); // Ripple effect for nodes
+        }
+
+        // Fetch Nodes API
+        async function fetchNodes() {
+            const statusEl = document.getElementById('netStatus');
+            const countEl = document.getElementById('nodeCount');
+            const heightEl = document.getElementById('blockHeight');
+            
+            statusEl.innerText = "Scanning...";
+            statusEl.style.color = "#ffff00";
+
+            try {
+                // Use the DISCOVERY endpoint which returns curated/active nodes
+                const res = await fetch('/api/nodes/discover'); 
+                const data = await res.json();
+                
+                // DATA PROCESSING
+                // Map API data to visualization format
+                const nodes = (data.nodes || []).map(node => ({
+                    name: `Node (${node.country})`,
+                    lat: getLatFromCountry(node.country), // Mock lat/lng if missing
+                    lng: getLngFromCountry(node.country), // Mock lat/lng if missing
+                    size: 1,
+                    color: node.status === 'healthy' ? '#00f2ff' : '#ff0000',
+                    ...node
+                }));
+
+                // Ensure we separate nodes slightly if they are in the same country
+                jitterLocations(nodes);
+
+                // Update UI
+                countEl.innerText = nodes.length;
+                if (nodes.length > 0) {
+                    const maxHeight = Math.max(...nodes.map(n => n.height || 0));
+                    heightEl.innerText = maxHeight;
+                    statusEl.innerText = "Online";
+                    statusEl.style.color = "#00ff00";
+                } else {
+                     statusEl.innerText = "No Peers";
+                     statusEl.style.color = "#ff5555";
+                }
+
+                // Update Globe Data
+                world.pointsData(nodes)
+                    .pointColor('color')
+                    .pointAltitude(0.01)
+                    .pointRadius('size')
+                    .pointLabel(node => `
+                        <div style="font-weight:bold">${node.url}</div>
+                        <div>Height: ${node.height}</div>
+                        <div>Status: ${node.status}</div>
+                        <div>Country: ${node.country}</div>
+                    `);
+
+                // Create Arcs (Connections between nodes)
+                // Connect everyone to everyone for visualization "mesh" effect, or just to randoms
+                const arcs = [];
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        arcs.push({
+                            startLat: nodes[i].lat,
+                            startLng: nodes[i].lng,
+                            endLat: nodes[j].lat,
+                            endLng: nodes[j].lng,
+                            color: ['rgba(0, 242, 255, 0.5)', 'rgba(0, 242, 255, 0.1)']
+                        });
+                    }
+                }
+                world.arcsData(arcs)
+                    .arcColor('color')
+                    .arcDashLength(0.4)
+                    .arcDashGap(4)
+                    .arcDashInitialGap(() => Math.random() * 5)
+                    .arcDashAnimateTime(2000);
+
+            } catch (err) {
+                console.error("Failed to fetch nodes", err);
+                statusEl.innerText = "Error";
+                statusEl.style.color = "#ff0000";
+            }
+        }
+
+        // --- Helper: Jitter locations to prevent overlap ---
+        function jitterLocations(nodes) {
+            nodes.forEach(node => {
+                // Add random offset +/- 2 degrees
+                node.lat += (Math.random() - 0.5) * 4;
+                node.lng += (Math.random() - 0.5) * 4;
+            });
+        }
+
+        // --- Helper: Mock Geo for demo (Real app would use IP geolocation) ---
+        // Since the API returns Country Code, we map to rough centers
+        const COUNTRY_COORDS = {
+            'US': { lat: 37.0902, lng: -95.7129 },
+            'DE': { lat: 51.1657, lng: 10.4515 },
+            'TR': { lat: 38.9637, lng: 35.2433 },
+            'GB': { lat: 55.3781, lng: -3.4360 },
+            'JP': { lat: 36.2048, lng: 138.2529 },
+            'Unknown': { lat: 0, lng: 0 }
+        };
+
+        function getLatFromCountry(code) {
+            return (COUNTRY_COORDS[code] || COUNTRY_COORDS['Unknown']).lat;
+        }
+        function getLngFromCountry(code) {
+             return (COUNTRY_COORDS[code] || COUNTRY_COORDS['Unknown']).lng;
+        }
+
+        // Start
+        initGlobe();
+        fetchNodes();
+        
+        // Auto refresh
+        setInterval(fetchNodes, 10000);
+
+    </script>
+</body>
+</html>

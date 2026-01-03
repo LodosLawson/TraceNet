@@ -82,4 +82,30 @@ export class LocalDatabase {
             return null;
         }
     }
+
+    /**
+     * Save known peers
+     */
+    async savePeers(peers: string[]): Promise<void> {
+        try {
+            await this.db.put('known_peers', peers);
+            // console.log(`[Database] Saved ${peers.length} peers.`);
+        } catch (error) {
+            console.error('[Database] Failed to save peers:', error);
+        }
+    }
+
+    /**
+     * Load known peers
+     */
+    async loadPeers(): Promise<string[]> {
+        try {
+            const peers = await this.db.get('known_peers');
+            console.log(`[Database] Loaded ${peers.length} known peers.`);
+            return peers;
+        } catch (error) {
+            // Key not found is normal for first run
+            return [];
+        }
+    }
 }

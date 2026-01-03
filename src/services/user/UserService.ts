@@ -5,6 +5,8 @@ import { WalletService } from '../../wallet/WalletService';
 import { AirdropService } from '../../wallet/AirdropService';
 import { Mempool } from '../../node/Mempool';
 import { TransactionModel, TransactionType } from '../../blockchain/models/Transaction';
+import { Blockchain } from '../../blockchain/core/Blockchain';
+import { Block } from '../../blockchain/models/Block';
 
 /**
  * User Service for managing user profiles and metadata
@@ -678,5 +680,111 @@ export class UserService {
      */
     isNicknameAvailable(nickname: string): boolean {
         return !this.nicknameIndex.has(nickname);
+    }
+
+    /**
+     * Sync user state with blockchain history
+     * Replays all blocks to rebuild user database
+     */
+    async syncWithBlockchain(blockchain: Blockchain): Promise<void> {
+        console.log('[UserService] Syncing with blockchain...');
+        const chain = blockchain.getChain();
+        this.users.clear();
+        this.emailIndex.clear();
+        this.nicknameIndex.clear();
+
+        for (const block of chain) {
+            this.processBlock(block);
+        }
+        console.log(`[UserService] Sync complete. Loaded ${this.users.size} users.`);
+    }
+
+    /**
+     * Process a block to update user state
+     */
+    processBlock(block: Block): void {
+        for (const tx of block.transactions) {
+            // Handle PROFILE_UPDATE
+            if (tx.type === TransactionType.PROFILE_UPDATE) {
+                // If we have a payload, we might be creating or updating a user
+                if (tx.payload) {
+                    const walletId = tx.from_wallet;
+
+                    // Check if it's a creation (USER_CREATED action or just first update) or update
+                    // We assume if user doesn't exist, we create it.
+                    // But we use the system_id as the wallet_id usually in our model.
+                    // Let's check if user exists by wallet.
+
+                    // Actually, in our model system_id IS the wallet_id for the first wallet.
+                    const system_id = walletId;
+
+                    let user = this.users.get(system_id);
+
+                    if (!user) {
+                        // New User
+                        user = {
+                            system_id,
+                            nickname: tx.payload.nickname || `User_${walletId.substring(0, 8)}`,
+                            email: tx.payload.email,
+                            first_name: tx.payload.first_name,
+                            last_name: tx.payload.last_name,
+                            birthday: tx.payload.birthday,
+                            encryption_public_key: tx.payload.encryption_public_key,
+                            messaging_privacy: tx.payload.messaging_privacy || 'public',
+                            metadata: [],
+                            status: UserStatus.OFFLINE,
+                            roles: [UserRole.USER],
+                            wallet_ids: [walletId],
+                            created_at: new Date(tx.payload.created_at || block.timestamp),
+                            updated_at: new Date(block.timestamp),
+                        };
+
+                        // Handle indexes
+                        this.users.set(system_id, user);
+                        if (user.nickname) this.nicknameIndex.set(user.nickname, system_id);
+                        if (user.email) this.emailIndex.set(user.email, system_id);
+
+                        // console.log(`[UserService] Restored user: ${user.nickname} (${system_id})`);
+                    } else {
+                        // Update existing user
+                        const oldNickname = user.nickname;
+                        const oldEmail = user.email;
+
+                        // Apply updates from payload
+                        if (tx.payload.nickname) user.nickname = tx.payload.nickname;
+                        if (tx.payload.email) user.email = tx.payload.email;
+                        if (tx.payload.first_name) user.first_name = tx.payload.first_name;
+                        if (tx.payload.last_name) user.last_name = tx.payload.last_name;
+                        if (tx.payload.messaging_privacy) user.messaging_privacy = tx.payload.messaging_privacy;
+                        if (tx.payload.encryption_public_key) user.encryption_public_key = tx.payload.encryption_public_key;
+
+                        // Handle special "updates" object structure if used (consistency with updateProfile method)
+                        if (tx.payload.updates) {
+                            const updates = tx.payload.updates;
+                            if (updates.nickname) user.nickname = updates.nickname;
+                            if (updates.email) user.email = updates.email;
+                            if (updates.first_name) user.first_name = updates.first_name;
+                            if (updates.last_name) user.last_name = updates.last_name;
+                            if (updates.messaging_privacy) user.messaging_privacy = updates.messaging_privacy;
+                            if (updates.encryption_public_key) user.encryption_public_key = updates.encryption_public_key;
+                        }
+
+                        user.updated_at = new Date(block.timestamp);
+
+                        // Update indexes if changed
+                        if (oldNickname !== user.nickname) {
+                            if (oldNickname) this.nicknameIndex.delete(oldNickname);
+                            if (user.nickname) this.nicknameIndex.set(user.nickname, system_id);
+                        }
+                        if (oldEmail !== user.email) {
+                            if (oldEmail) this.emailIndex.delete(oldEmail);
+                            if (user.email) this.emailIndex.set(user.email, system_id);
+                        }
+
+                        this.users.set(system_id, user);
+                    }
+                }
+            }
+        }
     }
 }

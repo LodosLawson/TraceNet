@@ -5,6 +5,7 @@ import { Mempool } from './Mempool';
 import { Block } from '../blockchain/models/Block';
 import { Transaction } from '../blockchain/models/Transaction';
 import { ValidatorPool } from '../consensus/ValidatorPool';
+import { LocalDatabase } from '../database/LocalDatabase';
 import * as geoip from 'geoip-lite';
 
 interface Peer {
@@ -30,7 +31,7 @@ export class P2PNetwork {
     private isSyncing: boolean = false;
     private readonly MAX_PEERS = 50;
     private connectedIPs: Map<string, string> = new Map(); // IP -> Node ID (anti-sybil)
-    private peerStore: any; // PeerStore instance (initialized in start())
+    private db: LocalDatabase; // Persistence
     private healthCheckInterval: NodeJS.Timeout | null = null;
 
     constructor(
@@ -38,15 +39,35 @@ export class P2PNetwork {
         mempool: Mempool,
         validatorPool: ValidatorPool,
         server: SocketIOServer,
-        port: number
+        port: number,
+        db: LocalDatabase // Inject DB
     ) {
         this.blockchain = blockchain;
         this.mempool = mempool;
         this.validatorPool = validatorPool;
         this.server = server;
         this.myPort = port;
+        this.db = db;
 
+        this.loadPersistedPeers(); // Load peers on startup
         this.setupServerHandlers();
+    }
+
+    /**
+     * Load peers from DB
+     */
+    private async loadPersistedPeers() {
+        const peers = await this.db.loadPeers();
+        if (peers && peers.length > 0) {
+            peers.forEach(p => this.knownPeers.add(p));
+            // Try to connect to a few random ones if we have no connections?
+            setTimeout(() => {
+                if (this.peers.size === 0) {
+                    console.log('[P2P] No active peers. Attempting to connect to recently known peers...');
+                    this.connectToRandomPeers();
+                }
+            }, 5000);
+        }
     }
 
     /**
@@ -225,6 +246,10 @@ export class P2PNetwork {
 
             if (newPeersCount > 0) {
                 console.log(`[P2P] Added ${newPeersCount} new peers. Total known: ${this.knownPeers.size}`);
+
+                // 💾 Persist new peer list
+                this.db.savePeers(Array.from(this.knownPeers));
+
                 // 🚀 FAILOVER / AUTO-CONNECT
                 // If we have few connections, try connecting to these new peers
                 if (this.peers.size < 5) {

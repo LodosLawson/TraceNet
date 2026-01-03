@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import http from 'http';
 import { Blockchain } from './blockchain/core/Blockchain';
 import { Mempool } from './node/Mempool';
+import { SocialPool } from './node/SocialPool';
 import { WalletService } from './wallet/WalletService';
 import { AirdropService } from './wallet/AirdropService';
 import { ValidatorPool } from './consensus/ValidatorPool';
@@ -64,6 +65,7 @@ class BlockchainNode {
     private p2pNetwork: P2PNetwork;
     private autoUpdater: AutoUpdater;
     private cloudBackup: CloudStorageBackup;
+    private socialPool: SocialPool;
 
     constructor() {
         console.log('[Startup] Initializing Blockchain Node...');
@@ -83,6 +85,9 @@ class BlockchainNode {
         const mempoolExpiration = parseInt(process.env.MEMPOOL_EXPIRATION_MS || '3600000', 10);
         this.mempool = new Mempool(maxMempoolSize, mempoolExpiration);
 
+        // Initialize SocialPool
+        this.socialPool = new SocialPool(this.mempool);
+
         // Initialize MessagePool
         // Import must be at top, using require here for simplicity in this edit block or I should add import
         const { MessagePool } = require('./node/MessagePool');
@@ -101,21 +106,31 @@ class BlockchainNode {
 
         // CRITICAL SECURITY: Validator key validation
         const sysPrivateKey = process.env.VALIDATOR_PRIVATE_KEY;
-        if (!sysPrivateKey && process.env.NODE_ENV === 'production') {
-            throw new Error('SECURITY ERROR: VALIDATOR_PRIVATE_KEY must be set in production!');
+        const sysPublicKey = process.env.GENESIS_VALIDATOR_PUBLIC_KEY;
+
+        let publicKeyToUse: string;
+
+        if (sysPublicKey) {
+            // If public key is explicitly provided, use it (Consumer Node)
+            publicKeyToUse = sysPublicKey;
+            console.log('[Security] Using explicit GENESIS_VALIDATOR_PUBLIC_KEY');
+        } else {
+            // Fallback to deriving from Private Key (Validator Node / Dev)
+            if (!sysPrivateKey && process.env.NODE_ENV === 'production') {
+                throw new Error('SECURITY ERROR: Either VALIDATOR_PRIVATE_KEY or GENESIS_VALIDATOR_PUBLIC_KEY must be set in production!');
+            }
+
+            // Default key is ONLY for development
+            const defaultSystemKey = '0000000000000000000000000000000000000000000000000000000000000001';
+            const validatorKey = sysPrivateKey || defaultSystemKey;
+            publicKeyToUse = KeyManager.getKeyPairFromPrivate(validatorKey).publicKey;
         }
 
-        // Use a consistent private key for the System Validator so all nodes agree on signatures
-        // Default key is ONLY for development
-        const defaultSystemKey = '0000000000000000000000000000000000000000000000000000000000000001';
-        const validatorKey = sysPrivateKey || defaultSystemKey;
-
-        const sysKeyPair = KeyManager.getKeyPairFromPrivate(validatorKey);
         const sysUserId = 'system_user';
 
-        this.validatorPool.registerValidator(systemValidatorId, sysUserId, sysKeyPair.publicKey);
+        this.validatorPool.registerValidator(systemValidatorId, sysUserId, publicKeyToUse);
         this.validatorPool.setOnline(systemValidatorId);
-        console.log(`System Validator registered: ${systemValidatorId} (Public Key: ${sysKeyPair.publicKey.substring(0, 10)}...)`);
+        console.log(`System Validator registered: ${systemValidatorId} (Public Key: ${publicKeyToUse.substring(0, 10)}...)`);
 
         // Initialize core components IN ORDER with correct parameters
         const genesisValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
@@ -180,16 +195,22 @@ class BlockchainNode {
             maxTxPerBlock, // Use maxTxPerBlock, not maxTransactionsPerBlock
             nodeWalletPublicKey // Pass automated node wallet
         );
-        // Register local system validator key for signing
-        this.blockProducer.registerLocalValidator(systemValidatorId, sysKeyPair.privateKey);
+        // Register local system validator key for signing (ONLY IF PRIVATE KEY EXISTS)
+        if (sysPrivateKey) {
+            this.blockProducer.registerLocalValidator(systemValidatorId, sysPrivateKey);
+        } else {
+            console.log('[BlockProducer] Running in Read-Only Mode (No Private Key)');
+        }
 
         // Initialize AirdropService with Blockchain and System Keys
         const airdropAmount = parseInt(process.env.AIRDROP_AMOUNT || '625000', 10);
+        // If no private key, pass empty string or dummy (AirdropService might require refactor if it strictly needs it)
+        // For now, we assume Airdrop won't be triggered by this node if it's read-only
         this.airdropService = new AirdropService(
             airdropAmount,
             systemWalletId,
             this.blockchain,
-            { publicKey: sysKeyPair.publicKey, privateKey: sysKeyPair.privateKey }
+            { publicKey: publicKeyToUse, privateKey: sysPrivateKey || '' }
         );
 
         const rewardConfig: RewardConfig = {
@@ -250,7 +271,7 @@ class BlockchainNode {
         this.rpcServer.setContentService(this.contentService);
 
         // Initialize social service
-        this.socialService = new SocialService(this.blockchain, this.mempool);
+        this.socialService = new SocialService(this.blockchain, this.mempool, this.socialPool);
         this.socialService.setContentService(this.contentService);
         this.rpcServer.setSocialService(this.socialService);
 
@@ -288,7 +309,8 @@ class BlockchainNode {
             this.mempool,
             this.validatorPool,
             this.wsServer.getIO(),
-            port
+            port,
+            this.localDb // ✅ Inject DB
         );
 
         // Connect to peers from env
@@ -346,6 +368,9 @@ class BlockchainNode {
 
             // Broadcast via P2P
             this.p2pNetwork.broadcastBlock(data.block);
+
+            // ✅ Update UserService with new block
+            this.userService.processBlock(data.block);
 
             // Distribute rewards (system transactions, not added to mempool)
             const blockRewards = this.rewardDistributor.distributeBlockReward(
@@ -491,6 +516,10 @@ class BlockchainNode {
         } else {
             console.log(`✅ System validator '${systemValidatorId}' is ready and online`);
         }
+
+        // ✅ RECOVERY: Sync User Service with Blockchain
+        // This rebuilds the user database from the chain history
+        await this.userService.syncWithBlockchain(this.blockchain);
 
         // Start block production
         this.blockProducer.start();

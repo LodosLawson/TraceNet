@@ -1,6 +1,7 @@
 import { Blockchain } from '../blockchain/core/Blockchain';
 import { Mempool } from '../node/Mempool';
-import { TransactionModel, TransactionType, Transaction } from '../blockchain/models/Transaction';
+import { SocialPool } from '../node/SocialPool';
+import { TransactionModel, TransactionType, Transaction, InnerTransaction, Signature } from '../blockchain/models/Transaction';
 import { TOKEN_CONFIG, TREASURY_ADDRESSES } from '../economy/TokenConfig';
 import { ContentService } from './ContentService';
 import crypto from 'crypto';
@@ -38,11 +39,13 @@ export interface FollowUserOptions {
 export class SocialService {
     private blockchain: Blockchain;
     private mempool: Mempool;
+    private socialPool: SocialPool; // Injected
     private contentService?: ContentService;
 
-    constructor(blockchain: Blockchain, mempool: Mempool) {
+    constructor(blockchain: Blockchain, mempool: Mempool, socialPool: SocialPool) {
         this.blockchain = blockchain;
         this.mempool = mempool;
+        this.socialPool = socialPool;
     }
 
     /**
@@ -62,6 +65,7 @@ export class SocialService {
         fee_paid: number;
         creator_received: number;
         treasury_received: number;
+        status: string; // 'queued' or 'confirmed'
     } {
         // Get content to find creator
         if (!this.contentService) {
@@ -81,53 +85,51 @@ export class SocialService {
         const totalFee = TOKEN_CONFIG.LIKE_FEE; // 1000 = 0.00001 LT
         const creatorAmount = Math.floor(totalFee * 0.5); // 50%
         const treasuryAmount = totalFee - creatorAmount; // 50%
+        const timestamp = Date.now();
 
-        // Create LIKE transaction to content creator (50%)
-        const likeTransaction = TransactionModel.create(
-            options.wallet_id,
-            content.owner_wallet, // 50% goes to content creator
-            TransactionType.LIKE,
-            creatorAmount,
-            0, // Fee already included in amount
-            (Date.now() % 1000000), // Nonce
-            {
+        // 1. Create INNER Like Transaction
+        const innerLike: InnerTransaction = {
+            type: TransactionType.LIKE,
+            from_wallet: options.wallet_id,
+            to_wallet: content.owner_wallet,
+            amount: creatorAmount,
+            nonce: (timestamp % 1000000),
+            timestamp: timestamp,
+            payload: {
                 action_type: 'LIKE',
                 content_id: options.content_id,
                 target_content_id: options.content_id,
-                timestamp: Date.now(),
-            }
-        );
+            },
+            signature: 'PENDING', // Client should sign, but for now we simulate
+        };
 
-        // Create treasury transaction (50%)
-        const treasuryTransaction = TransactionModel.create(
-            options.wallet_id,
-            TREASURY_ADDRESSES.main,
-            TransactionType.LIKE,
-            treasuryAmount,
-            0,
-            (Date.now() % 1000000) + 1, // Nonce + 1
-            {
+        // 2. Create INNER Treasury Transaction
+        const innerTreasury: InnerTransaction = {
+            type: TransactionType.LIKE, // Or generic FEE type?
+            from_wallet: options.wallet_id,
+            to_wallet: TREASURY_ADDRESSES.main,
+            amount: treasuryAmount,
+            nonce: (timestamp % 1000000) + 1,
+            timestamp: timestamp,
+            payload: {
                 action_type: 'LIKE_FEE',
                 content_id: options.content_id,
-                is_treasury_fee: true,
-                timestamp: Date.now(),
-            }
-        );
+                is_treasury_fee: true
+            },
+            signature: 'PENDING'
+        };
 
-        // Add both transactions to mempool
-        const result1 = this.mempool.addTransaction(likeTransaction.toJSON());
-        const result2 = this.mempool.addTransaction(treasuryTransaction.toJSON());
-
-        if (!result1.success || !result2.success) {
-            throw new Error('Failed to add like transaction to mempool');
-        }
+        // Add to Social Pool (Batch Queue)
+        this.socialPool.addSocialAction(innerLike);
+        this.socialPool.addSocialAction(innerTreasury);
 
         return {
-            tx_id: likeTransaction.tx_id,
+            tx_id: `PENDING-BATCH-${timestamp}`,
             success: true,
             fee_paid: totalFee,
             creator_received: creatorAmount,
             treasury_received: treasuryAmount,
+            status: 'queued'
         };
     }
 
@@ -141,6 +143,7 @@ export class SocialService {
         fee_paid: number;
         creator_received: number;
         treasury_received: number;
+        status: string;
     } {
         // Validate comment
         if (!options.comment_text || options.comment_text.trim().length === 0) {
@@ -161,70 +164,71 @@ export class SocialService {
             throw new Error('Content not found');
         }
 
-        const totalFee = TOKEN_CONFIG.COMMENT_FEE; // 1000 = 0.00001 LT
-        const creatorAmount = Math.floor(totalFee * 0.5); // 50%
-        const treasuryAmount = totalFee - creatorAmount; // 50%
+        const totalFee = TOKEN_CONFIG.COMMENT_FEE;
+        const creatorAmount = Math.floor(totalFee * 0.5);
+        const treasuryAmount = totalFee - creatorAmount;
+        const timestamp = Date.now();
 
         // Create comment ID
         const comment_id = crypto
             .createHash('sha256')
-            .update(`${options.wallet_id}${options.content_id}${Date.now()}`)
+            .update(`${options.wallet_id}${options.content_id}${timestamp}`)
             .digest('hex');
 
-        // Create COMMENT transaction to content creator (50%)
-        const commentTransaction = TransactionModel.create(
-            options.wallet_id,
-            content.owner_wallet,
-            TransactionType.COMMENT,
-            creatorAmount,
-            0,
-            (Date.now() % 1000000), // Nonce
-            {
+        // 1. Inner Comment Tx
+        const innerComment: InnerTransaction = {
+            type: TransactionType.COMMENT,
+            from_wallet: options.wallet_id,
+            to_wallet: content.owner_wallet,
+            amount: creatorAmount,
+            nonce: (timestamp % 1000000),
+            timestamp: timestamp,
+            payload: {
                 action_type: 'COMMENT',
                 comment_id,
                 content_id: options.content_id,
                 target_content_id: options.content_id,
                 comment_text: options.comment_text,
                 parent_comment_id: options.parent_comment_id,
-                timestamp: Date.now(),
-            }
-        );
+            },
+            signature: 'PENDING'
+        };
 
-        // Create treasury transaction (50%)
-        const treasuryTransaction = TransactionModel.create(
-            options.wallet_id,
-            TREASURY_ADDRESSES.main,
-            TransactionType.COMMENT,
-            treasuryAmount,
-            0,
-            (Date.now() % 1000000) + 1, // Nonce + 1
-            {
+        // 2. Inner Treasury Tx
+        const innerTreasury: InnerTransaction = {
+            type: TransactionType.COMMENT,
+            from_wallet: options.wallet_id,
+            to_wallet: TREASURY_ADDRESSES.main,
+            amount: treasuryAmount,
+            nonce: (timestamp % 1000000) + 1,
+            timestamp: timestamp,
+            payload: {
                 action_type: 'COMMENT_FEE',
                 content_id: options.content_id,
-                is_treasury_fee: true,
-                timestamp: Date.now(),
-            }
-        );
+                is_treasury_fee: true
+            },
+            signature: 'PENDING'
+        };
 
-        // Add both transactions to mempool
-        const result1 = this.mempool.addTransaction(commentTransaction.toJSON());
-        const result2 = this.mempool.addTransaction(treasuryTransaction.toJSON());
-
-        if (!result1.success || !result2.success) {
-            throw new Error('Failed to add comment transaction to mempool');
-        }
+        // Add to Social Pool
+        this.socialPool.addSocialAction(innerComment);
+        this.socialPool.addSocialAction(innerTreasury);
 
         return {
-            tx_id: commentTransaction.tx_id,
+            tx_id: `PENDING-BATCH-${timestamp}`,
             success: true,
             fee_paid: totalFee,
             creator_received: creatorAmount,
             treasury_received: treasuryAmount,
+            status: 'queued'
         };
     }
 
     /**
      * Follow user (FREE - no fee)
+     * For now, we allow immediate execution as it's free/lightweight, 
+     * or we can batch it too. Let's keep it immediate to show hybrid approach is possible,
+     * unless requested otherwise. The prompt specifically mentioned Like and Comments.
      */
     followUser(options: FollowUserOptions): {
         tx_id: string;
@@ -308,14 +312,31 @@ export class SocialService {
         const likes: Transaction[] = [];
         const chain = this.blockchain.getChain();
 
+        // TODO: Also search SocialPool?
+
         for (const block of chain) {
             for (const tx of block.transactions) {
+                // Handle Normal Likes
                 if (
                     tx.type === TransactionType.LIKE &&
                     (tx.payload?.content_id === contentId || tx.payload?.target_content_id === contentId) &&
                     !tx.payload?.is_treasury_fee
                 ) {
                     likes.push(tx);
+                }
+
+                // Handle Batched Likes
+                if (tx.type === TransactionType.BATCH && tx.payload && Array.isArray(tx.payload.transactions)) {
+                    for (const innerTx of tx.payload.transactions) {
+                        if (
+                            innerTx.type === TransactionType.LIKE &&
+                            (innerTx.payload?.content_id === contentId || innerTx.payload?.target_content_id === contentId) &&
+                            !innerTx.payload?.is_treasury_fee
+                        ) {
+                            // Convert InnerTx to Tx format for consistency
+                            likes.push(innerTx as any);
+                        }
+                    }
                 }
             }
         }
@@ -338,6 +359,19 @@ export class SocialService {
                     !tx.payload?.is_treasury_fee
                 ) {
                     comments.push(tx);
+                }
+
+                // Handle Batched Comments
+                if (tx.type === TransactionType.BATCH && tx.payload && Array.isArray(tx.payload.transactions)) {
+                    for (const innerTx of tx.payload.transactions) {
+                        if (
+                            innerTx.type === TransactionType.COMMENT &&
+                            (innerTx.payload?.content_id === contentId || innerTx.payload?.target_content_id === contentId) &&
+                            !innerTx.payload?.is_treasury_fee
+                        ) {
+                            comments.push(innerTx as any);
+                        }
+                    }
                 }
             }
         }
@@ -405,6 +439,7 @@ export class SocialService {
 
         for (const block of chain) {
             for (const tx of block.transactions) {
+                // Normal
                 if (
                     tx.type === TransactionType.LIKE &&
                     tx.from_wallet === walletId &&
@@ -412,6 +447,20 @@ export class SocialService {
                     !tx.payload?.is_treasury_fee
                 ) {
                     return true;
+                }
+
+                // Batched
+                if (tx.type === TransactionType.BATCH && tx.payload && Array.isArray(tx.payload.transactions)) {
+                    for (const innerTx of tx.payload.transactions) {
+                        if (
+                            innerTx.type === TransactionType.LIKE &&
+                            innerTx.from_wallet === walletId &&
+                            (innerTx.payload?.content_id === contentId || innerTx.payload?.target_content_id === contentId) &&
+                            !innerTx.payload?.is_treasury_fee
+                        ) {
+                            return true;
+                        }
+                    }
                 }
             }
         }
