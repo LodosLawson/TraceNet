@@ -57,6 +57,11 @@ export class P2PNetwork {
      * Load peers from DB
      */
     private async loadPersistedPeers() {
+        if (!this.db) {
+            console.log('[P2P] Database not initialized yet. Skipping peer loading.');
+            return;
+        }
+
         const peers = await this.db.loadPeers();
         if (peers && peers.length > 0) {
             peers.forEach(p => this.knownPeers.add(p));
