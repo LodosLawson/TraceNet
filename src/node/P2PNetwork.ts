@@ -139,6 +139,14 @@ export class P2PNetwork {
 
             socket.on('p2p:handshake', (data: any) => {
                 this.handleHandshake(socket, data, true); // Incoming
+
+                // Respond with my info
+                socket.emit('p2p:handshake', {
+                    port: this.myPort,
+                    publicHost: process.env.PUBLIC_HOST,
+                    height: this.blockchain.getChainLength(),
+                    version: '2.5.0',
+                });
             });
 
             socket.on('p2p:newBlock', (blockData: any) => {
@@ -175,12 +183,18 @@ export class P2PNetwork {
     /**
      * Setup handlers for outgoing connections (Client)
      */
+    /**
+     * Setup handlers for outgoing connections (Client)
+     */
     private setupClientHandlers(socket: Socket, peerUrl: string): void {
         socket.on('p2p:handshake', (data: any) => {
             // Response to my handshake involved?
             // Actually currently handshake is one-way announce.
             // We can register them.
             this.handleHandshake(socket, data, false, peerUrl);
+
+            // 🚀 DISCOVERY: Ask for their peers immediately after handshake
+            socket.emit('p2p:requestPeers');
         });
 
         socket.on('p2p:newBlock', (blockData: any) => {
@@ -196,14 +210,46 @@ export class P2PNetwork {
         });
 
         socket.on('p2p:sendPeers', (peers: string[]) => {
+            console.log(`[P2P] Received ${peers.length} peers from ${peerUrl}`);
+            let newPeersCount = 0;
+
             peers.forEach(p => {
-                if (p !== `http://localhost:${this.myPort}`) {
-                    this.knownPeers.add(p);
-                    // Optionally connect automatically
+                // Don't add myself or localhost to known list if I'm public
+                if (p !== `http://localhost:${this.myPort}` && !this.knownPeers.has(p)) {
+                    if (this.knownPeers.size < 500) { // Hardcoded limit for now, should use Config
+                        this.knownPeers.add(p);
+                        newPeersCount++;
+                    }
                 }
             });
+
+            if (newPeersCount > 0) {
+                console.log(`[P2P] Added ${newPeersCount} new peers. Total known: ${this.knownPeers.size}`);
+                // 🚀 FAILOVER / AUTO-CONNECT
+                // If we have few connections, try connecting to these new peers
+                if (this.peers.size < 5) {
+                    this.connectToRandomPeers();
+                }
+            }
         });
     }
+
+    /**
+     * Connect to random peers from known list
+     */
+    private connectToRandomPeers() {
+        if (this.isSyncing) return;
+
+        const candidates = Array.from(this.knownPeers).filter(p => !this.peers.has(p));
+        // Shuffle
+        candidates.sort(() => Math.random() - 0.5);
+
+        // Try top 3
+        for (let i = 0; i < Math.min(3, candidates.length); i++) {
+            this.connectToPeer(candidates[i]);
+        }
+    }
+
 
     /**
      * Extract IP from URL and lookup geolocation
@@ -344,10 +390,10 @@ export class P2PNetwork {
     }
 
     private checkForSync(peer: Peer) {
-        const myHeight = this.blockchain.getLatestBlock().index;
+        const myHeight = this.blockchain.getChainLength();
         if (peer.height > myHeight) {
             console.log(`[P2P] Peer ${peer.id} is ahead (${peer.height} > ${myHeight}). Requesting chain...`);
-            peer.socket.emit('p2p:requestChain', { fromHeight: myHeight + 1 });
+            peer.socket.emit('p2p:requestChain', { fromHeight: myHeight });
             this.isSyncing = true;
         }
     }
@@ -424,6 +470,14 @@ export class P2PNetwork {
 
     public getPeers(): Peer[] {
         return Array.from(this.peers.values());
+    }
+
+    /**
+     * Get all known peer URLs (connected + disconnected)
+     * Used by Frontend for failover
+     */
+    public getKnownPeers(): string[] {
+        return Array.from(this.knownPeers);
     }
 }
 

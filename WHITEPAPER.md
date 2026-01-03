@@ -212,13 +212,13 @@ This is suitable for social applications where instant confirmation is critical 
 
 ### 5.1 Token Supply
 
-**Maximum Supply**: 100,000,000 TNN (TraceNet Network Tokens)
+**Maximum Supply**: 100,000,000 TRN (TraceNet Network Tokens)
 **Initial Distribution**: 0 (Fair launch - no pre-mine)
-**Unit System**: 1 TNN = 100,000,000 units (8 decimals)
+**Unit System**: 1 TRN = 100,000,000 units (8 decimals)
 
 **Emission Schedule**
 Tokens enter circulation through:
-1. Wallet creation bonus: 625,000 units (0.00625 TNN) per new user
+1. Wallet creation bonus: 625,000 units (0.00625 TRN) per new user
 2. Transaction fees: Recycled back to network participants
 
 ### 5.2 Fee Structure
@@ -439,7 +439,7 @@ Wallet C: +4,166 units → Balance: 4,166 units
     type: 'TRANSFER',
     from_wallet: 'TRN0abc...',
     to_wallet: 'TRN0xyz...',
-    amount: 100000,  // 0.001 TNN
+    amount: 100000,  // 0.001 TRN
     fee: 500
 }
 ```
@@ -546,7 +546,7 @@ Wallet C: +4,166 units → Balance: 4,166 units
 
 ### 9.1 Token Utility
 
-**TNN Token Uses**:
+**TRN Token Uses**:
 1. Transaction fees (all operations)
 2. Social interactions (likes, comments, follows)
 3. Content creation and publishing
@@ -560,7 +560,7 @@ Wallet C: +4,166 units → Balance: 4,166 units
 - Positive feedback loop drives adoption
 
 **Deflationary Pressure**:
-- Fixed max supply (100M TNN)
+- Fixed max supply (100M TRN)
 - Fee burn mechanism possible in future
 - Locked tokens in inactive accounts
 
@@ -798,7 +798,7 @@ TraceNet is not just a blockchain. It's a social revolution powered by cryptogra
 
 ## Appendix A: Unit Conversion Table
 
-| TNN Amount | Units | Common Use |
+| TRN Amount | Units | Common Use |
 |-----------|-------|------------|
 | 0.00000001 | 1 | Smallest unit (satoshi equivalent) |
 | 0.000005 | 500 | Transfer fee |

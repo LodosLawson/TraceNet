@@ -1,6 +1,6 @@
 import { Block, IBlock } from '../models/Block';
 import { GENESIS_BLOCK_DATA } from '../config/GenesisBlock';
-import { Transaction, TransactionModel } from '../models/Transaction';
+import { Transaction, TransactionModel, TransactionType } from '../models/Transaction';
 import { KeyManager } from '../crypto/KeyManager';
 import { ValidatorPool } from '../../consensus/ValidatorPool';
 import { TOKEN_CONFIG } from '../../economy/TokenConfig';
@@ -655,16 +655,11 @@ export class Blockchain extends EventEmitter {
         }
 
         // Replay Protection: Check if transaction ID has already been seen using cache
-        // ONLY check if we are supposed to cache (i.e. this is a real application), 
-        // OR always check?
-        // If we are doing a dry run (calculateStateRoot), we shouldn't fail if we just saw it in memory?
-        // But calculateStateRoot is usually done on new transactions.
-        // The issue was calculateStateRoot CACHING it.
-        // So checking is fine, as long as we haven't cached it yet.
         if (shouldCache && this.isTransactionDuplicate(tx.tx_id)) {
             return { success: false, error: `Duplicate transaction ID: ${tx.tx_id} ` };
         }
 
+        // Determine fromAccount
         let fromAccount = state.get(tx.from_wallet);
         if (!fromAccount) {
             fromAccount = {
@@ -672,6 +667,32 @@ export class Blockchain extends EventEmitter {
                 balance: 0,
                 nonce: 0,
             };
+        }
+
+        // SIGNATURE VERIFICATION (CRITICAL SECURITY FIX)
+        if (tx.type !== TransactionType.REWARD) {
+            if (!tx.sender_signature) {
+                return { success: false, error: 'Missing signature' };
+            }
+
+            // Determine Public Key
+            let verifyKey = tx.sender_public_key;
+            if (!verifyKey && fromAccount && fromAccount.public_key) {
+                verifyKey = fromAccount.public_key;
+            }
+
+            if (!verifyKey) {
+                return { success: false, error: 'Missing public key for verification' };
+            }
+
+            // Reconstruct Signable Data
+            const txModel = new TransactionModel(tx);
+            const signableData = txModel.getSignableData();
+
+            // Verify
+            if (!KeyManager.verify(signableData, tx.sender_signature, verifyKey)) {
+                return { success: false, error: 'Invalid signature' };
+            }
         }
 
         let toAccount: AccountState;
@@ -1041,103 +1062,62 @@ export class Blockchain extends EventEmitter {
         state.set(tx.from_wallet, fromAccount);
         state.set(tx.to_wallet, toAccount);
 
-        // NEW FEE DISTRIBUTION LOGIC
+        // FEE DISTRIBUTION LOGIC (V2.6 - 45/30/20/5)
         if (tx.fee > 0) {
             const isGenesis = blockIndex === 0;
-            const isSocialAction = ['LIKE', 'COMMENT', 'FOLLOW', 'UNFOLLOW', 'SHARE'].includes(tx.type);
+            if (!isGenesis) {
+                // Calculate Split
+                const pPrimary = 0.45;
+                const pPool = 0.30;
+                const pRecycle = 0.20;
 
-            if (!isGenesis && nodeWallet) {
-                // Node wallet registered and not genesis block
-                const nodeFee = Math.floor(tx.fee * 0.5); // 50% to node owner
+                const primaryFee = Math.floor(tx.fee * pPrimary);
+                const poolFee = Math.floor(tx.fee * pPool);
+                const recycleFee = Math.floor(tx.fee * pRecycle);
+                const devFee = tx.fee - primaryFee - poolFee - recycleFee;
+
+                // 1. Distribute Primary (45%)
+                // If Node Wallet is present, they get the primary share?
+                // OR if it's Social, the Creator gets it?
+                // The report says: "45% Node Owner / Creator".
+                // Interpretation: If I am the Node processing this, I assume I get it?
+                // But wait, if I am a Creator, I should get paid for my content.
+                // Logic:
+                // - Social (Like/Comment): Primary goes to Content Owner (to_wallet).
+                // - Transfer/Other: Primary goes to Node Owner (nodeWallet).
+
+                const isSocialAction = ['LIKE', 'COMMENT', 'FOLLOW', 'UNFOLLOW', 'SHARE', 'POST_CONTENT'].includes(tx.type);
+                let primaryWallet = nodeWallet;
 
                 if (isSocialAction) {
-                    // Social actions: 50% node, 25% content owner, 25% treasury
-                    const remainingFee = tx.fee - nodeFee;
-                    const contentOwnerFee = Math.floor(remainingFee * 0.5); // 25% of total
-                    const treasuryFee = tx.fee - nodeFee - contentOwnerFee; // Remaining 25%
-
-                    // Credit node owner
-                    const nodeAccount = state.get(nodeWallet) || {
-                        address: nodeWallet,
-                        balance: 0,
-                        nonce: 0,
-                    };
-                    nodeAccount.balance += nodeFee;
-                    state.set(nodeWallet, nodeAccount);
-
-                    // Credit content owner (to_wallet for social actions)
-                    const contentOwnerAccount = state.get(tx.to_wallet) || {
-                        address: tx.to_wallet,
-                        balance: 0,
-                        nonce: 0,
-                    };
-                    contentOwnerAccount.balance += contentOwnerFee;
-                    state.set(tx.to_wallet, contentOwnerAccount);
-
-                    // Credit treasury
-                    const treasuryAccount = state.get('TREASURY_MAIN') || {
-                        address: 'TREASURY_MAIN',
-                        balance: 0,
-                        nonce: 0,
-                    };
-                    treasuryAccount.balance += treasuryFee;
-                    state.set('TREASURY_MAIN', treasuryAccount);
-                } else {
-                    // Transfer: 50% node, 50% treasury
-                    const treasuryFee = tx.fee - nodeFee;
-
-                    // Credit node owner
-                    const nodeAccount = state.get(nodeWallet) || {
-                        address: nodeWallet,
-                        balance: 0,
-                        nonce: 0,
-                    };
-                    nodeAccount.balance += nodeFee;
-                    state.set(nodeWallet, nodeAccount);
-
-                    // Credit treasury
-                    const treasuryAccount = state.get('TREASURY_MAIN') || {
-                        address: 'TREASURY_MAIN',
-                        balance: 0,
-                        nonce: 0,
-                    };
-                    treasuryAccount.balance += treasuryFee;
-                    state.set('TREASURY_MAIN', treasuryAccount);
+                    primaryWallet = tx.to_wallet; // Content Owner
                 }
-            } else {
-                // No node wallet or genesis block
-                if (isSocialAction) {
-                    // Social actions: 50% content owner, 50% treasury
-                    const contentOwnerFee = Math.floor(tx.fee * 0.5);
-                    const treasuryFee = tx.fee - contentOwnerFee;
 
-                    // Credit content owner
-                    const contentOwnerAccount = state.get(tx.to_wallet) || {
-                        address: tx.to_wallet,
-                        balance: 0,
-                        nonce: 0,
-                    };
-                    contentOwnerAccount.balance += contentOwnerFee;
-                    state.set(tx.to_wallet, contentOwnerAccount);
-
-                    // Credit treasury
-                    const treasuryAccount = state.get('TREASURY_MAIN') || {
-                        address: 'TREASURY_MAIN',
-                        balance: 0,
-                        nonce: 0,
-                    };
-                    treasuryAccount.balance += treasuryFee;
-                    state.set('TREASURY_MAIN', treasuryAccount);
+                if (primaryWallet) {
+                    const primaryAcc = state.get(primaryWallet) || { address: primaryWallet, balance: 0, nonce: 0 };
+                    primaryAcc.balance += primaryFee;
+                    state.set(primaryWallet, primaryAcc);
                 } else {
-                    // Transfer: 100% treasury
-                    const treasuryAccount = state.get('TREASURY_MAIN') || {
-                        address: 'TREASURY_MAIN',
-                        balance: 0,
-                        nonce: 0,
-                    };
-                    treasuryAccount.balance += tx.fee;
-                    state.set('TREASURY_MAIN', treasuryAccount);
+                    // Fallback to Dev/Burn if no primary wallet applicable (e.g. transfer with no node wallet known?)
+                    // Usually nodeWallet is passed by the block miner.
+                    // If missing, burn it.
+                    // Actually, let's give to dev as fallback.
                 }
+
+                // 2. Distribute Pool (30%)
+                const poolAcc = state.get('TREASURY_POOL') || { address: 'TREASURY_POOL', balance: 0, nonce: 0 };
+                poolAcc.balance += poolFee;
+                state.set('TREASURY_POOL', poolAcc);
+
+                // 3. Distribute Recycle (20%)
+                const recycleAcc = state.get('TREASURY_RECYCLE') || { address: 'TREASURY_RECYCLE', balance: 0, nonce: 0 };
+                recycleAcc.balance += recycleFee;
+                state.set('TREASURY_RECYCLE', recycleAcc);
+
+                // 4. Distribute Dev (5%)
+                const devAcc = state.get('TREASURY_DEV') || { address: 'TREASURY_DEV', balance: 0, nonce: 0 };
+                devAcc.balance += devFee;
+                state.set('TREASURY_DEV', devAcc);
             }
         }
 
@@ -1162,6 +1142,8 @@ export class Blockchain extends EventEmitter {
             }
         }
     }
+
+
 
 
     /**

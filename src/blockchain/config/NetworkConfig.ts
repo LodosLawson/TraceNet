@@ -10,8 +10,10 @@ export interface NetworkMetadata {
     version: string;
     genesisTimestamp: number;
     maxSupply: number;
-    tokenSymbol: string;
+    tokenSymbol: 'TRN';
     tokenDecimals: number;
+    MAX_KNOWN_PEERS: number;
+    BOOTSTRAP_NODES: string[];
 }
 
 /**
@@ -26,6 +28,12 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     maxSupply: 100_000_000, // 100 million TRN
     tokenSymbol: 'TRN', // TraceNet (changed from TNN)
     tokenDecimals: 8,
+    MAX_KNOWN_PEERS: 500,
+    BOOTSTRAP_NODES: [
+        'https://tracenet-node-1.run.app',
+        'https://tracenet-node-2.run.app',
+        'https://tracenet-mainnet-seed.herokuapp.com'
+    ]
 };
 
 /**

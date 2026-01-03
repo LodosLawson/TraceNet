@@ -17,13 +17,15 @@ export class BlockProducer extends EventEmitter {
     private maxTransactionsPerBlock: number;
     private isProducing: boolean;
     private productionInterval: NodeJS.Timeout | null;
+    private nodeWalletAddress?: string;
 
     constructor(
         blockchain: Blockchain,
         validatorPool: ValidatorPool,
         mempool: Mempool,
         blockTime: number = 5000,
-        maxTransactionsPerBlock: number = 1000
+        maxTransactionsPerBlock: number = 1000,
+        nodeWalletAddress?: string // New parameter
     ) {
         super();
         this.blockchain = blockchain;
@@ -31,8 +33,16 @@ export class BlockProducer extends EventEmitter {
         this.mempool = mempool;
         this.blockTime = blockTime;
         this.maxTransactionsPerBlock = maxTransactionsPerBlock;
+        this.nodeWalletAddress = nodeWalletAddress;
         this.isProducing = false;
         this.productionInterval = null;
+    }
+
+    /**
+     * Set the node wallet address for fee collection
+     */
+    setNodeWallet(address: string) {
+        this.nodeWalletAddress = address;
     }
 
     // Store private keys for local validators (e.g. System Validator)
@@ -240,7 +250,7 @@ export class BlockProducer extends EventEmitter {
                 validTransactions, // Use filtered list
                 producer.validator_id,
                 stateRoot,
-                undefined, // node_wallet (can be added later if needed)
+                this.nodeWalletAddress, // Use the configured node wallet
                 nextTimestamp // Explicitly pass the calculated timestamp
             );
 
@@ -415,7 +425,7 @@ export class BlockProducer extends EventEmitter {
                 validTransactions, // Use filtered
                 producer.validator_id,
                 stateRoot,
-                undefined,
+                this.nodeWalletAddress,
                 Date.now() // Use current time for triggered blocks
             );
 

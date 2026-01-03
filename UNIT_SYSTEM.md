@@ -7,38 +7,38 @@ TraceNet blockchain uses **integer units** internally, similar to Ethereum's Wei
 ## Conversion
 
 ```
-1 TNN = 100,000,000 units (10^8)
+1 TRN = 100,000,000 units (10^8)
 ```
 
 ### Examples:
 
-| TNN (Frontend) | Units (Blockchain) | Use Case |
+| TRN (Frontend) | Units (Blockchain) | Use Case |
 |----------------|---------------------|----------|
-| 0.00625 TNN | 625,000 | Wallet creation (ONLY initial reward) |
-| 0.00001 TNN | 1,000 | Like fee |
-| 0.00002 TNN | 2,000 | Comment fee |
-| 0.0000001 TNN | 10 | Standard message |
-| 0.00000001 TNN | 1 | Low priority message |
+| 0.00625 TRN | 625,000 | Wallet creation (ONLY initial reward) |
+| 0.00001 TRN | 1,000 | Like fee |
+| 0.00002 TRN | 2,000 | Comment fee |
+| 0.0000001 TRN | 10 | Standard message |
+| 0.00000001 TRN | 1 | Low priority message |
 
 ## Updated Fee Structure (in Units)
 
 ### Sosyal İşlemler
 ```typescript
-MIN_LIKE_FEE = 1,000 units        // 0.00001 TNN
-MIN_COMMENT_FEE = 2,000 units     // 0.00002 TNN
-MIN_FOLLOW_FEE = 1,000 units      // 0.00001 TNN
+MIN_LIKE_FEE = 1,000 units        // 0.00001 TRN
+MIN_COMMENT_FEE = 2,000 units     // 0.00002 TRN
+MIN_FOLLOW_FEE = 1,000 units      // 0.00001 TRN
 ```
 
 ### Mesajlaşma
 ```typescript
-MESSAGE_FAST = 1,000 units        // 0.00001 TNN (instant)
-MESSAGE_STANDARD = 10 units       // 0.0000001 TNN (10 min)
-MESSAGE_LOW = 1 unit              // 0.00000001 TNN (1 hour)
+MESSAGE_FAST = 1,000 units        // 0.00001 TRN (instant)
+MESSAGE_STANDARD = 10 units       // 0.0000001 TRN (10 min)
+MESSAGE_LOW = 1 unit              // 0.00000001 TRN (1 hour)
 ```
 
 ### İlk Cüzdan Bonusu (TEK ÖDÜL)
 ```typescript
-WALLET_CREATION_REWARD = 625,000  // 0.00625 TNN (wallet açılışında)
+WALLET_CREATION_REWARD = 625,000  // 0.00625 TRN (wallet açılışında)
 ```
 
 ### Coin Kazanma Yöntemleri
@@ -46,13 +46,13 @@ WALLET_CREATION_REWARD = 625,000  // 0.00625 TNN (wallet açılışında)
 Kullanıcılar **sadece** şu şekilde coin kazanır:
 
 1. **Postuna beğeni geldiğinde:**
-   - Beğenen kişi: 1,000 units (0.00001 TNN) öder
+   - Beğenen kişi: 1,000 units (0.00001 TRN) öder
    - İçerik sahibi alır: %50 = 500 units
    - Node sahibi alır: %25 = 250 units
    - Hazine alır: %25 = 250 units
 
 2. **Postuna yorum geldiğinde:**
-   - Yorum yapan: 2,000 units (0.00002 TNN) öder
+   - Yorum yapan: 2,000 units (0.00002 TRN) öder
    - İçerik sahibi alır: %50 = 1,000 units
    - Node sahibi alır: %25 = 500 units
    - Hazine alır: %25 = 500 units
@@ -66,26 +66,26 @@ Kullanıcılar **sadece** şu şekilde coin kazanır:
 
 ## Frontend Implementation
 
-### Display (Units → TNN)
+### Display (Units → TRN)
 ```typescript
-import { unitsToTNN, formatTNN } from '@/utils/TokenUnits';
+import { unitsToTRN, formatTRN } from '@/utils/TokenUnits';
 
 // Display balance
 const balance = 625000; // units from blockchain
-console.log(formatTNN(balance)); // "0.00625 TNN"
+console.log(formatTRN(balance)); // "0.00625 TRN"
 
 // Display fee
 const fee = 1000;
-console.log(`Fee: ${unitsToTNN(fee)} TNN`); // "Fee: 0.00001 TNN"
+console.log(`Fee: ${unitsToTRN(fee)} TRN`); // "Fee: 0.00001 TRN"
 ```
 
-### Input (TNN → Units)
+### Input (TRN → Units)
 ```typescript
-import { tnnToUnits, parseTNN } from '@/utils/TokenUnits';
+import { tnnToUnits, parseTRN } from '@/utils/TokenUnits';
 
-// User enters "0.00625 TNN"
+// User enters "0.00625 TRN"
 const userInput = "0.00625";
-const units = parseTNN(userInput); // 625000
+const units = parseTRN(userInput); // 625000
 ```
 
 ## Backend Changes Required

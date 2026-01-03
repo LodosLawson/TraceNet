@@ -279,16 +279,33 @@ export class RPCServer {
                 res.json([]); // No P2P network linked yet
                 return;
             }
-            const peers = this.p2pNetwork.getPeers();
-            res.json(peers.map((p: any) => ({
+
+            // Get connected peers with details
+            const connectedPeers = this.p2pNetwork.getPeers().map((p: any) => ({
                 id: p.id,
                 url: p.url,
+                status: 'connected',
                 height: p.height,
                 ip: p.ip,
                 country: p.country,
                 region: p.region,
                 city: p.city
-            })));
+            }));
+
+            // Get disconnected known peers
+            const knownUrls = this.p2pNetwork.getKnownPeers();
+            const disconnectedPeers = knownUrls
+                .filter((url: string) => !connectedPeers.find((cp: any) => cp.url === url))
+                .map((url: string) => ({
+                    url: url,
+                    status: 'disconnected', // Known but not currently connected
+                    country: 'Unknown'
+                }));
+
+            // Combine and limit to 500
+            const allPeers = [...connectedPeers, ...disconnectedPeers].slice(0, 500);
+
+            res.json(allPeers);
         } catch (error) {
             res.status(500).json({ error: 'Failed to fetch peers' });
         }

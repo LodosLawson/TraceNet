@@ -2,7 +2,7 @@
  * Token configuration for TraceNet blockchain
  */
 export const TOKEN_CONFIG = {
-    SYMBOL: 'LT',
+    SYMBOL: 'TRN',
     NAME: 'TraceNet Token',
     DECIMALS: 8,
     TOTAL_SUPPLY: 10000000000000000, // 100,000,000 LT (in smallest unit)
@@ -43,9 +43,16 @@ export const TOKEN_CONFIG = {
     INITIAL_AIRDROP: 625000, // 0.00625 LT
 
     // Fee split percentages
-    FEE_TO_NODE_OWNER_PERCENT: 50, // 50% to node owner (if wallet registered and not genesis)
-    FEE_TO_CREATOR_PERCENT: 50, // 50% to content creator (for social actions, from remaining 50%)
-    FEE_TO_TREASURY_PERCENT: 50, // 50% to blockchain treasury
+    // Fee split percentages
+    FEE_TO_PRIMARY_PERCENT: 45, // 45% (Node or Creator)
+    FEE_TO_POOL_PERCENT: 30,    // 30% (Mining Pool)
+    FEE_TO_RECYCLE_PERCENT: 20, // 20% (Recycle/Burn)
+    FEE_TO_DEV_PERCENT: 5,      // 5% (Network Owner)
+
+    // Deprecated but kept for compatibility until full refactor
+    FEE_TO_NODE_OWNER_PERCENT: 45,
+    FEE_TO_CREATOR_PERCENT: 45,
+    FEE_TO_TREASURY_PERCENT: 25, // No longer accurate in new model
 };
 
 /**

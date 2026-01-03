@@ -1,8 +1,8 @@
 # TraceNet V2.6 - Ödeme Fiyatları (Fee Structure)
 
-**Son Güncelleme:** 31 Aralık 2024  
+**Son Güncelleme:** 3 Ocak 2026
 **Network:** TraceNet Mainnet V2.6  
-**Token:** TNN (TraceNet Token)
+**Token:** TRN (TraceNet Token)
 
 ---
 
@@ -10,17 +10,18 @@
 
 | İşlem | Minimum Ücret | Maksimum Ücret | Notlar |
 |-------|---------------|----------------|---------|
-| ❤️ **Beğeni (LIKE)** | 0.00001 TNN | Sınırsız | Spam önleme için zorunlu |
-| 💬 **Yorum (COMMENT)** | 0.00002 TNN | Sınırsız | Beğeniden 2x daha yüksek |
-| 👤 **Takip (FOLLOW)** | 0.00001 TNN | Sınırsız | Her takip işlemi için |
-| 👋 **Takipten Çık (UNFOLLOW)** | 0.00001 TNN | Sınırsız | Her çıkış işlemi için |
-| 📝 **Post Paylaş (POST_CONTENT)** | 0 TNN | Sınırsız | Şu an ücretsiz (geçici) |
-| 🔄 **Paylaş (SHARE)** | 0 TNN | Sınırsız | Opsiyonel ücret |
+| ❤️ **Beğeni (LIKE)** | 0.00001 TRN | Sınırsız | Spam önleme için zorunlu |
+| 💬 **Yorum (COMMENT)** | 0.00002 TRN | Sınırsız | Beğeniden 2x daha yüksek |
+| 👤 **Takip (FOLLOW)** | 0.00001 TRN | Sınırsız | Her takip işlemi için |
+| 👋 **Takipten Çık (UNFOLLOW)** | 0.00001 TRN | Sınırsız | Her çıkış işlemi için |
+| 📝 **Post Paylaş (POST_CONTENT)** | 0 TRN | Sınırsız | Şu an ücretsiz (geçici) |
+| 🔄 **Paylaş (SHARE)** | 0 TRN | Sınırsız | Opsiyonel ücret |
 
 > **Önemli:** Sosyal işlemler için ödenen ücretler:
-> - %50 → İçerik sahibine
-> - %25 → Node sahibine
-> - %25 → Hazineye (Treasury)
+> - %45 → İçerik sahibine
+> - %30 → Mining Pool
+> - %20 → Recycle (Supply)
+> - %5 → Ağ Geliştirme
 
 ---
 
@@ -47,11 +48,11 @@ Transfer ücretleri **alıcının popülaritesine** göre otomatik hesaplanır:
 
 ### Örnek Hesaplama
 
-**Senaryo:** 100 TNN gönderiyorsunuz, alıcı Tier 1 (50 transfer/yıl)
+**Senaryo:** 100 TRN gönderiyorsunuz, alıcı Tier 1 (50 transfer/yıl)
 
-- **STANDARD:** 100 × (0.005% + 0%) = **0.005 TNN**
-- **HIGH:** 100 × (0.005% + 0.005%) = **0.01 TNN**
-- **URGENT:** 100 × (0.005% + 0.01%) = **0.015 TNN**
+- **STANDARD:** 100 × (0.005% + 0%) = **0.005 TRN**
+- **HIGH:** 100 × (0.005% + 0.005%) = **0.01 TRN**
+- **URGENT:** 100 × (0.005% + 0.01%) = **0.015 TRN**
 
 ---
 
@@ -61,9 +62,9 @@ TraceNet V2 mesajlaşma sistemi **zaman penceresi** kullanır:
 
 | Mod | Minimum Ücret | Bekleme Süresi | Blok Oluşturma |
 |-----|---------------|----------------|----------------|
-| **FAST** | 0.00001 TNN | 0 saniye | Anında |
-| **STANDARD** | 0.0000001 TNN | 10 dakika | 10 dakika sonra |
-| **LOW** | 0.00000001 TNN | 1 saat | 1 saat sonra |
+| **FAST** | 0.00001 TRN | 0 saniye | Anında |
+| **STANDARD** | 0.0000001 TRN | 10 dakika | 10 dakika sonra |
+| **LOW** | 0.00000001 TRN | 1 saat | 1 saat sonra |
 
 > **Not:** Mesajlar "batch transaction" olarak gruplandırılır, blok boyutunu küçültür.
 
@@ -73,25 +74,28 @@ TraceNet V2 mesajlaşma sistemi **zaman penceresi** kullanır:
 
 | İşlem Tipi | Ücret | Açıklama |
 |------------|-------|----------|
-| **Profil Güncelleme (PROFILE_UPDATE)** | 0 TNN | Ücretsiz (ilk güncelleme) |
-| **Airdrop (REWARD)** | 0 TNN | Sistem otomatik ödeme |
-| **Batch Transaction** | 0.00001 TNN | Validator ücreti |
+| **Profil Güncelleme (PROFILE_UPDATE)** | 0 TRN | Ücretsiz (ilk güncelleme) |
+| **Airdrop (REWARD)** | 0 TRN | Sistem otomatik ödeme |
+| **Batch Transaction** | 0.00001 TRN | Validator ücreti |
 
 ---
 
 ## 📊 Ücret Dağılımı
 
 ### Transfer İşlemleri:
-- **%50** → Node sahibi
-- **%50** → Hazine (Treasury)
+- **%45** → Node sahibi
+- **%30** → Mining Pool
+- **%20** → Supply (Recycle)
+- **%5**  → Ağ Geliştirme
 
 ### Sosyal İşlemler (Like, Comment, Follow):
-- **%50** → İçerik sahibi
-- **%25** → Node sahibi
-- **%25** → Hazine
+- **%45** → İçerik sahibi
+- **%30** → Mining Pool
+- **%20** → Supply (Recycle)
+- **%5**  → Ağ Geliştirme
 
 ### Mesaj İşlemleri:
-- **%100** → Mesaj alıcısı
+- **%100** → Mesaj alıcısı (Değişmedi)
 
 ---
 
@@ -99,7 +103,7 @@ TraceNet V2 mesajlaşma sistemi **zaman penceresi** kullanır:
 
 Yeni cüzdan oluşturulduğunda otomatik olarak verilir:
 
-- **Cüzdan Oluşturma:** 0.00625 TNN (625,000 units)
+- **Cüzdan Oluşturma:** 0.00625 TRN (625,000 units)
 
 > **Not:** Başka hiçbir otomatik bonus YOK (kayıt bonusu, profil bonusu, takipçi bonusu vb.)
 
@@ -110,30 +114,32 @@ Yeni cüzdan oluşturulduğunda otomatik olarak verilir:
 Kullanıcılar sadece **içerik sahipleri olarak** fee'lerden coin kazanır:
 
 ### 1. Postuna Beğeni Geldiğinde
-- Beğenen kişi öder: **0.00001 TNN**
-- **SEN kazanırsın:** 0.000005 TNN (%50)
-- Node: 0.0000025 TNN (%25)
-- Hazine: 0.0000025 TNN (%25)
+- Beğenen kişi öder: **0.00001 TRN**
+- **SEN kazanırsın:** 0.0000045 TRN (%45)
+- Mining Pool: 0.000003 TRN (%30)
+- Recycle: 0.000002 TRN (%20)
+- Dev: 0.0000005 TRN (%5)
 
 ### 2. Postuna Yorum Geldiğinde
-- Yorum yapan öder: **0.00002 TNN**
-- **SEN kazanırsın:** 0.00001 TNN (%50)
-- Node: 0.000005 TNN (%25)
-- Hazine: 0.000005 TNN (%25)
+- Yorum yapan öder: **0.00002 TRN**
+- **SEN kazanırsın:** 0.000009 TRN (%45)
+- Mining Pool: 0.000006 TRN (%30)
+- Recycle: 0.000004 TRN (%20)
+- Dev: 0.000001 TRN (%5)
 
 ### 3. Yorumuna Beğeni Geldiğinde
-- Beğenen kişi öder: **0.00001 TNN**
-- **SEN kazanırsın:** 0.000005 TNN (%50)
-- Node + Hazine: Kalan %50
+- Beğenen kişi öder: **0.00001 TRN**
+- **SEN kazanırsın:** 0.0000045 TRN (%45)
+- Kalan %55 → Pool/Recycle/Dev dağıtılır
 
 ### Örnek Senaryo:
 ```
 Bir post paylaşıyorsun:
-- 100 beğeni alırsın → 0.0005 TNN kazanırsın
-- 20 yorum gelir → 0.0002 TNN kazanırsın
-- Yorumlara 50 beğeni → 0.00025 TNN kazanırsın
+- 100 beğeni alırsın → 0.00045 TRN kazanırsın
+- 20 yorum gelir → 0.00018 TRN kazanırsın
+- Yorumlara 50 beğeni → 0.000225 TRN kazanırsın
 
-TOPLAM: 0.00095 TNN kazandın!
+TOPLAM: 0.000855 TRN kazandın!
 ```
 
 ---
@@ -159,7 +165,7 @@ TOPLAM: 0.00095 TNN kazandın!
 
 ## ⚠️ Önemli Notlar
 
-1. **Tüm ücretler TNN cinsinden** hesaplanır
+1. **Tüm ücretler TRN cinsinden** hesaplanır
 2. **Yetersiz bakiye** = Transaction reddedilir
 3. **Nonce yanlışsa** = Transaction geçersiz
 4. **Her transaction** geri alınamaz (blockchain)
@@ -179,7 +185,7 @@ TOPLAM: 0.00095 TNN kazandın!
 ## 📈 Gelecek Güncellemeler
 
 Planlanan değişiklikler:
-- [ ] POST_CONTENT için minimum ücret (0.0001 TNN)
+- [ ] POST_CONTENT için minimum ücret (0.0001 TRN)
 - [ ] Validator staking gereksinimleri
 - [ ] Dynamic fee adjustment (network load bazlı)
 - [ ] Fee burn mechanism (deflasyon)

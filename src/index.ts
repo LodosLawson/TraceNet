@@ -24,6 +24,7 @@ import { KeyManager } from './blockchain/crypto/KeyManager';
 import crypto from 'crypto';
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { LocalDatabase } from './database/LocalDatabase';
 import { P2PNetwork } from './node/P2PNetwork';
 import { AutoUpdater } from './node/AutoUpdater';
@@ -141,6 +142,34 @@ class BlockchainNode {
             signatureTimeout
         );
 
+        // NODE WALLET AUTOMATION (User Request)
+        // Check for node wallet private key
+        let nodeWalletPrivateKey = process.env.NODE_WALLET_PRIVATE_KEY;
+        let nodeWalletPublicKey: string;
+
+        if (!nodeWalletPrivateKey) {
+            console.log('[Setup] No NODE_WALLET_PRIVATE_KEY found. Generating new Node Wallet...');
+            const keyPair = KeyManager.generateKeyPair();
+            nodeWalletPrivateKey = keyPair.privateKey;
+            nodeWalletPublicKey = keyPair.publicKey;
+
+            // Persist to .env for future runs
+            try {
+                const envPath = path.join(__dirname, '../.env');
+                fs.appendFileSync(envPath, `\nNODE_WALLET_PRIVATE_KEY=${nodeWalletPrivateKey}\n`);
+                console.log(`[Setup] ✅ Generated and saved new Node Wallet to .env`);
+            } catch (err: any) {
+                console.warn('[Setup] ⚠️ Could not save wallet to .env (Check permissions). Wallet will be lost on restart!', err.message);
+            }
+        } else {
+            // Derive public key from private key
+            const keyPair = KeyManager.getKeyPairFromPrivate(nodeWalletPrivateKey);
+            nodeWalletPublicKey = keyPair.publicKey;
+            console.log('[Setup] Loaded existing Node Wallet from config');
+        }
+
+        console.log(`[Setup] 💰 Node Wallet Address: ${nodeWalletPublicKey}`);
+
         const blockTime = parseInt(process.env.BLOCK_TIME_MS || '5000', 10);
         const maxTxPerBlock = parseInt(process.env.MAX_TRANSACTIONS_PER_BLOCK || '1000', 10);
         this.blockProducer = new BlockProducer(
@@ -148,7 +177,8 @@ class BlockchainNode {
             this.validatorPool,
             this.mempool,
             blockTime,
-            maxTxPerBlock
+            maxTxPerBlock, // Use maxTxPerBlock, not maxTransactionsPerBlock
+            nodeWalletPublicKey // Pass automated node wallet
         );
         // Register local system validator key for signing
         this.blockProducer.registerLocalValidator(systemValidatorId, sysKeyPair.privateKey);

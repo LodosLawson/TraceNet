@@ -8,9 +8,14 @@ import { TreasuryManager } from './TreasuryManager';
 export interface FeeCalculation {
     totalCost: number;
     fee: number;
-    netAmount: number;
-    contentOwnerAmount?: number;
-    treasuryAmount: number;
+    netAmount: number; // For social, this is content owner share. For transfer, usually 0 or burned.
+
+    // Distribution breakdown
+    nodeAmount: number;
+    poolAmount: number;
+    recycleAmount: number;
+    devAmount: number;
+    treasuryAmount: number; // Remaining or specific treasury share
 }
 
 /**
@@ -33,11 +38,17 @@ export class FeeHandler extends EventEmitter {
         const netAmount = amount - fee;
         const treasuryAmount = fee;
 
+        const distribution = this.calculateDistribution(fee);
+
         return {
             totalCost: amount,
             fee,
-            netAmount,
-            treasuryAmount,
+            netAmount, // Amount receiver gets
+            nodeAmount: 0, // Context dependent
+            poolAmount: distribution.pool,
+            recycleAmount: distribution.recycle,
+            devAmount: distribution.dev,
+            treasuryAmount: 0,
         };
     }
 
@@ -65,35 +76,66 @@ export class FeeHandler extends EventEmitter {
     /**
      * Calculate social interaction fee (like/comment)
      */
+    /**
+     * Calculate social interaction fee (like/comment)
+     */
     calculateSocialFee(
         action: 'like' | 'comment' | 'message'
     ): FeeCalculation {
         const config = SOCIAL_FEES[action];
         const totalCost = config.cost;
+        const fee = totalCost;
 
-        if (action === 'message') {
-            return {
-                totalCost,
-                fee: totalCost,
-                netAmount: 0,
-                treasuryAmount: totalCost,
-            };
-        }
+        // Use helper to calculate split
+        const distribution = this.calculateDistribution(fee);
 
-        const contentOwnerAmount = Math.floor(totalCost * (config as any).contentOwnerShare);
-        const treasuryAmount = totalCost - contentOwnerAmount;
+        // For social actions (Like/Comment), the 'netAmount' usually refers to what key people get?
+        // Actually, in the new model:
+        // 45% Node/Creator
+        // 30% Pool
+        // 20% Recycle
+        // 5% Dev
+
+        // IF it's a social action, the "Primary" 45% goes to the Content Creator (if no node) or Node?
+        // Technical Report says: "45% Node Owner / Creator".
+        // Blockchain.ts logic distinguishes: "If Node Wallet -> Node gets it. Else -> Creator gets it?"
+        // Or "Node gets 45% AND Creator gets ?"
+        // Let's assume the "Primary" share is the one directed to the intended recipient (Creator) or Facilitator (Node).
+        // For LIKE/COMMENT -> To Creator.
+        // For TRANSFER -> To Node.
 
         return {
             totalCost,
-            fee: totalCost,
-            netAmount: contentOwnerAmount,
-            contentOwnerAmount,
-            treasuryAmount,
+            fee,
+            netAmount: distribution.primary, // This is the Creator/Node share
+            nodeAmount: 0, // Assigned by Blockchain depending on context
+            poolAmount: distribution.pool,
+            recycleAmount: distribution.recycle,
+            devAmount: distribution.dev,
+            treasuryAmount: 0 // Using specific buckets now
         };
     }
 
     /**
-     * Process social interaction fee
+     * Helper: Calculate fee distribution based on TokenConfig
+     */
+    public calculateDistribution(totalFee: number): { primary: number; pool: number; recycle: number; dev: number } {
+        // Percentages
+        const pPrimary = 0.45;
+        const pPool = 0.30;
+        const pRecycle = 0.20;
+        // Dev is remainder to avoid rounding loss
+
+        const primary = Math.floor(totalFee * pPrimary);
+        const pool = Math.floor(totalFee * pPool);
+        const recycle = Math.floor(totalFee * pRecycle);
+        const dev = totalFee - primary - pool - recycle; // Approx 5%
+
+        return { primary, pool, recycle, dev };
+    }
+
+    /**
+     * Process social interaction fee (Just emits event, actual balance move is in Blockchain)
      */
     processSocialFee(
         action: 'like' | 'comment' | 'message',
@@ -101,16 +143,11 @@ export class FeeHandler extends EventEmitter {
     ): FeeCalculation {
         const calculation = this.calculateSocialFee(action);
 
-        // Add to treasury
-        this.treasuryManager.addIncome(calculation.treasuryAmount, 'socialFees');
-
         // Emit event
         this.emit('fee.collected', {
             feeType: `social_${action}`,
             amount: calculation.fee,
-            contentOwnerAmount: calculation.contentOwnerAmount || 0,
-            treasuryAmount: calculation.treasuryAmount,
-            txId,
+            distribution: calculation,
             timestamp: Date.now(),
         });
 
@@ -179,11 +216,17 @@ export class FeeHandler extends EventEmitter {
             totalCostLT: calculation.totalCost / 100_000_000,
             treasury: calculation.treasuryAmount,
             treasuryLT: calculation.treasuryAmount / 100_000_000,
+            distribution: {
+                primary: calculation.netAmount,
+                pool: calculation.poolAmount,
+                recycle: calculation.recycleAmount,
+                dev: calculation.devAmount
+            }
         };
 
-        if (calculation.contentOwnerAmount) {
-            result.contentOwner = calculation.contentOwnerAmount;
-            result.contentOwnerLT = calculation.contentOwnerAmount / 100_000_000;
+        if (calculation.netAmount > 0) {
+            result.contentOwner = calculation.netAmount;
+            result.contentOwnerLT = calculation.netAmount / 100_000_000;
         }
 
         return result;
