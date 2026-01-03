@@ -80,6 +80,37 @@ class MiningApp:
         self.entry_port = ttk.Entry(frame_config, width=10)
         self.entry_port.grid(row=0, column=1, sticky='w', padx=5, pady=5)
         self.entry_port.insert(0, self.env_manager.get("PORT", "3000"))
+
+        # Access Mode (Host)
+        ttk.Label(frame_config, text="Access:").grid(row=0, column=2, sticky='e', padx=5, pady=5)
+        self.combo_host = ttk.Combobox(frame_config, values=["Local Only (127.0.0.1)", "Public (0.0.0.0)"], state="readonly", width=20)
+        self.combo_host.grid(row=0, column=3, sticky='w', padx=5, pady=5)
+        
+        current_host = self.env_manager.get("HOST", "0.0.0.0")
+        if "127.0.0.1" in current_host:
+            self.combo_host.current(0)
+        else:
+            self.combo_host.current(1)
+
+        # Peers
+        ttk.Label(frame_config, text="Secure Peers (comma-sep):").grid(row=1, column=0, sticky='w', padx=5, pady=5)
+        self.entry_peers = ttk.Entry(frame_config, width=50)
+        self.entry_peers.grid(row=1, column=1, columnspan=3, sticky='w', padx=5, pady=5)
+        self.entry_peers.insert(0, self.env_manager.get("PEERS", ""))
+
+        ttk.Button(frame_config, text="Save Config", command=self.save_config).grid(row=2, column=3, sticky='e', padx=5, pady=10)
+        
+        # Advanced Editor Button
+        ttk.Button(frame_config, text="Advanced .env Editor", command=self.open_env_editor).grid(row=2, column=0, sticky='w', padx=5, pady=10)
+
+        # --- Earnings ---
+        earn_frame = ttk.LabelFrame(self.tab_dashboard, text="Your Earnings", padding=20)
+        earn_frame.pack(fill='both', expand=True, padx=20, pady=10)
+
+        self.lbl_balance = ttk.Label(earn_frame, text="Balance: Loading...", font=("Arial", 16))
+        self.lbl_balance.pack(pady=10)
+        
+        ttk.Label(earn_frame, text="(Includes Mining Rewards & Fees)").pack()
         
         # ... (Rest of UI unchanged up to save_config)
 
@@ -539,32 +570,55 @@ class MiningApp:
 class EnvManager:
     def __init__(self, env_path="../../.env"):
         self.env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), env_path))
+        self.lines = []
         self.env_vars = {}
         self.load()
 
     def load(self):
+        self.lines = []
         self.env_vars = {}
         if os.path.exists(self.env_path):
-            with open(self.env_path, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#'):
-                        try:
-                            key, val = line.split('=', 1)
+            with open(self.env_path, 'r', encoding='utf-8') as f:
+                self.lines = f.readlines()
+                
+            for line in self.lines:
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    try:
+                        if '=' in stripped:
+                            key, val = stripped.split('=', 1)
                             self.env_vars[key.strip()] = val.strip()
-                        except ValueError:
-                            pass # Skip malformed lines
+                    except:
+                        pass
 
     def get(self, key, default=""):
         return self.env_vars.get(key, default)
 
     def set(self, key, value):
         self.env_vars[key] = value
+        # Update lines
+        updated = False
+        new_lines = []
+        for line in self.lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#') and '=' in stripped:
+                k, v = stripped.split('=', 1)
+                if k.strip() == key:
+                    new_lines.append(f"{key}={value}\n")
+                    updated = True
+                    continue
+            new_lines.append(line)
+        
+        if not updated:
+            if new_lines and not new_lines[-1].endswith('\n'):
+                new_lines.append('\n')
+            new_lines.append(f"{key}={value}\n")
+            
+        self.lines = new_lines
 
     def save(self):
-        with open(self.env_path, 'w') as f:
-            for key, val in self.env_vars.items():
-                f.write(f"{key}={val}\n")
+        with open(self.env_path, 'w', encoding='utf-8') as f:
+            f.writelines(self.lines)
 
 if __name__ == "__main__":
     root = tk.Tk()
