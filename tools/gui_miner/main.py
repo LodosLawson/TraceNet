@@ -114,6 +114,54 @@ class MiningApp:
         
         # ... (Rest of UI unchanged up to save_config)
 
+    def open_env_editor(self):
+        """Open a raw text editor for .env file"""
+        editor = tk.Toplevel(self.root)
+        editor.title("Advanced .env Editor")
+        editor.geometry("600x450")
+        
+        ttk.Label(editor, text="Edit config file directly. Restart node to apply changes.", padding=10).pack(fill='x')
+        
+        # Text Area
+        txt = tk.Text(editor, wrap='none')
+        txt.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        # Scrollbars
+        ys = ttk.Scrollbar(editor, orient='vertical', command=txt.yview)
+        xs = ttk.Scrollbar(editor, orient='horizontal', command=txt.xview)
+        txt['yscrollcommand'] = ys.set
+        txt['xscrollcommand'] = xs.set
+        ys.pack(side='right', fill='y')
+        xs.pack(side='bottom', fill='x')
+        
+        # Load content
+        if os.path.exists(self.env_manager.env_path):
+            with open(self.env_manager.env_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                txt.insert('1.0', content)
+        
+        def save_raw():
+            content = txt.get('1.0', tk.END).strip()
+            try:
+                with open(self.env_manager.env_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                # Reload env manager
+                self.env_manager.load()
+                # Update main UI fields if possible
+                self.entry_port.delete(0, tk.END)
+                self.entry_port.insert(0, self.env_manager.get("PORT", "3000"))
+                self.entry_peers.delete(0, tk.END)
+                self.entry_peers.insert(0, self.env_manager.get("PEERS", ""))
+                
+                messagebox.showinfo("Saved", ".env file updated successfully!")
+                editor.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save: {e}")
+
+        btn_frame = ttk.Frame(editor, padding=10)
+        btn_frame.pack(fill='x')
+        ttk.Button(btn_frame, text="Save & Close", command=save_raw).pack(side='right')
+
     def wipe_db(self):
         """Wipe the data directory to fix sync errors"""
         if self.node_process:
@@ -559,13 +607,17 @@ class MiningApp:
             self.txt_stats.insert(tk.END, str(stats))
         
         # Update Balance Label
-        if is_online and balance_info:
-            if "balance" in balance_info:
-                self.lbl_balance.config(text=f"Balance: {balance_info['balance']} TRC")
-            elif "error" in balance_info:
-                self.lbl_balance.config(text=f"Balance: Error ({balance_info['error']})")
-        else:
-             self.lbl_balance.config(text="Balance: Node Offline")
+        try:
+            if hasattr(self, 'lbl_balance'):
+                if is_online and balance_info:
+                    if "balance" in balance_info:
+                        self.lbl_balance.config(text=f"Balance: {balance_info['balance']} TRC")
+                    elif "error" in balance_info:
+                        self.lbl_balance.config(text=f"Balance: Error ({balance_info['error']})")
+                else:
+                    self.lbl_balance.config(text="Balance: Node Offline")
+        except Exception as e:
+            print(f"UI Update Warning: {e}")
 
 class EnvManager:
     def __init__(self, env_path="../../.env"):
