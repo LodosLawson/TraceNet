@@ -1,0 +1,82 @@
+# Cloud Build Configuration for TraceNet Blockchain
+# Automatic deployment from GitHub to Cloud Run
+# Triggers on: push to main branch
+
+steps:
+  # Step 1: Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-image'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:$SHORT_SHA'
+      - '--build-arg'
+      - 'NODE_ENV=production'
+      - '.'
+    timeout: '600s'
+
+  # Step 2: Push Docker image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-image'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
+    waitFor: ['build-image']
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-cloudrun'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'tracenet-blockchain'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '3000'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '2'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--timeout'
+      - '3600'
+      - '--concurrency'
+      - '80'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,LOG_LEVEL=info'
+      - '--update-secrets'
+      - 'SUPABASE_URL=supabase-url:latest,SUPABASE_ANON_KEY=supabase-anon-key:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-role-key:latest,JWT_SECRET=jwt-secret:latest,ENCRYPTION_KEY=encryption-key:latest'
+      - '--no-cpu-throttling'
+    waitFor: ['push-image']
+    timeout: '900s'
+
+# Substitutions for build variables
+substitutions:
+  _SERVICE_NAME: tracenet-blockchain
+  _REGION: us-central1
+
+# Build options
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+  substitution_option: 'ALLOW_LOOSE'
+
+# Overall timeout
+timeout: '1200s'
+
+# Images to store in Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/tracenet-blockchain:latest'
+  - 'gcr.io/$PROJECT_ID/tracenet-blockchain:$SHORT_SHA'
