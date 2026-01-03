@@ -42,6 +42,26 @@ class WalletManager:
     def get_keys(self):
         return self.public_key, self.private_key
 
+    def sign(self, message):
+        """Sign a string message"""
+        if not self.private_key:
+            return None
+        
+        try:
+            # Decode hex private key to bytes
+            priv_bytes = nacl.encoding.HexEncoder.decode(self.private_key)
+            signing_key = nacl.signing.SigningKey(priv_bytes)
+            
+            # Sign the message (bytes)
+            signed = signing_key.sign(message.encode('utf-8'))
+            
+            # Return signature in hex
+            return nacl.encoding.HexEncoder.encode(signed.signature).decode('utf-8')
+        except Exception as e:
+            print(f"Signing error: {e}")
+            return None
+
+
 if __name__ == "__main__":
     wm = WalletManager()
     if not wm.public_key:

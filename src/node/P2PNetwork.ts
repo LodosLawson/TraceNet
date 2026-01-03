@@ -308,7 +308,16 @@ export class P2PNetwork {
     /**
      * Extract real client IP from socket (handles proxies and Cloud Run)
      */
+    /**
+     * Extract real client IP from socket (handles proxies and Cloud Run)
+     */
     private extractClientIP(socket: any): string {
+        // Validation for missing socket or handshake data to prevent crash
+        if (!socket || !socket.handshake || !socket.handshake.headers) {
+            // Fallback to address if available
+            return socket?.request?.connection?.remoteAddress || socket?.handshake?.address || 'unknown';
+        }
+
         // Priority 1: X-Forwarded-For header (for proxies/load balancers)
         const forwarded = socket.handshake.headers['x-forwarded-for'];
         if (forwarded) {

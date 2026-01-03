@@ -1,7 +1,11 @@
+import subprocess
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
 import time
+import os
+import sys
+import json
 from wallet import WalletManager
 from miner import MinerClient
 from explorer import ExplorerClient
@@ -9,12 +13,14 @@ from explorer import ExplorerClient
 class MiningApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("TraceNet Miner Tool V1.0")
-        self.root.geometry("600x450")
+        self.root.title("TraceNet Miner Tool V1.1")
+        self.root.geometry("700x550")
 
         self.wallet_manager = WalletManager()
         self.miner_client = MinerClient()
         self.explorer_client = ExplorerClient()
+        self.node_process = None
+        self.env_manager = EnvManager()
 
         # Styles
         style = ttk.Style()
@@ -24,20 +30,146 @@ class MiningApp:
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(expand=True, fill='both', padx=10, pady=10)
 
+        self.tab_dashboard = ttk.Frame(self.notebook)
         self.tab_wallet = ttk.Frame(self.notebook)
+        self.tab_social = ttk.Frame(self.notebook)
         self.tab_miner = ttk.Frame(self.notebook)
         self.tab_explorer = ttk.Frame(self.notebook)
 
+        self.notebook.add(self.tab_dashboard, text="  Dashboard  ")
         self.notebook.add(self.tab_wallet, text="  Wallet  ")
+        self.notebook.add(self.tab_social, text="  Netra Feed  ")
         self.notebook.add(self.tab_miner, text="  Miner  ")
         self.notebook.add(self.tab_explorer, text="  Explorer  ")
 
+        self.setup_dashboard_tab()
         self.setup_wallet_tab()
+        self.setup_netra_tab()
         self.setup_miner_tab()
         self.setup_explorer_tab()
 
         # Auto-refresh stats
         self.root.after(2000, self.update_stats)
+
+    def setup_dashboard_tab(self):
+        # --- Node Control ---
+        frame_ctrl = ttk.LabelFrame(self.tab_dashboard, text="Node Process", padding=20)
+        frame_ctrl.pack(fill='x', padx=20, pady=10)
+
+        self.lbl_node_status = ttk.Label(frame_ctrl, text="Node Status: STOPPED", font=("Arial", 12, "bold"), foreground="red")
+        self.lbl_node_status.pack(pady=5)
+
+        btn_frame = ttk.Frame(frame_ctrl)
+        btn_frame.pack(pady=5)
+
+        self.btn_run_node = ttk.Button(btn_frame, text="RUN LOCAL NODE", command=self.run_node, width=20)
+        self.btn_run_node.pack(side='left', padx=10)
+
+        self.btn_kill_node = ttk.Button(btn_frame, text="STOP NODE", command=self.stop_node, width=20, state='disabled')
+        self.btn_kill_node.pack(side='left', padx=10)
+
+        # --- Configuration ---
+        frame_config = ttk.LabelFrame(self.tab_dashboard, text="Configuration (Env)", padding=20)
+        frame_config.pack(fill='x', padx=20, pady=10)
+
+        # Port
+        ttk.Label(frame_config, text="Node Port:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        self.entry_port = ttk.Entry(frame_config, width=10)
+        self.entry_port.grid(row=0, column=1, sticky='w', padx=5, pady=5)
+        self.entry_port.insert(0, self.env_manager.get("PORT", "3000"))
+
+        # Access Mode (Host)
+        ttk.Label(frame_config, text="Access:").grid(row=0, column=2, sticky='e', padx=5, pady=5)
+        self.combo_host = ttk.Combobox(frame_config, values=["Local Only (127.0.0.1)", "Public (0.0.0.0)"], state="readonly", width=20)
+        self.combo_host.grid(row=0, column=3, sticky='w', padx=5, pady=5)
+        
+        current_host = self.env_manager.get("HOST", "0.0.0.0")
+        if "127.0.0.1" in current_host:
+            self.combo_host.current(0)
+        else:
+            self.combo_host.current(1)
+
+        # Peers
+        ttk.Label(frame_config, text="Secure Peers (comma-sep):").grid(row=1, column=0, sticky='w', padx=5, pady=5)
+        self.entry_peers = ttk.Entry(frame_config, width=50)
+        self.entry_peers.grid(row=1, column=1, columnspan=3, sticky='w', padx=5, pady=5)
+        self.entry_peers.insert(0, self.env_manager.get("PEERS", ""))
+
+        ttk.Button(frame_config, text="Save Config", command=self.save_config).grid(row=2, column=3, sticky='e', padx=5, pady=10)
+        
+        # Advanced Editor Button
+        ttk.Button(frame_config, text="Advanced .env Editor", command=self.open_env_editor).grid(row=2, column=0, sticky='w', padx=5, pady=10)
+
+        # --- Earnings ---
+        earn_frame = ttk.LabelFrame(self.tab_dashboard, text="Your Earnings", padding=20)
+        earn_frame.pack(fill='both', expand=True, padx=20, pady=10)
+
+        self.lbl_balance = ttk.Label(earn_frame, text="Balance: Loading...", font=("Arial", 16))
+        self.lbl_balance.pack(pady=10)
+        
+        ttk.Label(earn_frame, text="(Includes Mining Rewards & Fees)").pack()
+    
+    def open_env_editor(self):
+        """Open a raw text editor for .env file"""
+        editor = tk.Toplevel(self.root)
+        editor.title("Advanced .env Editor")
+        editor.geometry("600x450")
+        
+        ttk.Label(editor, text="Edit config file directly. Restart node to apply changes.", padding=10).pack(fill='x')
+        
+        # Text Area
+        txt = tk.Text(editor, wrap='none')
+        txt.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        # Scrollbars
+        ys = ttk.Scrollbar(editor, orient='vertical', command=txt.yview)
+        xs = ttk.Scrollbar(editor, orient='horizontal', command=txt.xview)
+        txt['yscrollcommand'] = ys.set
+        txt['xscrollcommand'] = xs.set
+        ys.pack(side='right', fill='y')
+        xs.pack(side='bottom', fill='x')
+        
+        # Load content
+        if os.path.exists(self.env_manager.env_path):
+            with open(self.env_manager.env_path, 'r') as f:
+                content = f.read()
+                txt.insert('1.0', content)
+        
+        def save_raw():
+            content = txt.get('1.0', tk.END).strip()
+            try:
+                with open(self.env_manager.env_path, 'w') as f:
+                    f.write(content)
+                # Reload env manager
+                self.env_manager.load()
+                # Update main UI fields if possible
+                self.entry_port.delete(0, tk.END)
+                self.entry_port.insert(0, self.env_manager.get("PORT", "3000"))
+                self.entry_peers.delete(0, tk.END)
+                self.entry_peers.insert(0, self.env_manager.get("PEERS", ""))
+                
+                messagebox.showinfo("Saved", ".env file updated successfully!")
+                editor.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save: {e}")
+
+        btn_frame = ttk.Frame(editor, padding=10)
+        btn_frame.pack(fill='x')
+        ttk.Button(btn_frame, text="Save & Close", command=save_raw).pack(side='right')
+
+    def save_config(self):
+        self.env_manager.set("PORT", self.entry_port.get())
+        self.env_manager.set("PEERS", self.entry_peers.get())
+        
+        # Save Host
+        selection = self.combo_host.get()
+        if "Local" in selection:
+            self.env_manager.set("HOST", "127.0.0.1")
+        else:
+            self.env_manager.set("HOST", "0.0.0.0")
+            
+        self.env_manager.save()
+        messagebox.showinfo("Saved", "Configuration saved!\nRestart node to apply changes.")
 
     def setup_wallet_tab(self):
         frame = ttk.LabelFrame(self.tab_wallet, text="Keys", padding=20)
@@ -60,9 +192,222 @@ class MiningApp:
         # Actions
         frame_act = ttk.LabelFrame(self.tab_wallet, text="Actions", padding=20)
         frame_act.pack(fill='x', padx=20, pady=5)
-        ttk.Label(frame_act, text="Use this wallet to run your node and receive fees.").pack(anchor='w')
+        ttk.Label(frame_act, text="Use this wallet to run your node and receive fees.").pack(anchor='w', pady=5)
+        
+        ttk.Button(frame_act, text="BIND WALLET TO NODE (Set as Node Wallet)", command=self.bind_wallet).pack(fill='x')
 
         self.refresh_wallet_display()
+
+    def bind_wallet(self):
+        """Bind current UI wallet to Node's .env"""
+        if not self.wallet_manager.private_key:
+            messagebox.showerror("Error", "No wallet loaded!")
+            return
+            
+        if messagebox.askyesno("Bind Wallet", "This will set your current GUI wallet as the NODE WALLET in .env.\n\nYour node will pay fees/rewards to this address.\n\nRestart node to apply?"):
+            self.env_manager.set("NODE_WALLET_PRIVATE_KEY", self.wallet_manager.private_key)
+            self.env_manager.save()
+            messagebox.showinfo("Success", "Wallet bound to Node!\nPlease restart the local node.")
+
+    def setup_netra_tab(self):
+        # Create separate frames for Social and Wallet Actions
+        main_frame = ttk.Frame(self.tab_social, padding=20)
+        main_frame.pack(fill='both', expand=True)
+
+        # --- LEFT: Social Feed ---
+        left_frame = ttk.Frame(main_frame)
+        left_frame.pack(side='left', fill='both', expand=True, padx=(0, 10))
+
+        # Feed Area
+        feed_frame = ttk.LabelFrame(left_frame, text="Netra Feed", padding=10)
+        feed_frame.pack(fill='both', expand=True, pady=(0, 10))
+
+        self.txt_feed = tk.Text(feed_frame, height=20, width=50)
+        self.txt_feed.pack(fill='both', expand=True, side='left')
+        
+        scroll = ttk.Scrollbar(feed_frame, command=self.txt_feed.yview)
+        scroll.pack(side='right', fill='y')
+        self.txt_feed['yscrollcommand'] = scroll.set
+        
+        ttk.Button(feed_frame, text="Refresh Feed", command=self.refresh_feed).pack(pady=5)
+
+        # --- RIGHT: Actions (Post, Transfer) ---
+        right_frame = ttk.Frame(main_frame, width=300)
+        right_frame.pack(side='right', fill='y', padx=(10, 0))
+
+        # 1. Post Content
+        post_frame = ttk.LabelFrame(right_frame, text="New Post", padding=10)
+        post_frame.pack(fill='x', pady=(0, 20))
+        
+        self.entry_post = tk.Text(post_frame, height=5, width=30)
+        self.entry_post.pack(fill='x', pady=5)
+        
+        ttk.Button(post_frame, text="Post Tweet", command=self.post_tweet).pack(fill='x')
+
+        # 2. Transfer Coins
+        trans_frame = ttk.LabelFrame(right_frame, text="Transfer Coins (LT)", padding=10)
+        trans_frame.pack(fill='x')
+        
+        ttk.Label(trans_frame, text="To Wallet:").pack(anchor='w')
+        self.entry_to = ttk.Entry(trans_frame, width=30)
+        self.entry_to.pack(fill='x', pady=5)
+        
+        ttk.Label(trans_frame, text="Amount:").pack(anchor='w')
+        self.entry_amount = ttk.Entry(trans_frame, width=30)
+        self.entry_amount.pack(fill='x', pady=5)
+        
+        ttk.Button(trans_frame, text="SEND COINS", command=self.send_coins).pack(fill='x', pady=10)
+
+    def post_tweet(self):
+        content = self.entry_post.get("1.0", tk.END).strip()
+        if not content:
+            return
+
+        if not self.wallet_manager.private_key:
+            messagebox.showerror("Error", "You need a wallet to post!")
+            return
+
+        timestamp = int(time.time() * 1000)
+        payload_data = {
+            "content": content,
+            "type": "post",
+            "timestamp": timestamp
+        }
+        
+        nonce = timestamp # Simple nonce
+        
+        # Transaction structure matching TransactionModel.ts
+        tx = {
+            "tx_id": "", # Will be generated by server if empty, but for signing we need structure
+            "from_wallet": self.wallet_manager.public_key,
+            "to_wallet": self.wallet_manager.public_key, # Self for content
+            "type": "POST_CONTENT", # Updated per TransactionType enum
+            "payload": payload_data,
+            "amount": 0,
+            "fee": 0,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "sender_public_key": self.wallet_manager.public_key
+        }
+        
+        # Construct signable data exactly as TransactionModel.getSignableData()
+        # { tx_id, from_wallet, to_wallet, type, payload, amount, fee, timestamp, nonce, valid_until, sender_public_key }
+        signable_dict = {
+            "tx_id": "", # Server generates ID, but signature might need to verify original data. 
+            # Actually, standard is server validates, if server generates ID, signature of ID is impossible.
+            # Client must generate ID to sign it, OR sign the data *excluding* ID.
+            # Let's rely on backend's relaxed check or specific content endpoint logic.
+            # ContentService.ts usually handles this.
+            # FALLBACK: Use simple JSON dump of payload for content if API supports it.
+            # But let's look at what we did before: f"CONTENT:..."
+            # The backend TransactionModel.ts uses JSON.stringify of the whole object.
+            # We will try to mimic it.
+             "tx_id": "",
+             "from_wallet": tx['from_wallet'],
+             "to_wallet": tx['to_wallet'],
+             "type": tx['type'],
+             "payload": tx['payload'],
+             "amount": tx['amount'],
+             "fee": tx['fee'],
+             "timestamp": tx['timestamp'],
+             "nonce": tx['nonce'],
+             # "valid_until": undefined, 
+             "sender_public_key": tx['sender_public_key']
+        }
+        
+        # Python json.dumps with separators=(',', ':') compacts it like JS JSON.stringify
+        signable_data = json.dumps(signable_dict, separators=(',', ':'))
+        
+        signature = self.wallet_manager.sign(signable_data)
+        if not signature:
+            messagebox.showerror("Error", "Signing failed")
+            return
+            
+        tx["sender_signature"] = signature
+        
+        # Send
+        res = self.explorer_client.post_content(tx)
+        if "error" in res:
+            messagebox.showerror("Failed", str(res))
+        else:
+            messagebox.showinfo("Success", "Tweet posted!")
+            self.entry_post.delete("1.0", tk.END)
+            self.refresh_feed()
+            
+    def send_coins(self):
+        to_wallet = self.entry_to.get().strip()
+        try:
+            amount = float(self.entry_amount.get().strip())
+        except:
+            messagebox.showerror("Error", "Invalid Amount")
+            return
+
+        if not self.wallet_manager.private_key:
+            messagebox.showerror("Error", "Wallet not loaded")
+            return
+            
+        timestamp = int(time.time() * 1000)
+        nonce = timestamp
+        fee = 500 # Estimate
+        
+        tx = {
+            "tx_id": "",
+            "from_wallet": self.wallet_manager.public_key,
+            "to_wallet": to_wallet,
+            "type": "TRANSFER",
+            "payload": {},
+            "amount": amount,
+            "fee": fee,
+            "timestamp": timestamp,
+            "nonce": nonce,
+            "sender_public_key": self.wallet_manager.public_key
+        }
+        
+        signable_dict = {
+             "tx_id": "",
+             "from_wallet": tx['from_wallet'],
+             "to_wallet": tx['to_wallet'],
+             "type": tx['type'],
+             "payload": tx['payload'],
+             "amount": tx['amount'],
+             "fee": tx['fee'],
+             "timestamp": tx['timestamp'],
+             "nonce": tx['nonce'],
+             "sender_public_key": tx['sender_public_key']
+        }
+        
+        signable_data = json.dumps(signable_dict, separators=(',', ':'))
+        signature = self.wallet_manager.sign(signable_data)
+        
+        if not signature:
+             messagebox.showerror("Error", "Signing failed")
+             return
+
+        tx["sender_signature"] = signature
+        
+        res = self.explorer_client.send_transfer(tx)
+        if "error" in res:
+             messagebox.showerror("Transaction Failed", f"Error: {res.get('error')}")
+        else:
+             messagebox.showinfo("Success", f"Sent {amount} LT to {to_wallet[:8]}...!")
+             self.entry_to.delete(0, tk.END)
+             self.entry_amount.delete(0, tk.END)
+
+    def refresh_feed(self):
+        feed = self.explorer_client.get_feed()
+        self.txt_feed.delete(1.0, tk.END)
+        
+        if not feed or "error" in feed:
+            self.txt_feed.insert(tk.END, "No posts or node offline.")
+            return
+
+        for post in feed:
+            try:
+                user = post.get('author', 'Unknown')[:8]
+                content = post.get('content', '')
+                self.txt_feed.insert(tk.END, f"@{user}: {content}\n{'-'*20}\n")
+            except:
+                pass
 
     def setup_miner_tab(self):
         frame = ttk.Frame(self.tab_miner, padding=30)
@@ -124,14 +469,146 @@ class MiningApp:
         self.btn_start.config(state='normal')
         self.btn_stop.config(state='disabled')
 
-    def update_stats(self):
-        stats = self.explorer_client.get_stats()
-        self.txt_stats.delete(1.0, tk.END)
-        self.txt_stats.insert(tk.END, str(stats)) # Pretty print json if possible using json.dumps
+    def run_node(self):
+        if self.node_process:
+            return
         
-        # Schedule next update if tab is visible? 
-        # For simplicity, just run it
-        # self.root.after(5000, self.update_stats)
+        # Check if port is in use
+        port = self.entry_port.get()
+        if self._is_port_in_use(port):
+            if messagebox.askyesno("Port in Use", f"Port {port} is already in use.\n\nDo you want to FORCE STOP the existing node process and start a new one?"):
+                self._kill_process_on_port(port)
+                time.sleep(1) # Wait for cleanup
+            else:
+                return
+
+        try:
+            # Assume we are in tools/gui_miner/ and need to go up to project root
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+            
+            # Use Shell=True for windows npm execution
+            self.node_process = subprocess.Popen(
+                ["npm", "start"], 
+                cwd=project_root,
+                shell=True
+            )
+            
+            self.lbl_node_status.config(text="Node Status: RUNNING (PID: {})".format(self.node_process.pid), foreground="green")
+            self.btn_run_node.config(state='disabled')
+            self.btn_kill_node.config(state='normal')
+            messagebox.showinfo("Success", "Node started successfully in background!")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to start node: {str(e)}")
+
+    def _is_port_in_use(self, port):
+        """Check if port is open using netstat"""
+        # Simple check using socket connect
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', int(port))) == 0
+
+    def _kill_process_on_port(self, port):
+        """Find PID on port and kill it (Windows)"""
+        try:
+            # Run netstat to find PID
+            result = subprocess.check_output(f"netstat -ano | findstr :{port}", shell=True).decode()
+            for line in result.splitlines():
+                if "LISTENING" in line:
+                    parts = line.split()
+                    pid = parts[-1]
+                    # Kill PID
+                    subprocess.call(['taskkill', '/F', '/PID', pid])
+        except:
+            pass # Process might not exist or other error
+
+    def stop_node(self):
+        if self.node_process:
+            # On Windows, killing shell=True process is tricky.
+            # We will try taskkill
+            subprocess.call(['taskkill', '/F', '/T', '/PID', str(self.node_process.pid)])
+            self.node_process = None
+            self.lbl_node_status.config(text="Node Status: STOPPED", foreground="red")
+            self.btn_run_node.config(state='normal')
+            self.btn_kill_node.config(state='disabled')
+
+    def update_stats(self):
+        """Start background thread to fetch stats without freezing GUI"""
+        threading.Thread(target=self._fetch_stats_background, daemon=True).start()
+        
+        # Schedule next update in 5 seconds
+        self.root.after(5000, self.update_stats)
+
+    def _fetch_stats_background(self):
+        """Run network calls in separate thread"""
+        try:
+            # Fetch Stats
+            stats = self.explorer_client.get_stats()
+            
+            # Fetch Balance
+            balance_info = None
+            if self.wallet_manager.public_key:
+                balance_info = self.explorer_client.get_balance(self.wallet_manager.public_key)
+            
+            # Schedule UI update on main thread
+            self.root.after(0, lambda: self._update_ui_with_data(stats, balance_info))
+        except Exception as e:
+            print(f"Background fetch error: {e}")
+
+    def _update_ui_with_data(self, stats, balance_info):
+        """Update UI widgets (Must run on main thread)"""
+        # Update Stats Text
+        self.txt_stats.delete(1.0, tk.END)
+        
+        is_online = True
+        if "error" in stats:
+            error_msg = str(stats["error"])
+            if "WinError 10061" in error_msg or "Connection refused" in error_msg:
+                self.txt_stats.insert(tk.END, "⚠️ NODE IS OFFLINE\n\nPlease click 'RUN LOCAL NODE' on the Dashboard and wait for it to start.")
+                is_online = False
+            else:
+                self.txt_stats.insert(tk.END, f"Error: {error_msg}")
+        else:
+            self.txt_stats.insert(tk.END, str(stats))
+        
+        # Update Balance Label
+        if is_online and balance_info:
+            if "balance" in balance_info:
+                self.lbl_balance.config(text=f"Balance: {balance_info['balance']} TRC")
+            elif "error" in balance_info:
+                self.lbl_balance.config(text=f"Balance: Error ({balance_info['error']})")
+        else:
+             self.lbl_balance.config(text="Balance: Node Offline")
+
+class EnvManager:
+    def __init__(self, env_path="../../.env"):
+        self.env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), env_path))
+        self.env_vars = {}
+        self.load()
+
+    def load(self):
+        self.env_vars = {}
+        if os.path.exists(self.env_path):
+            with open(self.env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        try:
+                            key, val = line.split('=', 1)
+                            self.env_vars[key.strip()] = val.strip()
+                        except ValueError:
+                            pass # Skip malformed lines
+
+    def get(self, key, default=""):
+        return self.env_vars.get(key, default)
+
+    def set(self, key, value):
+        self.env_vars[key] = value
+
+    def save(self):
+        with open(self.env_path, 'w') as f:
+            for key, val in self.env_vars.items():
+                f.write(f"{key}={val}\n")
 
 if __name__ == "__main__":
     root = tk.Tk()
