@@ -49,14 +49,37 @@ export class AutoUpdater {
                 console.log(`[AutoUpdater] Remote: ${remoteHash.trim().substring(0, 7)}`);
                 console.log('[AutoUpdater] Initiating update sequence...');
 
-                // Exit with Code 42 -> Signals Runner to Update
-                process.exit(42);
+                await this.applyUpdate();
             } else {
                 console.log('[AutoUpdater] System is up to date.');
             }
         } catch (error) {
             console.error('[AutoUpdater] Failed to check for updates:', error);
             // Don't crash the node just because git check failed
+        }
+    }
+
+    private async applyUpdate() {
+        try {
+            console.log('[AutoUpdater] Step 1: Pulling latest code from GitHub...');
+            await execAsync('git pull');
+
+            console.log('[AutoUpdater] Step 2: Installing dependencies...');
+            await execAsync('npm install');
+
+            console.log('[AutoUpdater] Step 3: Rebuilding application...');
+            await execAsync('npm run build');
+
+            console.log('[AutoUpdater] ✅ Update applied successfully!');
+            console.log('[AutoUpdater] Restarting node in 3 seconds...');
+
+            setTimeout(() => {
+                console.log('[AutoUpdater] 🔄 Restarting...');
+                process.exit(0); // Clean exit - process manager (pm2/systemd) will restart
+            }, 3000);
+        } catch (error) {
+            console.error('[AutoUpdater] ❌ Update failed:', error);
+            console.log('[AutoUpdater] Continuing with current version...');
         }
     }
 }
