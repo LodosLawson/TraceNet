@@ -93,10 +93,13 @@ export class KeyManager {
             throw new Error('Failed to derive encryption private key');
         }
 
-        const boxKeyPair = nacl.box.keyPair.fromSecretKey(derived.privateKey.slice(0, 32));
+        // CRITICAL FIX: TweetNaCl doesn't have box.keyPair.fromSecretKey()
+        // We must derive the public key manually using scalarMult.base
+        const secretKey = new Uint8Array(derived.privateKey.slice(0, 32));
+        const publicKey_curve25519 = nacl.scalarMult.base(secretKey);
 
-        const encryptionPublicKey = Buffer.from(boxKeyPair.publicKey).toString('hex');
-        const encryptionPrivateKey = Buffer.from(boxKeyPair.secretKey).toString('hex');
+        const encryptionPublicKey = Buffer.from(publicKey_curve25519).toString('hex');
+        const encryptionPrivateKey = Buffer.from(secretKey).toString('hex');
 
         // Address is derived from signing public key
         const address = this.deriveAddress(publicKey);
