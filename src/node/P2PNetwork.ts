@@ -510,8 +510,9 @@ export class P2PNetwork {
             const subnet = this.getSubnet(clientIP);
 
             // Policy: Max peers per subnet
+            // RELAXED: Increased limit from 2 to 10 to allow Local Node + Frontend + Mobile from same Wi-Fi
             const peersInSubnet = Array.from(this.connectedIPs.keys()).filter(ip => this.getSubnet(ip) === subnet).length;
-            if (peersInSubnet >= 2 && process.env.NODE_ENV === 'production') {
+            if (peersInSubnet >= 10 && process.env.NODE_ENV === 'production') {
                 console.warn(`[P2P] ❌ Rejected peer ${clientIP}: Too many peers from subnet ${subnet}`);
                 socket.emit('error', { code: 'SUBNET_LIMIT', message: 'Too many peers from your subnet' });
                 socket.disconnect(true);
