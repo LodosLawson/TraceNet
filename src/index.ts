@@ -596,12 +596,27 @@ class BlockchainNode {
                     console.error('[GCS] Failed to restore from cloud, using local DB');
                 }
             } else if (savedChain && savedChain.length > 0) {
-                console.log(`[Persistence] Found saved chain with ${savedChain.length} blocks.`);
-                const success = this.blockchain.restoreChain(savedChain);
-                if (success) {
-                    console.log('[Persistence] Chain successfully restored to height', this.blockchain.getChainLength());
+                // GENESIS HASH CHECK
+                const loadedGenesisHash = savedChain[0].hash;
+                const currentGenesisHash = this.blockchain.getChain()[0].hash;
+
+                if (loadedGenesisHash !== currentGenesisHash) {
+                    console.error('🚨 [Startup] Genesis Hash Mismatch!');
+                    console.error(`   Expected: ${currentGenesisHash}`);
+                    console.error(`   Found:    ${loadedGenesisHash}`);
+                    console.warn('[Startup] 🧹 Wiping database to sync with correct network...');
+
+                    await this.localDb.clear();
+                    // Don't restore the chain, let it start fresh with the in-memory genesis
+                    console.log('[Startup] Database wiped. Starting fresh.');
                 } else {
-                    console.warn('[Persistence] Failed to restore chain. Starting from Genesis.');
+                    console.log(`[Persistence] Found saved chain with ${savedChain.length} blocks.`);
+                    const success = this.blockchain.restoreChain(savedChain);
+                    if (success) {
+                        console.log('[Persistence] Chain successfully restored to height', this.blockchain.getChainLength());
+                    } else {
+                        console.warn('[Persistence] Failed to restore chain. Starting from Genesis.');
+                    }
                 }
             } else {
                 console.log('[Persistence] No saved chain found. Starting fresh.');
