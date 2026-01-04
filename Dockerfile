@@ -34,6 +34,9 @@ RUN apk add --no-cache python3 make g++ && \
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
+# Copy public assets
+COPY public ./public
+
 # Create data directory for blockchain storage
 RUN mkdir -p /app/data
 
