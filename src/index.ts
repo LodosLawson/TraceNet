@@ -125,10 +125,16 @@ class BlockchainNode {
         let sysPrivateKey = keyStore.loadKey('validator_key', keystorePassword || '');
 
         // Compatibility/Migration: Check env if not in KeyStore (Dev only)
-        if (!sysPrivateKey && process.env.NODE_ENV !== 'production') {
+        // Compatibility/Migration: Check env if not in KeyStore
+        // MODIFICATION: Allow Env Var fallback in Production because Cloud Run may not have secrets/keystore.json (gitignored)
+        if (!sysPrivateKey) {
             sysPrivateKey = process.env.VALIDATOR_PRIVATE_KEY;
             if (sysPrivateKey) {
-                console.warn('[Security] ⚠️  Loaded validator key from .env (unsafe for production). Please migrate to KeyStore.');
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn('[Security] ⚠️  Loaded validator key from .env (unsafe for production). Please migrate to KeyStore.');
+                } else {
+                    console.log('[Security] ℹ️  Loaded validator key from Environment Variable (Cloud Run Mode).');
+                }
             }
         }
 
@@ -175,12 +181,17 @@ class BlockchainNode {
         let nodeWalletPublicKey: string;
 
         if (!nodeWalletPrivateKey) {
-            if (process.env.NODE_WALLET_PRIVATE_KEY && process.env.NODE_ENV !== 'production') {
-                // Dev fallback
+            if (process.env.NODE_WALLET_PRIVATE_KEY) {
+                // Cloud Run / Env Fallback
                 nodeWalletPrivateKey = process.env.NODE_WALLET_PRIVATE_KEY;
                 const keyPair = KeyManager.getKeyPairFromPrivate(nodeWalletPrivateKey);
                 nodeWalletPublicKey = keyPair.publicKey;
-                console.warn('[Security] ⚠️  Loaded node wallet from .env. Please migrate to KeyStore.');
+
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn('[Security] ⚠️  Loaded node wallet from .env. Please migrate to KeyStore.');
+                } else {
+                    console.log('[Security] ℹ️  Loaded node wallet from Environment Variable (Cloud Run Mode).');
+                }
             } else {
                 SecureLogger.log('[Setup] No Node Wallet found. Generating new one...');
                 const keyPair = KeyManager.generateKeyPair();
