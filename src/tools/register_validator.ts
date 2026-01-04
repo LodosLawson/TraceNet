@@ -1,8 +1,8 @@
-import axios from 'axios';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { KeyStore } from '../blockchain/utils/KeyStore';
+import { KeyManager } from '../blockchain/crypto/KeyManager';
 import readline from 'readline';
 
 // Load environment variables
@@ -48,18 +48,24 @@ async function main() {
     if (fs.existsSync(keyStorePath)) {
         try {
             const password = process.env.KEYSTORE_PASSWORD || await askQuestion("Enter KeyStore Password: ");
-            const keys = await KeyStore.load(password);
+            const keyStore = new KeyStore();
 
-            // Prefer Validator Key if available, else Node Wallet
-            if (keys.validatorKey) {
+            // Try loading Validator Key first
+            const validatorPrivKey = keyStore.loadKey('validator_key', password);
+            if (validatorPrivKey) {
                 console.log("✅ Found Validator Key in KeyStore.");
-                publicKey = keys.validatorKey.publicKey;
-                // Derive ID from public key (simplified)
+                const pair = KeyManager.getKeyPairFromPrivate(validatorPrivKey);
+                publicKey = pair.publicKey;
                 validatorId = `node_${publicKey.substring(0, 10)}`;
-            } else if (keys.nodeWallet) {
-                console.log("⚠️ No specific Validator Key found, using Node Wallet.");
-                publicKey = keys.nodeWallet.publicKey;
-                validatorId = `node_${publicKey.substring(0, 10)}`;
+            } else {
+                // Try Node Wallet
+                const nodePrivKey = keyStore.loadKey('node_wallet', password);
+                if (nodePrivKey) {
+                    console.log("⚠️ No specific Validator Key found, using Node Wallet.");
+                    const pair = KeyManager.getKeyPairFromPrivate(nodePrivKey);
+                    publicKey = pair.publicKey;
+                    validatorId = `node_${publicKey.substring(0, 10)}`;
+                }
             }
         } catch (error) {
             console.error("❌ Failed to load KeyStore:", error);
@@ -94,29 +100,42 @@ async function main() {
     // 3. Register
     try {
         console.log("\n☁️  Sending Registration Request...");
-        const registerRes = await axios.post(`${mainnetUrl}/api/validator/register`, {
+
+        const registerBody = {
             validator_id: validatorId,
             user_id: userId,
             public_key: publicKey
+        };
+
+        const registerRes = await fetch(`${mainnetUrl}/api/validator/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(registerBody)
         });
 
-        if (registerRes.data.success) {
+        const registerData: any = await registerRes.json();
+
+        if (registerRes.ok && registerData.success) {
             console.log("✅ Registration Successful!");
         } else {
-            console.error("❌ Registration Failed:", registerRes.data);
+            console.error("❌ Registration Failed:", registerData);
             process.exit(1);
         }
 
         // 4. Heartbeat
         console.log("\n💓 Sending Initial Heartbeat...");
-        const heartbeatRes = await axios.post(`${mainnetUrl}/api/validator/heartbeat`, {
-            validator_id: validatorId
+        const heartbeatRes = await fetch(`${mainnetUrl}/api/validator/heartbeat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ validator_id: validatorId })
         });
 
-        if (heartbeatRes.data.success) {
+        const heartbeatData: any = await heartbeatRes.json();
+
+        if (heartbeatRes.ok && heartbeatData.success) {
             console.log("✅ Heartbeat Accepted! You are now ONLINE.");
         } else {
-            console.warn("⚠️ Heartbeat failed:", heartbeatRes.data);
+            console.warn("⚠️ Heartbeat failed:", heartbeatData);
         }
 
         console.log("\n🎉 DONE! Your node is now a recognized validator on the network.");
@@ -124,12 +143,7 @@ async function main() {
 
     } catch (error: any) {
         console.error("\n❌ Error connecting to Mainnet:");
-        if (error.response) {
-            console.error(`   Status: ${error.response.status}`);
-            console.error(`   Data: ${JSON.stringify(error.response.data)}`);
-        } else {
-            console.error(`   ${error.message}`);
-        }
+        console.error(`   ${error.message}`);
     }
 
     RL.close();
