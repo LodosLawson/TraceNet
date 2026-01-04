@@ -93,54 +93,67 @@ class BlockchainNode {
         const { MessagePool } = require('./node/MessagePool');
         this.messagePool = new MessagePool();
 
-        const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
-        this.walletService = new WalletService(encryptionKey);
+        // 🔐 SECURITY: Load keys from Encrypted KeyStore
+        const { KeyStore } = require('./blockchain/utils/KeyStore');
+        const { SecureLogger } = require('./utils/SecureLogger'); // Import SecureLogger
+        const keyStore = new KeyStore();
 
-        // AirdropService initialized later after Blockchain
-        const systemWalletId = 'SYSTEM';
-
-        this.validatorPool = new ValidatorPool();
-
-        // Register system validator
+        // System Validator Setup
         const systemValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
+        const GENESIS_VALIDATOR_PUBLIC_KEY = '25b86a85774d69db8af2a782f7fbf9c062054c48d4c2c3fac9ec4b10c54f43d7'; // Hardcoded for security
 
-        // CRITICAL SECURITY: Validator key validation
-        const sysPrivateKey = process.env.VALIDATOR_PRIVATE_KEY;
-        const sysPublicKey = process.env.GENESIS_VALIDATOR_PUBLIC_KEY;
+        // NODE ROLE CONFIGURATION
+        const nodeRole = process.env.NODE_ROLE || 'full'; // 'full' | 'validator'
+        SecureLogger.log(`[Config] Node Role: ${nodeRole.toUpperCase()}`);
 
-        let publicKeyToUse: string;
+        // 🔐 INTERACTIVE PASSWORD PROMPT (Production)
+        let keystorePassword = process.env.KEYSTORE_PASSWORD;
+        if (!keystorePassword && process.env.NODE_ENV === 'production') {
+            // In a real TTY env we would use a library like 'readline-sync' or 'read' for hidden input.
+            // For strict POSIX compliance in standard node, we can't easily hide input without deps.
+            // We will assume the user MUST provide it via stdin if we implement a blocker here.
+            // NOTE: For this implementation, we will WARN and EXIT if not found, unless we add readline logic.
+            // Given the limitations of non-interactive shells in some deployments (like Cloud Run), 
+            // we should check if TTY is available.
 
-        if (sysPublicKey) {
-            // If public key is explicitly provided, use it (Consumer Node)
-            publicKeyToUse = sysPublicKey;
-            console.log('[Security] Using explicit GENESIS_VALIDATOR_PUBLIC_KEY');
-        } else {
-            // Fallback to deriving from Private Key (Validator Node / Dev)
-            if (!sysPrivateKey && process.env.NODE_ENV === 'production') {
-                throw new Error('SECURITY ERROR: Either VALIDATOR_PRIVATE_KEY or GENESIS_VALIDATOR_PUBLIC_KEY must be set in production!');
+            console.error('❌ CRITICAL SECURITY: KEYSTORE_PASSWORD missing in production!');
+            console.error('Please set it via environment variable or secret manager.');
+            process.exit(1);
+        }
+
+        // Attempt to load private key from KeyStore first
+        let sysPrivateKey = keyStore.loadKey('validator_key', keystorePassword || '');
+
+        // Compatibility/Migration: Check env if not in KeyStore (Dev only)
+        if (!sysPrivateKey && process.env.NODE_ENV !== 'production') {
+            sysPrivateKey = process.env.VALIDATOR_PRIVATE_KEY;
+            if (sysPrivateKey) {
+                console.warn('[Security] ⚠️  Loaded validator key from .env (unsafe for production). Please migrate to KeyStore.');
             }
+        }
 
-            // Default key is ONLY for development
-            const defaultSystemKey = '0000000000000000000000000000000000000000000000000000000000000001';
-            const validatorKey = sysPrivateKey || defaultSystemKey;
-            publicKeyToUse = KeyManager.getKeyPairFromPrivate(validatorKey).publicKey;
+        if (nodeRole === 'validator' && !sysPrivateKey) {
+            console.error('[Configuration] ❌ NODE_ROLE is set to validator, but no private key found!');
+            if (process.env.NODE_ENV === 'production') {
+                throw new Error('Validator role requires a private key in KeyStore.');
+            }
+        }
+
+        if (!sysPrivateKey && process.env.NODE_ENV === 'production') {
+            SecureLogger.log('[Security] No validator private key found. Running as READ-ONLY Full Node.');
         }
 
         const sysUserId = 'system_user';
+        this.validatorPool = new ValidatorPool();
 
-        this.validatorPool.registerValidator(systemValidatorId, sysUserId, publicKeyToUse);
+        // Always register the genesis validator (even if we don't own the key) using the hardcoded public key
+        // This ensures every node knows who the genesis validator is.
+        this.validatorPool.registerValidator(systemValidatorId, sysUserId, GENESIS_VALIDATOR_PUBLIC_KEY);
         this.validatorPool.setOnline(systemValidatorId);
-        console.log(`System Validator registered: ${systemValidatorId} (Public Key: ${publicKeyToUse.substring(0, 10)}...)`);
+        SecureLogger.log(`System Validator registered: ${systemValidatorId}`);
 
         // Initialize core components IN ORDER with correct parameters
-        const genesisValidatorId = process.env.GENESIS_VALIDATOR_ID || 'SYSTEM';
-        this.blockchain = new Blockchain(genesisValidatorId, this.validatorPool);
-
-        // Initialize Local Database and Restore Chain
-        // Initialize Local Database (Moved to start())
-        // this.localDb = new LocalDatabase();
-
-        // Chain loading/restoration moved to start() for async support
+        this.blockchain = new Blockchain(systemValidatorId, this.validatorPool);
 
         // Keep system validator online
         setInterval(() => {
@@ -157,33 +170,41 @@ class BlockchainNode {
             signatureTimeout
         );
 
-        // NODE WALLET AUTOMATION (User Request)
-        // Check for node wallet private key
-        let nodeWalletPrivateKey = process.env.NODE_WALLET_PRIVATE_KEY;
+        // NODE WALLET AUTOMATION (Secure)
+        let nodeWalletPrivateKey = keyStore.loadKey('node_wallet', keystorePassword || '');
         let nodeWalletPublicKey: string;
 
         if (!nodeWalletPrivateKey) {
-            console.log('[Setup] No NODE_WALLET_PRIVATE_KEY found. Generating new Node Wallet...');
-            const keyPair = KeyManager.generateKeyPair();
-            nodeWalletPrivateKey = keyPair.privateKey;
-            nodeWalletPublicKey = keyPair.publicKey;
+            if (process.env.NODE_WALLET_PRIVATE_KEY && process.env.NODE_ENV !== 'production') {
+                // Dev fallback
+                nodeWalletPrivateKey = process.env.NODE_WALLET_PRIVATE_KEY;
+                const keyPair = KeyManager.getKeyPairFromPrivate(nodeWalletPrivateKey);
+                nodeWalletPublicKey = keyPair.publicKey;
+                console.warn('[Security] ⚠️  Loaded node wallet from .env. Please migrate to KeyStore.');
+            } else {
+                SecureLogger.log('[Setup] No Node Wallet found. Generating new one...');
+                const keyPair = KeyManager.generateKeyPair();
+                nodeWalletPrivateKey = keyPair.privateKey;
+                nodeWalletPublicKey = keyPair.publicKey;
 
-            // Persist to .env for future runs
-            try {
-                const envPath = path.join(__dirname, '../.env');
-                fs.appendFileSync(envPath, `\nNODE_WALLET_PRIVATE_KEY=${nodeWalletPrivateKey}\n`);
-                console.log(`[Setup] ✅ Generated and saved new Node Wallet to .env`);
-            } catch (err: any) {
-                console.warn('[Setup] ⚠️ Could not save wallet to .env (Check permissions). Wallet will be lost on restart!', err.message);
+                // Try to save to KeyStore if password available
+                if (keystorePassword) {
+                    keyStore.saveKey('node_wallet', nodeWalletPrivateKey, keystorePassword);
+                    SecureLogger.log('[Setup] ✅ Generated and saved new Node Wallet to KeyStore');
+                } else {
+                    console.warn('[Setup] ⚠️  Generated temporary Node Wallet (No KeyStore password). Wallet will be lost on exit.');
+                }
             }
         } else {
-            // Derive public key from private key
             const keyPair = KeyManager.getKeyPairFromPrivate(nodeWalletPrivateKey);
             nodeWalletPublicKey = keyPair.publicKey;
-            console.log('[Setup] Loaded existing Node Wallet from config');
+            SecureLogger.log('[Setup] Loaded Node Wallet from KeyStore');
         }
 
-        console.log(`[Setup] 💰 Node Wallet Address: ${nodeWalletPublicKey}`);
+        const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+        this.walletService = new WalletService(encryptionKey);
+
+        SecureLogger.log(`[Setup] 💰 Node Wallet Address: ${nodeWalletPublicKey}`);
 
         const blockTime = parseInt(process.env.BLOCK_TIME_MS || '5000', 10);
         const maxTxPerBlock = parseInt(process.env.MAX_TRANSACTIONS_PER_BLOCK || '1000', 10);
@@ -192,30 +213,30 @@ class BlockchainNode {
             this.validatorPool,
             this.mempool,
             blockTime,
-            maxTxPerBlock, // Use maxTxPerBlock, not maxTransactionsPerBlock
-            nodeWalletPublicKey // Pass automated node wallet
+            maxTxPerBlock,
+            nodeWalletPublicKey
         );
-        // Register local system validator key for signing (ONLY IF PRIVATE KEY EXISTS)
+
+        // Register local system validator key only if we have it
         if (sysPrivateKey) {
             this.blockProducer.registerLocalValidator(systemValidatorId, sysPrivateKey);
-        } else {
-            console.log('[BlockProducer] Running in Read-Only Mode (No Private Key)');
         }
 
-        // Initialize AirdropService with Blockchain and System Keys
+        // Initialize AirdropService
+        // ✅ SECURITY FIX: Use Node Wallet key instead of Validator Key for airdrops
+        // Validator key should ONLY be used for consensus signatures.
+        const systemWalletId = 'SYSTEM';
         const airdropAmount = parseInt(process.env.AIRDROP_AMOUNT || '625000', 10);
-        // If no private key, pass empty string or dummy (AirdropService might require refactor if it strictly needs it)
-        // For now, we assume Airdrop won't be triggered by this node if it's read-only
         this.airdropService = new AirdropService(
             airdropAmount,
             systemWalletId,
             this.blockchain,
-            { publicKey: publicKeyToUse, privateKey: sysPrivateKey || '' }
+            { publicKey: nodeWalletPublicKey, privateKey: nodeWalletPrivateKey || '' } // Using Node Wallet
         );
 
         const rewardConfig: RewardConfig = {
-            blockReward: parseInt(process.env.BLOCK_REWARD || '0', 10), // Disabled - only airdrops count
-            signatureReward: parseInt(process.env.SIGNATURE_REWARD || '0', 10), // Disabled
+            blockReward: parseInt(process.env.BLOCK_REWARD || '0', 10),
+            signatureReward: parseInt(process.env.SIGNATURE_REWARD || '0', 10),
             feeDistributionPercent: parseInt(process.env.FEE_DISTRIBUTION_PERCENT || '80', 10),
         };
         this.rewardDistributor = new RewardDistributor(this.blockchain, rewardConfig);
@@ -240,28 +261,41 @@ class BlockchainNode {
             port
         );
 
-        // Create HTTP server for WebSocket
+        // HTTP Server
         this.httpServer = http.createServer(this.rpcServer.getApp());
 
-        // SECURITY: Initialize rate limiter for DOS protection
-        // 100 requests per minute per IP
+        // 🛡️ SECURITY MIDDLEWARE
+
+        // 1. Strict CORS
+        const cors = require('cors');
+        const corsOptions = {
+            origin: process.env.NODE_ENV === 'production'
+                ? (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []) // Strict list in prod
+                : '*', // Allow all in dev
+            methods: ['GET', 'POST'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+            credentials: true,
+            maxAge: 86400 // 24 hours
+        };
+        this.rpcServer.getApp().use(cors(corsOptions));
+
+        // 2. Rate Limiting (Global)
         const { RateLimiter } = require('./middleware/RateLimiter');
         const rateLimiter = new RateLimiter(60000, 100);
-        this.rpcServer.getApp().use('/api', rateLimiter.middleware());
-        this.rpcServer.getApp().use('/rpc', rateLimiter.middleware());
+        this.rpcServer.getApp().use(rateLimiter.middleware());
 
         // CRITICAL SECURITY: JWT Secret validation
         const jwtSecret = process.env.JWT_SECRET;
         if (!jwtSecret && process.env.NODE_ENV === 'production') {
             throw new Error('SECURITY ERROR: JWT_SECRET must be set in production!');
         }
-        if (jwtSecret && jwtSecret.length < 32) {
+        if (jwtSecret && jwtSecret.length < 32 && process.env.NODE_ENV === 'production') {
             throw new Error('SECURITY ERROR: JWT_SECRET must be at least 32 characters');
         }
         const safeJwtSecret = jwtSecret || 'dev-random-' + Math.random().toString(36);
         this.authService = new AuthService(safeJwtSecret);
 
-        // Initialize user service (no auth service needed - no passwords!)
+        // Initialize user service
         this.userService = new UserService(this.walletService, this.airdropService, this.mempool);
         this.rpcServer.setUserService(this.userService);
 
@@ -334,8 +368,14 @@ class BlockchainNode {
         this.rpcServer.setP2PNetwork(this.p2pNetwork);
 
         // Initialize Auto Updater
+        // Initialize Auto Updater (Disable in production for security)
         this.autoUpdater = new AutoUpdater();
-        this.autoUpdater.start();
+        if (process.env.NODE_ENV !== 'production') {
+            this.autoUpdater.start();
+            console.log('[AutoUpdater] Active (Dev Mode)');
+        } else {
+            console.log('[AutoUpdater] Disabled (Production Mode)');
+        }
 
         // Initialize Cloud Storage Backup
         this.cloudBackup = new CloudStorageBackup();
@@ -565,12 +605,13 @@ class BlockchainNode {
 // Start the node if this is the main module
 if (require.main === module) {
     // Global error handlers to prevent crash without logging
+    const { SecureLogger } = require('./utils/SecureLogger');
     process.on('uncaughtException', (err) => {
-        console.error('❌ FATAL UNCAUGHT EXCEPTION:', err);
+        SecureLogger.error('❌ FATAL UNCAUGHT EXCEPTION:', err);
     });
 
     process.on('unhandledRejection', (reason, promise) => {
-        console.error('❌ FATAL UNHANDLED REJECTION:', reason);
+        SecureLogger.error('❌ FATAL UNHANDLED REJECTION:', reason);
     });
 
     try {

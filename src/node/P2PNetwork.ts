@@ -8,11 +8,15 @@ import { ValidatorPool } from '../consensus/ValidatorPool';
 import { LocalDatabase } from '../database/LocalDatabase';
 import * as geoip from 'geoip-lite';
 
+import { NETWORK_CONFIG } from '../blockchain/config/NetworkConfig';
+
 interface Peer {
     url: string;
     socket: Socket;
-    id: string;
+    id: string; // Node ID (Public Key derived or random UUID)
     height: number;
+    version: string;
+    genesisHash: string; // Security: Must match ours
     country?: string;
     region?: string;
     city?: string;
@@ -31,8 +35,18 @@ export class P2PNetwork {
     private isSyncing: boolean = false;
     private readonly MAX_PEERS = 50;
     private connectedIPs: Map<string, string> = new Map(); // IP -> Node ID (anti-sybil)
+    // ✅ Policy: Directional Counters
+    private inboundCount: number = 0;
+    private outboundCount: number = 0;
+    private readonly MAX_INBOUND = 20;
+    private readonly MAX_OUTBOUND = 20;
+
     private db: LocalDatabase; // Persistence
     private healthCheckInterval: NodeJS.Timeout | null = null;
+    private discoveryService: any; // Type: PeerDiscovery (using any to avoid circular import issues)
+
+    // ✅ Policy: Consensus Rate Limiters (Token Bucket style mostly)
+    private blockRateLimit: Map<string, number> = new Map(); // PeerID -> LastBlockTime
 
     constructor(
         blockchain: Blockchain,
@@ -51,6 +65,11 @@ export class P2PNetwork {
 
         this.loadPersistedPeers(); // Load peers on startup
         this.setupServerHandlers();
+
+        // Start Discovery
+        const { PeerDiscovery } = require('./discovery/PeerDiscovery');
+        this.discoveryService = new PeerDiscovery(this);
+        this.discoveryService.start();
     }
 
     /**
@@ -65,48 +84,71 @@ export class P2PNetwork {
         const peers = await this.db.loadPeers();
         if (peers && peers.length > 0) {
             peers.forEach(p => this.knownPeers.add(p));
-            // Try to connect to a few random ones if we have no connections?
-            setTimeout(() => {
-                if (this.peers.size === 0) {
-                    console.log('[P2P] No active peers. Attempting to connect to recently known peers...');
-                    this.connectToRandomPeers();
-                }
-            }, 5000);
         }
+
+        // Try to connect to a few random ones if we have no connections?
+        setTimeout(() => {
+            if (this.peers.size === 0) {
+                console.log('[P2P] No active peers. Attempting to connect to recently known peers...');
+                this.connectToRandomPeers();
+            }
+        }, 5000);
     }
 
     /**
      * Connect to a peer
      */
     public connectToPeer(peerUrl: string): void {
-        if (this.peers.size >= this.MAX_PEERS) {
-            console.warn(`[P2P] Max peers reached (${this.MAX_PEERS}). Ignoring connect request to ${peerUrl}`);
+        // ✅ Policy: Outbound Limit
+        if (this.outboundCount >= this.MAX_OUTBOUND) {
+            console.warn(`[P2P] Max outbound peers reached (${this.MAX_OUTBOUND}). Ignoring connect request to ${peerUrl}`);
             return;
         }
+
         if (this.peers.has(peerUrl) || peerUrl === `http://localhost:${this.myPort}`) return;
 
-        console.log(`[P2P] Connecting to peer: ${peerUrl}`);
-        const socket = io(peerUrl, {
+        // Support for /p2p/ style addresses (Mock support for now, we just stick to http/ws url part)
+        // Format: /ip4/1.2.3.4/tcp/3000/p2p/QmHash...
+        // We extract the IP and Port to build a URL.
+        let targetUrl = peerUrl;
+        if (peerUrl.startsWith('/ip4/')) {
+            const parts = peerUrl.split('/');
+            const ip = parts[2];
+            const port = parts[4];
+            targetUrl = `http://${ip}:${port}`;
+        }
+
+        console.log(`[P2P] Connecting to peer: ${targetUrl}`);
+        const socket = io(targetUrl, {
             reconnection: true,
             reconnectionAttempts: 10,
             reconnectionDelay: 1000,
+            timeout: 5000
         });
 
         socket.on('connect', () => {
-            console.log(`[P2P] Connected to ${peerUrl}`);
-            this.setupClientHandlers(socket, peerUrl);
+            console.log(`[P2P] Connected to ${targetUrl}`);
+            this.outboundCount++;
+            this.setupClientHandlers(socket, targetUrl);
 
-            // Handshake
+            // Handshake with SECURITY check
+            const myGenesisHash = this.blockchain.getChain()[0]?.hash;
             socket.emit('p2p:handshake', {
                 port: this.myPort,
-                publicHost: process.env.PUBLIC_HOST, // Send my public IP/Domain
+                id: this.getPeerId(), // We need a stable ID
+                publicHost: process.env.PUBLIC_HOST,
                 height: this.blockchain.getChainLength(),
-                version: '2.5.0',
+                version: '3.0.0', // TraceNet V3
+                genesisHash: myGenesisHash
             });
         });
 
         socket.on('connect_error', (err) => {
-            console.warn(`[P2P] Connection error to ${peerUrl}: ${err.message}`);
+            console.warn(`[P2P] Connection error to ${targetUrl}: ${err.message}`);
+        });
+
+        socket.on('disconnect', () => {
+            this.outboundCount = Math.max(0, this.outboundCount - 1);
         });
     }
 
@@ -114,6 +156,11 @@ export class P2PNetwork {
      * Broadcast a new block to all peers
      */
     public broadcastBlock(block: Block): void {
+        if (process.env.NODE_ENV === 'production' && this.peers.size < NETWORK_CONFIG.MIN_PEERS) {
+            console.warn(`[P2P] ⚠️ Not broadcasting block: Insufficient peers (${this.peers.size} < ${NETWORK_CONFIG.MIN_PEERS})`);
+            return;
+        }
+
         console.log(`[P2P] Broadcasting block ${block.index}`);
         this.server.emit('p2p:newBlock', block.toJSON());
         // Also send to connected peers via client sockets?
@@ -139,6 +186,14 @@ export class P2PNetwork {
      */
     private setupServerHandlers(): void {
         this.server.on('connection', (socket) => {
+            // ✅ Policy: Inbound Limit
+            if (this.inboundCount >= this.MAX_INBOUND) {
+                console.warn(`[P2P] Max inbound peers reached (${this.MAX_INBOUND}). Rejecting connection.`);
+                socket.emit('error', { code: 'MAX_PEERS', message: 'Node is full' });
+                socket.disconnect(true);
+                return;
+            }
+
             // ✅ ANTI-SYBIL: Extract and check IP immediately
             const clientIP = this.extractClientIP(socket);
 
@@ -159,23 +214,44 @@ export class P2PNetwork {
             }
 
             console.log(`[P2P] ✅ IP ${clientIP} is new, allowing connection...`);
+            this.inboundCount++;
 
             // Wait for handshake to register peer?
             // Or just listen to events.
 
             socket.on('p2p:handshake', (data: any) => {
+                // SECURITY: Validate Genesis Hash
+                const myGenesisHash = this.blockchain.getChain()[0]?.hash;
+                if (data.genesisHash && data.genesisHash !== myGenesisHash) {
+                    console.warn(`[P2P] ❌ Rejected peer ${clientIP}: Genesis Hash mismatch (Theirs: ${data.genesisHash}, Ours: ${myGenesisHash})`);
+                    socket.disconnect(true);
+                    return;
+                }
+
                 this.handleHandshake(socket, data, true); // Incoming
 
                 // Respond with my info
                 socket.emit('p2p:handshake', {
                     port: this.myPort,
+                    id: this.getPeerId(),
                     publicHost: process.env.PUBLIC_HOST,
                     height: this.blockchain.getChainLength(),
-                    version: '2.5.0',
+                    version: '3.0.0',
+                    genesisHash: myGenesisHash
                 });
             });
 
             socket.on('p2p:newBlock', (blockData: any) => {
+                // ✅ Rate Limit: Block Proposals (Consensus)
+                // 1 Block per 2 seconds max from same peer IP? 
+                // Better: Peer ID to avoid spoofing? IP is safer.
+                const now = Date.now();
+                const lastBlockTime = this.blockRateLimit.get(clientIP) || 0;
+                if (now - lastBlockTime < 2000) {
+                    console.warn(`[P2P] Rate Limit: Ignoring frequent block from ${clientIP}`);
+                    return;
+                }
+                this.blockRateLimit.set(clientIP, now);
                 this.handleNewBlock(blockData);
             });
 
@@ -197,6 +273,7 @@ export class P2PNetwork {
 
             // Clean up IP tracking when socket disconnects
             socket.on('disconnect', () => {
+                this.inboundCount = Math.max(0, this.inboundCount - 1);
                 const nodeId = this.connectedIPs.get(clientIP);
                 if (nodeId) {
                     console.log(`[P2P] Node ${nodeId} disconnected, freeing IP ${clientIP}`);
@@ -222,6 +299,8 @@ export class P2PNetwork {
             // 🚀 DISCOVERY: Ask for their peers immediately after handshake
             socket.emit('p2p:requestPeers');
         });
+
+        // ... rest of handlers ...
 
         socket.on('p2p:newBlock', (blockData: any) => {
             this.handleNewBlock(blockData);
@@ -270,7 +349,14 @@ export class P2PNetwork {
     private connectToRandomPeers() {
         if (this.isSyncing) return;
 
-        const candidates = Array.from(this.knownPeers).filter(p => !this.peers.has(p));
+        let candidates = Array.from(this.knownPeers).filter(p => !this.peers.has(p));
+
+        // 🚀 Fallback to Bootstrap Nodes if no candidates
+        if (candidates.length === 0) {
+            console.log('[P2P] No known candidates. Falling back to BOOTSTRAP_NODES...');
+            candidates = NETWORK_CONFIG.BOOTSTRAP_NODES.filter(p => !this.peers.has(p));
+        }
+
         // Shuffle
         candidates.sort(() => Math.random() - 0.5);
 
@@ -279,6 +365,8 @@ export class P2PNetwork {
             this.connectToPeer(candidates[i]);
         }
     }
+
+    // Correction: I will only replace connectToRandomPeers and ADD getASN
 
 
     /**
@@ -374,6 +462,37 @@ export class P2PNetwork {
         if (isIncoming) {
             console.log(`[P2P] Incoming handshake from IP: ${clientIP}`);
 
+            // ✅ Anti-Sybil: Subnet Analysis
+            const subnet = this.getSubnet(clientIP);
+
+            // Policy: Max peers per subnet
+            const peersInSubnet = Array.from(this.connectedIPs.keys()).filter(ip => this.getSubnet(ip) === subnet).length;
+            if (peersInSubnet >= 2 && process.env.NODE_ENV === 'production') {
+                console.warn(`[P2P] ❌ Rejected peer ${clientIP}: Too many peers from subnet ${subnet}`);
+                socket.emit('error', { code: 'SUBNET_LIMIT', message: 'Too many peers from your subnet' });
+                socket.disconnect(true);
+                return;
+            }
+
+            // ✅ Policy: ASN Analysis (Max 3 per ASN)
+            // Even if GeoIP doesn't have ASN, we implement the structure.
+            // In future, replaced by: const asn = geoip.lookup(clientIP).asn;
+            const asn = this.getASN(clientIP);
+            // We can map subnets to "mock" ASNs if needed, or assume UNKNOWN_ASN for now if not available.
+            // If ASN is unknown, we fall back to subnet/IP limits. 
+            if (asn !== 'UNKNOWN_ASN') {
+                // Count peers in this ASN
+                // Note: We need to store ASN in Peer or tracked separately.
+                // For now, calculating by re-deriving ASN from connected IPs
+                const peersInASN = Array.from(this.connectedIPs.keys()).filter(ip => this.getASN(ip) === asn).length;
+                if (peersInASN >= 3 && process.env.NODE_ENV === 'production') {
+                    console.warn(`[P2P] ❌ Rejected peer ${clientIP}: Too many peers from ASN ${asn}`);
+                    socket.emit('error', { code: 'ASN_LIMIT', message: 'Too many peers from your ISP/ASN' });
+                    socket.disconnect(true);
+                    return;
+                }
+            }
+
             // Perform geolocation on client IP
             try {
                 const geo = geoip.lookup(clientIP);
@@ -382,7 +501,8 @@ export class P2PNetwork {
                         ip: clientIP,
                         country: geo.country,
                         region: geo.region,
-                        city: geo.city
+                        city: geo.city,
+                        asn: geo.area // Basic ASN approx usage if available otherwise ignored
                     };
                 } else {
                     // No geolocation data (localhost or private IP)
@@ -409,8 +529,10 @@ export class P2PNetwork {
         const peer: Peer = {
             url: peerUrl || 'unknown', // If incoming, we don't strictly know their public URL unless they sent it
             socket: socket,
-            id: theirId,
+            id: data.id || theirId, // Prefer their announced ID
             height: data.height || 0,
+            version: data.version || 'unknown',
+            genesisHash: data.genesisHash,
             ...location
         };
 
@@ -517,6 +639,38 @@ export class P2PNetwork {
      */
     public getKnownPeers(): string[] {
         return Array.from(this.knownPeers);
+    }
+
+    private getPeerId(): string {
+        // Ideally derived from public key, but for now strict random or env
+        return process.env.PEER_ID || 'node_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    /**
+     * Get /24 subnet from IPv4
+     */
+    private getSubnet(ip: string): string {
+        if (ip.includes(':')) return 'ipv6_subnet'; // Simplified IPv6 handling
+        const parts = ip.split('.');
+        if (parts.length === 4) {
+            return `${parts[0]}.${parts[1]}.${parts[2]}.0`;
+        }
+        return ip;
+    }
+
+    /**
+     * Get ASN (Autonomous System Number) stub
+     * In a real implementation this would query a MaxMind DB or similar.
+     */
+    private getASN(ip: string): string {
+        if (this.isLocalOrPrivateIP(ip)) return 'LOCAL_ASN';
+        // Mock ASN generation based on first octet for testing/simulation policy
+        // Real: geoip.lookup(ip)?.asn (if available)
+        const parts = ip.split('.');
+        if (parts.length === 4) {
+            return 'ASN_' + parts[0];
+        }
+        return 'UNKNOWN_ASN';
     }
 }
 

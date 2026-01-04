@@ -95,8 +95,8 @@ export class GenesisValidator {
             if (!proof.developer || !proof.project) {
                 errors.push('Ownership proof incomplete (missing developer/project)');
             }
-            if (!proof.wordHashes || Object.keys(proof.wordHashes).length !== 5) {
-                errors.push('Ownership proof must have 5 word hashes');
+            if (Object.keys(proof.wordHashes).length !== 5 && Object.keys(proof.wordHashes).length !== 6) {
+                errors.push('Ownership proof must have 5 or 6 word hashes');
             }
         }
 

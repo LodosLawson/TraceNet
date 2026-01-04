@@ -13,7 +13,10 @@ export interface NetworkMetadata {
     tokenSymbol: 'TRN';
     tokenDecimals: number;
     MAX_KNOWN_PEERS: number;
+    MIN_PEERS: number;
     BOOTSTRAP_NODES: string[];
+    GENESIS_VALIDATOR_PUBLIC_KEY?: string; // Optional if not always present
+    initialValidators: string[];
 }
 
 /**
@@ -29,12 +32,18 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     tokenSymbol: 'TRN', // TraceNet (changed from TNN)
     tokenDecimals: 8,
     MAX_KNOWN_PEERS: 500,
+    MIN_PEERS: 3,
     BOOTSTRAP_NODES: [
         'https://tracenet-node-1.run.app',
         'https://tracenet-node-2.run.app',
         'https://tracenet-mainnet-seed.herokuapp.com'
+    ],
+    initialValidators: [
+        '25b86a85774d69db8af2a782f7fbf9c062054c48d4c2c3fac9ec4b10c54f43d7' // Genesis Validator
     ]
 };
+
+export const GENESIS_VALIDATOR_PUBLIC_KEY = '25b86a85774d69db8af2a782f7fbf9c062054c48d4c2c3fac9ec4b10c54f43d7';
 
 /**
  * Get network metadata for genesis block

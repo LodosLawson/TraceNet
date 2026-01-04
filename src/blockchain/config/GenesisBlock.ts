@@ -1,8 +1,6 @@
 import { IBlock } from '../models/Block';
-import { NETWORK_CONFIG } from './NetworkConfig';
+import { NETWORK_CONFIG, GENESIS_VALIDATOR_PUBLIC_KEY } from './NetworkConfig';
 import { KeyManager } from '../crypto/KeyManager';
-
-export const GENESIS_VALIDATOR_ID = 'SYSTEM_GENESIS_VALIDATOR';
 
 /**
  * Ownership Proof - TraceNet V3.0
@@ -36,14 +34,33 @@ function calculateGenesisHash(): string {
         index: 0,
         previous_hash: '0000000000000000000000000000000000000000000000000000000000000000',
         timestamp: NETWORK_CONFIG.genesisTimestamp,
-        merkle_root: '0000000000000000000000000000000000000000000000000000000000000000',
-        state_root: '0000000000000000000000000000000000000000000000000000000000000000',
+        merkle_root: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945', // Hash of []
+        state_root: '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a', // Hash of {}
         transactions: [],
-        validator_id: GENESIS_VALIDATOR_ID,
+        validator_id: GENESIS_VALIDATOR_PUBLIC_KEY,
         nonce: 0,
         metadata: {
             ...NETWORK_CONFIG,
-            ownershipProof: OWNERSHIP_PROOF
+            ownershipProof: OWNERSHIP_PROOF,
+            // Network identification
+            networkMagic: 0x54524E33,  // "TRN3" in hex
+
+            // Consensus rules
+            consensus: {
+                type: 'validator-pool',
+                blockTime: 5000,
+                maxBlockSize: 1_000_000,
+                maxTxPerBlock: 1000,
+                validatorSelection: 'round-robin-fallback',
+                slashingEnabled: true
+            },
+
+            // Timestamp rules
+            timestampRules: {
+                maxDrift: 300000,
+                blockTimeTarget: 5000,
+                monotonic: true
+            }
         }
     });
     return KeyManager.hash(data);
@@ -70,11 +87,11 @@ export const GENESIS_BLOCK_DATA: IBlock = {
     index: 0,
     previous_hash: '0000000000000000000000000000000000000000000000000000000000000000',
     timestamp: NETWORK_CONFIG.genesisTimestamp,
-    merkle_root: '0000000000000000000000000000000000000000000000000000000000000000',
-    state_root: '0000000000000000000000000000000000000000000000000000000000000000',
+    merkle_root: '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945',
+    state_root: '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
     transactions: [],
-    validator_id: GENESIS_VALIDATOR_ID,
-    signature: KeyManager.hash(GENESIS_VALIDATOR_ID + genesisHash),
+    validator_id: GENESIS_VALIDATOR_PUBLIC_KEY,
+    signature: 'cba12ac7289134b3a7a260a753f69f7a441e759019f2d68d40f4373e604ce348c8f59f831081e2eb9935b46d0aa4f778b16dc6862c8020bdd16c6199e7899c0c',
     nonce: 0,
     hash: genesisHash,
     metadata: {
