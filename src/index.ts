@@ -263,8 +263,10 @@ class BlockchainNode {
         );
 
         // Register local system validator key only if we have it
-        if (sysPrivateKey) {
-            this.blockProducer.registerLocalValidator(systemValidatorId, sysPrivateKey);
+        // Register local validator key
+        if (sysPrivateKey && myValidatorId) {
+            this.blockProducer.registerLocalValidator(myValidatorId, sysPrivateKey);
+            console.log(`[Consensus] 🔐 Registered private key for BlockProducer: ${myValidatorId}`);
         }
 
         // Initialize AirdropService
