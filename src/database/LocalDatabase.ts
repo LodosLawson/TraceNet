@@ -108,4 +108,15 @@ export class LocalDatabase {
             return [];
         }
     }
+    /**
+     * Clear database (for genesis reset)
+     */
+    async clear(): Promise<void> {
+        try {
+            await this.db.clear();
+            console.log('[Database] Database cleared.');
+        } catch (error) {
+            console.error('[Database] Failed to clear database:', error);
+        }
+    }
 }
