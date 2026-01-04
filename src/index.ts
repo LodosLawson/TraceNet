@@ -34,6 +34,8 @@ import { getBootstrapNodes } from './config/BootstrapNodes';
 import { IMMUTABLE_CONSENSUS_RULES } from './config/ConsensusRules';
 
 
+import { NETWORK_CONFIG } from './blockchain/config/NetworkConfig';
+
 // Load environment variables
 dotenv.config();
 
@@ -135,10 +137,8 @@ class BlockchainNode {
 
         if (nodeRole === 'validator' && !sysPrivateKey) {
             console.error('[Configuration] ❌ NODE_ROLE is set to validator, but no private key found!');
-            // Allow downgrading to full node instead of crashing
             if (process.env.NODE_ENV === 'production') {
                 console.warn('[Configuration] ⚠️  Downgrading to READ-ONLY FULL NODE due to missing private key.');
-                // nodeRole = 'full'; // implicit logic below handles this
             }
         }
 
@@ -149,19 +149,56 @@ class BlockchainNode {
         const sysUserId = 'system_user';
         this.validatorPool = new ValidatorPool();
 
-        // Always register the genesis validator (even if we don't own the key) using the hardcoded public key
-        // This ensures every node knows who the genesis validator is.
+        // 1. Register Genesis Validator (Public Spec)
+        // Every node must know about the genesis validator to validate early blocks
         this.validatorPool.registerValidator(systemValidatorId, sysUserId, GENESIS_VALIDATOR_PUBLIC_KEY);
-        this.validatorPool.setOnline(systemValidatorId);
-        SecureLogger.log(`System Validator registered: ${systemValidatorId}`);
+
+        // 2. Set Online Status CORRECTLY
+        // Only set online if WE are that validator (have the private key)
+        let myValidatorId = null;
+
+        if (sysPrivateKey) {
+            // Check if our key matches Genesis Validator
+            let myPublicKey: string;
+            try {
+                const keyPair = KeyManager.getKeyPairFromPrivate(sysPrivateKey);
+                myPublicKey = keyPair.publicKey;
+            } catch (err) {
+                console.error('[Consensus] ❌ Invalid Private Key in configuration!');
+                myPublicKey = 'invalid_key';
+            }
+
+            if (myPublicKey === GENESIS_VALIDATOR_PUBLIC_KEY) {
+                // We are the System Validator
+                myValidatorId = systemValidatorId;
+                this.validatorPool.setOnline(systemValidatorId);
+                SecureLogger.log(`[Consensus] 👑 We are the Genesis Validator (${systemValidatorId}). Online & Ready.`);
+            } else {
+                // We are a NEW Validator
+                const myId = process.env.VALIDATOR_ID || 'validator_' + myPublicKey.substring(0, 8);
+                myValidatorId = myId;
+
+                // Register ourselves
+                this.validatorPool.registerValidator(myId, 'local_admin', myPublicKey);
+                this.validatorPool.setOnline(myId);
+                SecureLogger.log(`[Consensus] 🛡️  Active Validator Registered: ${myId}`);
+
+                // Note: In DPoA, we might need a stake transaction or existing validator approval.
+                // For V3.0 bootstrap, we allow immediate participation if listed in GENESIS or via governance.
+            }
+
+            // Keep myself online
+            if (myValidatorId) {
+                setInterval(() => {
+                    this.validatorPool.updateHeartbeat(myValidatorId!);
+                }, 10000);
+            }
+        } else {
+            console.log('[Consensus] 👁️  Observer Mode: No validator keys loaded.');
+        }
 
         // Initialize core components IN ORDER with correct parameters
         this.blockchain = new Blockchain(systemValidatorId, this.validatorPool);
-
-        // Keep system validator online
-        setInterval(() => {
-            this.validatorPool.updateHeartbeat(systemValidatorId);
-        }, 10000);
 
         const thresholdPercent = parseInt(process.env.VALIDATOR_THRESHOLD_PERCENT || '66', 10);
         const validatorsPerTx = parseInt(process.env.VALIDATORS_PER_TRANSACTION || '7', 10);
@@ -487,7 +524,7 @@ class BlockchainNode {
                 console.log(`🌍 Public Host: ${process.env.PUBLIC_HOST}`);
             }
             console.log(`🔗 P2P Network: Active (Max Peers: 50)`);
-            console.log(`🔐 Token: ${process.env.TOKEN_SYMBOL || 'TNN'}`);
+            console.log(`🔐 Token: ${NETWORK_CONFIG.tokenSymbol} (${process.env.TOKEN_SYMBOL || 'Default'})`);
             console.log(`⏱️  Block Time: ${process.env.BLOCK_TIME_MS || 5000}ms`);
             console.log(`${'='.repeat(60)}\n`);
             console.log(`✅ Server is ready to accept connections on port ${port}`);
