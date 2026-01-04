@@ -34,6 +34,7 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     MAX_KNOWN_PEERS: 500,
     MIN_PEERS: 3,
     BOOTSTRAP_NODES: [
+        'https://tracenet-blockchain-136028201808.us-central1.run.app', // Active US Mainnet
         'https://tracenet-node-1.run.app',
         'https://tracenet-node-2.run.app',
         'https://tracenet-mainnet-seed.herokuapp.com'
