@@ -151,7 +151,26 @@ class BlockchainNode {
 
         // 1. Register Genesis Validator (Public Spec)
         // Every node must know about the genesis validator to validate early blocks
-        this.validatorPool.registerValidator(systemValidatorId, sysUserId, GENESIS_VALIDATOR_PUBLIC_KEY);
+        // 1. Register All Initial Validators (Public Spec)
+        // This includes Genesis Validator AND any other whitelisted validators (like the User's Home Node)
+        if (NETWORK_CONFIG.initialValidators) {
+            NETWORK_CONFIG.initialValidators.forEach((pubKey, index) => {
+                let vId = 'validator_' + pubKey.substring(0, 8);
+                let uId = `initial_validator_${index}`;
+
+                // Special case for Genesis Validator to keep ID consistent if needed
+                if (pubKey === GENESIS_VALIDATOR_PUBLIC_KEY) {
+                    vId = systemValidatorId;
+                    uId = sysUserId;
+                }
+
+                this.validatorPool.registerValidator(vId, uId, pubKey);
+                console.log(`[Consensus] 📜 Registered Initial Validator: ${vId}`);
+            });
+        } else {
+            // Fallback for older configs
+            this.validatorPool.registerValidator(systemValidatorId, sysUserId, GENESIS_VALIDATOR_PUBLIC_KEY);
+        }
 
         // 2. Set Online Status CORRECTLY
         // Only set online if WE are that validator (have the private key)
