@@ -5,7 +5,31 @@ import { motion } from 'framer-motion';
 import { NetworkGlobe } from '../components/3d/NetworkGlobe';
 import { Cuboid, Activity, Globe2 } from 'lucide-react';
 
+import { useState } from 'react';
+import { api } from '../services/api';
+
 export const LandingPage = () => {
+    const [loading, setLoading] = useState(false);
+    const [newWallet, setNewWallet] = useState<any>(null);
+
+    const handleCreateWallet = async () => {
+        const nickname = prompt("Enter a nickname for your new wallet:");
+        if (!nickname) return;
+
+        setLoading(true);
+        try {
+            const res = await api.createUser(nickname);
+            setNewWallet(res);
+            // Auto-mine to confirm
+            await api.mine(res.wallet.wallet_id);
+            alert(`✅ Wallet Created!\n\nID: ${res.wallet.wallet_id}\n\nPlease check console for credentials if in dev mode.`);
+        } catch (err: any) {
+            alert("❌ Error creating wallet: " + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="relative w-full h-screen overflow-hidden bg-pomegranate-950">
             {/* 3D Background */}
@@ -76,10 +100,58 @@ export const LandingPage = () => {
                     <a href="#" className="hover:text-white transition-colors">Blocks</a>
                     <a href="#" className="hover:text-white transition-colors">Transactions</a>
                 </div>
-                <button className="px-6 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm backdrop-blur-md">
-                    Connect Wallet
+                <button
+                    onClick={handleCreateWallet}
+                    disabled={loading}
+                    className="px-6 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm backdrop-blur-md disabled:opacity-50"
+                >
+                    {loading ? 'Creating...' : 'Create Wallet'}
                 </button>
             </motion.div>
+
+            {/* New Wallet Popup */}
+            {newWallet && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-auto">
+                    <div className="bg-pomegranate-950/90 border border-pomegranate-500/30 p-8 rounded-2xl max-w-md w-full text-left relative">
+                        <button onClick={() => setNewWallet(null)} className="absolute top-4 right-4 text-pomegranate-300 hover:text-white">✕</button>
+                        <h3 className="text-2xl font-bold text-seed-100 mb-4">Wallet Created!</h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs uppercase text-pomegranate-400 font-bold">Wallet ID</label>
+                                <div className="bg-black/50 p-3 rounded font-mono text-sm text-seed-200 break-all select-all">
+                                    {newWallet.wallet.wallet_id}
+                                </div>
+                            </div>
+
+                            {newWallet.credentials && (
+                                <div>
+                                    <label className="text-xs uppercase text-pomegranate-400 font-bold flex items-center gap-2">
+                                        Secret Mnemonic <span className="text-red-500 text-[10px]">(SAVE THIS SAFE!)</span>
+                                    </label>
+                                    <div className="bg-red-950/20 border border-red-500/20 p-3 rounded font-mono text-sm text-pomegranate-200 break-words select-all">
+                                        {newWallet.credentials.mnemonic}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="text-xs uppercase text-pomegranate-400 font-bold">Public Key</label>
+                                <div className="bg-black/50 p-3 rounded font-mono text-xs text-gray-400 break-all select-all">
+                                    {newWallet.user.public_key}
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setNewWallet(null)}
+                            className="w-full mt-6 py-3 bg-pomegranate-600 text-white rounded-lg font-bold hover:bg-pomegranate-500 transition-colors"
+                        >
+                            I have saved my keys
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
