@@ -97,16 +97,19 @@ export class BlockProducer extends EventEmitter {
                 if (producer) {
                     // Check if WE are this producer (do we have the private key?)
                     if (this.localValidators.has(producer.validator_id)) {
-                        // It is our turn! Produce the block.
-                        // Optimization: Don't spam logs, only log when starting production
-                        // console.log(`[Consensus] It's my turn (Round ${currentRound}). Producing block...`);
+                        console.log(`[Consensus] 🟢 It's my turn (Round ${currentRound}). Producer: ${producer.validator_id}. Mempool: ${this.mempool.getSize()}`);
                         await this.produceBlock();
                     } else {
                         // Not our turn. Wait.
-                        // console.log(`[Consensus] Round ${currentRound}: Waiting for ${producer.validator_id}`);
+                        // Optimization: Only log if we have something in mempool, to show we are waiting
+                        if (this.mempool.getSize() > 0) {
+                            console.log(`[Consensus] ⏳ Round ${currentRound}: Waiting for ${producer.validator_id} (Mempool: ${this.mempool.getSize()})`);
+                        }
                     }
                 } else {
-                    console.warn('[Consensus] No producer selected for this round.');
+                    console.warn('[Consensus] ⚠️ No producer selected for this round. Check active validators.');
+                    // Force start if mempool has items and we are local admin?
+                    // No, that breaks consensus.
                 }
             } catch (err) {
                 console.error('[Consensus] Loop Error:', err);

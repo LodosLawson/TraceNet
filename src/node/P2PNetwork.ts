@@ -626,7 +626,7 @@ export class P2PNetwork {
 
         const result = this.blockchain.receiveBlock(block);
         if (result.success) {
-            console.log(`[P2P] Block ${block.index} added to chain`);
+            console.log(`[P2P] ✅ Verified and Added Block ${block.index} from Peer (Hash: ${block.hash.substring(0, 8)})`);
             // Stop my own mining if I was mining? (Handled by BlockProducer listening to Blockchain events ideally)
         } else {
             console.warn(`[P2P] Block ${block.index} rejected: ${result.error}`);

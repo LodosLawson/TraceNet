@@ -209,7 +209,8 @@ class BlockchainNode {
             // Keep myself online
             if (myValidatorId) {
                 setInterval(() => {
-                    this.validatorPool.updateHeartbeat(myValidatorId!);
+                    const currentHeight = this.blockchain.getLatestBlock().index;
+                    this.validatorPool.updateHeartbeat(myValidatorId!, currentHeight);
                 }, 10000);
             }
         } else {
