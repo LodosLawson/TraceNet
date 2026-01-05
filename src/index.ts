@@ -125,12 +125,20 @@ class BlockchainNode {
         // Compatibility/Migration: Check env if not in KeyStore
         // MODIFICATION: Allow Env Var fallback in Production because Cloud Run may not have secrets/keystore.json (gitignored)
         if (!sysPrivateKey) {
-            sysPrivateKey = process.env.VALIDATOR_PRIVATE_KEY;
-            if (sysPrivateKey) {
-                if (process.env.NODE_ENV !== 'production') {
-                    console.warn('[Security] ⚠️  Loaded validator key from .env (unsafe for production). Please migrate to KeyStore.');
-                } else {
-                    console.log('[Security] ℹ️  Loaded validator key from Environment Variable (Cloud Run Mode).');
+            const rawSysKey = process.env.VALIDATOR_PRIVATE_KEY;
+            if (rawSysKey) {
+                try {
+                    // Normalize to full 64-byte secret key
+                    const keyPair = KeyManager.getKeyPairFromPrivate(rawSysKey);
+                    sysPrivateKey = keyPair.privateKey;
+
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.warn('[Security] ⚠️  Loaded validator key from .env (unsafe for production). Please migrate to KeyStore.');
+                    } else {
+                        console.log('[Security] ℹ️  Loaded validator key from Environment Variable (Cloud Run Mode).');
+                    }
+                } catch (err) {
+                    console.error('[Config] ❌ Failed to load VALIDATOR_PRIVATE_KEY from env:', err);
                 }
             }
         }
@@ -198,8 +206,10 @@ class BlockchainNode {
         if (!nodeWalletPrivateKey) {
             if (process.env.NODE_WALLET_PRIVATE_KEY) {
                 // Cloud Run / Env Fallback
-                nodeWalletPrivateKey = process.env.NODE_WALLET_PRIVATE_KEY;
-                const keyPair = KeyManager.getKeyPairFromPrivate(nodeWalletPrivateKey);
+                // Cloud Run / Env Fallback
+                const rawNodeKey = process.env.NODE_WALLET_PRIVATE_KEY;
+                const keyPair = KeyManager.getKeyPairFromPrivate(rawNodeKey);
+                nodeWalletPrivateKey = keyPair.privateKey; // FIX: Use full 64-byte key
                 nodeWalletPublicKey = keyPair.publicKey;
 
                 if (process.env.NODE_ENV !== 'production') {
