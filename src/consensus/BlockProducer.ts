@@ -245,18 +245,30 @@ export class BlockProducer extends EventEmitter {
                     // Mempool.getTopTransactions returns them again.
                     // So yes, we should probably remove "Hard Invalid" transactions here to clean up.
                     // But `validateTransaction` might fail due to temporary reasons?
-                    // "Invalid Nonce" -> Might be future nonce? (Gap)
-                    // If it's a Gap, we should keep it.
-                    // If it's "Invalid Signature", remove it.
-                    // "Insufficient balance" -> Remove.
-
-                    // For safety, let's just skip them for this block.
-                    // The "Stall" protection is in the `else` block of `produceBlock` (if block add fails).
-                    // But if we filter them here, `addBlock` won't fail.
-                    // So we must manage mempool cleanup here or rely on expiration.
-                    // Let's rely on expiration for now to be safe, OR purge if clearly invalid.
-                    // Let's purge if it's NOT a nonce gap or time wait.
-                    if (validation.error && !validation.error.includes('wait') && !validation.error.includes('Invalid nonce')) {
+                    // "Invalid Nonce" -> Might be future nonce? (Gap) or Past nonce? (Stale)
+                    if (validation.error && validation.error.includes('Invalid nonce')) {
+                        // Check if it's a "Future" nonce (Gap) - Keep it
+                        // Or "Past" nonce (Stale/Replay) - Remove it
+                        // Error format: "Invalid nonce. Expected A, got B"
+                        // If B < A, it's stale. If B > A, it's future.
+                        const match = validation.error.match(/Expected (\d+), got (\d+)/);
+                        if (match) {
+                            const expected = parseInt(match[1]);
+                            const got = parseInt(match[2]);
+                            if (got < expected) {
+                                console.warn(`[BlockProducer] 🗑️ Purging STALE tx ${tx.tx_id.substring(0, 8)} (Nonce ${got} < ${expected})`);
+                                this.mempool.removeTransaction(tx.tx_id);
+                            } else {
+                                console.log(`[BlockProducer] Keeping FUTURE tx ${tx.tx_id.substring(0, 8)} (Nonce ${got} > ${expected})`);
+                            }
+                        } else {
+                            // Can't parse, remove to be safe? Or keep?
+                            // Default to keep unless we are sure.
+                            console.warn(`[BlockProducer] Skipping ambiguous nonce error for ${tx.tx_id.substring(0, 8)}: ${validation.error}`);
+                        }
+                    } else if (validation.error && !validation.error.includes('wait')) {
+                        // Hard error (Signature, Balance, etc.) -> Remove
+                        console.warn(`[BlockProducer] 🗑️ Purging INVALID tx ${tx.tx_id.substring(0, 8)}: ${validation.error}`);
                         this.mempool.removeTransaction(tx.tx_id);
                     }
                 }
