@@ -7,6 +7,7 @@ export interface Validator {
     public_key: string;
     is_online: boolean;
     last_active: number;
+    last_seen_block_height: number; // NEW: Track activity by block height
     reputation: number;
     total_blocks_produced: number;
     total_signatures: number;
@@ -56,6 +57,7 @@ export class ValidatorPool {
             public_key: publicKey,
             is_online: false,
             last_active: Date.now(),
+            last_seen_block_height: 0, // Initialize
             reputation: 100.0,
             total_blocks_produced: 0,
             total_signatures: 0,
@@ -92,15 +94,34 @@ export class ValidatorPool {
     /**
      * Update validator heartbeat
      */
-    updateHeartbeat(validatorId: string): void {
+    updateHeartbeat(validatorId: string, currentBlockHeight: number = 0): void {
         const validator = this.validators.get(validatorId);
         if (validator) {
             validator.last_active = Date.now();
+            // Only update height if greater than previous (monotonicity)
+            if (currentBlockHeight > validator.last_seen_block_height) {
+                validator.last_seen_block_height = currentBlockHeight;
+            }
             validator.is_online = true;
             this.onlineValidators.add(validatorId);
-            this.validators.set(validatorId, validator);
+            this.validators.set(validatorId, validator); // Map update? needed if object ref is same?
         }
     }
+
+    /**
+     * Get validators active since a specific block height
+     * Used for Epoch rewards
+     */
+    getValidatorsActiveSinceBlock(minBlockHeight: number): Validator[] {
+        const activeValidators: Validator[] = [];
+        for (const validator of this.validators.values()) {
+            if (validator.last_seen_block_height >= minBlockHeight) {
+                activeValidators.push(validator);
+            }
+        }
+        return activeValidators;
+    }
+
 
     /**
      * Get online validators

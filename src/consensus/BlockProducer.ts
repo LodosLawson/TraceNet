@@ -268,12 +268,19 @@ export class BlockProducer extends EventEmitter {
             // NEW: Epoch Rewards (Every 200 blocks)
             // We check the NEXT block index (nextIndex)
             // If nextIndex % 200 === 0, we verify and distribute
-            // UPDATE: Distribute to ALL validators (User Request), not just online ones
-            const allValidators = this.validatorPool.getAllValidators().map(v => v.validator_id);
-            const epochRewards = this.rewardDistributor.distributeEpochRewards(nextIndex, allValidators);
+
+            // UPDATE: Distribute to validators active WITHIN the epoch (User Request)
+            // "Active" means they sent a heartbeat or produced a block within the last 200 blocks.
+            // Using Block Height based tracking solely.
+            const EPOCH_LENGTH = 200;
+            const minActiveBlock = Math.max(0, nextIndex - EPOCH_LENGTH);
+
+            const eligibleValidators = this.validatorPool.getValidatorsActiveSinceBlock(minActiveBlock).map(v => v.validator_id);
+
+            const epochRewards = this.rewardDistributor.distributeEpochRewards(nextIndex, eligibleValidators);
 
             if (epochRewards.length > 0) {
-                console.log(`[BlockProducer] Including ${epochRewards.length} Epoch Reward transactions in Block ${nextIndex} (All Validators)`);
+                console.log(`[BlockProducer] Including ${epochRewards.length} Epoch Reward transactions in Block ${nextIndex} (Validators active since Block ${minActiveBlock})`);
                 // These are TransactionModel objects. Need to convert to Transaction interface or similar?
                 // TransactionModel usually implements Transaction.
                 // We add them to the FRONT of the validTransactions list to ensure they are processed first?

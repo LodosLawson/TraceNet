@@ -310,9 +310,20 @@ export class P2PNetwork {
             socket.on('p2p:sendChain', (data: any) => {
                 this.handleReceiveChain(data);
             });
-
             socket.on('p2p:requestPeers', () => {
                 socket.emit('p2p:sendPeers', Array.from(this.knownPeers));
+            });
+
+            socket.on('p2p:heartbeat', (data: any) => {
+                // console.log(`[P2P] ❤️ Heartbeat from ${data.validatorId}`);
+                // Pass current block height to track activity based on blocks
+                if (data.validatorId) {
+                    // Update validator status if handshake identifies a validator
+                    // We can trust payload.validatorId partially, but should verify signature ideally.
+                    // For now, in V3 prototype, we assume P2P trust or add signature later.
+                    const currentHeight = this.blockchain.getLatestBlock().index;
+                    this.validatorPool.updateHeartbeat(data.validatorId, currentHeight);
+                }
             });
 
             // Clean up IP tracking when socket disconnects
