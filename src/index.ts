@@ -587,13 +587,26 @@ class BlockchainNode {
             console.log('[GCS] Checking for cloud backup...');
             const gcsChain = await this.cloudBackup.restore();
 
-            if (gcsChain && gcsChain.length > savedChain.length) {
-                console.log(`[GCS] ✅ Restoring from cloud: ${gcsChain.length} blocks`);
-                const success = this.blockchain.restoreChain(gcsChain);
-                if (success) {
-                    console.log(`⛓️  Chain restored from GCS`);
+            if (gcsChain && gcsChain.length > (savedChain ? savedChain.length : 0)) {
+                // GENESIS HASH CHECK FOR GCS
+                const loadedGenesisHash = gcsChain[0].hash;
+                const currentGenesisHash = this.blockchain.getChain()[0].hash;
+
+                if (loadedGenesisHash !== currentGenesisHash) {
+                    console.error('🚨 [GCS] Genesis Hash Mismatch in Cloud Backup!');
+                    console.error(`   Expected: ${currentGenesisHash}`);
+                    console.error(`   Found:    ${loadedGenesisHash}`);
+                    console.warn('[Startup] 🧹 Wiping database to sync with correct network...');
+                    await this.localDb.clear();
+                    console.log('[Startup] Database wiped. Starting fresh (Ignoring incompatible GCS backup).');
                 } else {
-                    console.error('[GCS] Failed to restore from cloud, using local DB');
+                    console.log(`[GCS] ✅ Restoring from cloud: ${gcsChain.length} blocks`);
+                    const success = this.blockchain.restoreChain(gcsChain);
+                    if (success) {
+                        console.log(`⛓️  Chain restored from GCS`);
+                    } else {
+                        console.error('[GCS] Failed to restore from cloud, using local DB');
+                    }
                 }
             } else if (savedChain && savedChain.length > 0) {
                 // GENESIS HASH CHECK
