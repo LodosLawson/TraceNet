@@ -56,7 +56,7 @@ export class BlockProducer extends EventEmitter {
     }
 
     /**
-     * Start block production (event-driven)
+     * Start block production (Consensus Loop)
      */
     start(): void {
         if (this.isProducing) {
@@ -64,32 +64,53 @@ export class BlockProducer extends EventEmitter {
         }
 
         this.isProducing = true;
+        console.log('Starting Consensus Loop...');
 
-        // Check for existing transactions in mempool at startup
-        const existingTxCount = this.mempool.getSize();
-        if (existingTxCount > 0) {
-            console.log(`Found ${existingTxCount} existing transaction(s) in mempool, scheduling initial block production...`);
-            // Schedule initial block production with small delay
-            setTimeout(() => {
-                if (this.isProducing) {
-                    this.produceBlock();
-                }
-            }, 1000);
+        // Check for existing transactions on startup
+        if (this.mempool.getSize() > 0) {
+            console.log(`[Consensus] Found ${this.mempool.getSize()} pending transactions.`);
         }
 
-        // Listen for new transactions in mempool
-        this.mempool.on('transactionAdded', () => {
-            // Use a small delay to batch multiple transactions into one block
-            if (this.productionInterval) {
-                clearTimeout(this.productionInterval);
+        // CONSENSUS POLLING LOOP (1000ms)
+        // Checks eligibility every second to handle round changes and timeouts
+        this.productionInterval = setInterval(async () => {
+            if (!this.isProducing) return;
+
+            // 1. Check if there are transactions to mine
+            if (this.mempool.getSize() === 0) return;
+
+            // 2. Determine if it is our turn to produce
+            try {
+                const latestBlock = this.blockchain.getLatestBlock();
+                const nextIndex = latestBlock.index + 1;
+
+                const elapsedTime = Date.now() - latestBlock.timestamp;
+                const currentRound = Math.max(0, Math.floor(elapsedTime / this.blockTime));
+
+                // Select expected producer for this round
+                const producer = this.validatorPool.selectBlockProducer(nextIndex, latestBlock.hash, currentRound);
+
+                if (producer) {
+                    // Check if WE are this producer (do we have the private key?)
+                    if (this.localValidators.has(producer.validator_id)) {
+                        // It is our turn! Produce the block.
+                        // Optimization: Don't spam logs, only log when starting production
+                        // console.log(`[Consensus] It's my turn (Round ${currentRound}). Producing block...`);
+                        await this.produceBlock();
+                    } else {
+                        // Not our turn. Wait.
+                        // console.log(`[Consensus] Round ${currentRound}: Waiting for ${producer.validator_id}`);
+                    }
+                } else {
+                    console.warn('[Consensus] No producer selected for this round.');
+                }
+            } catch (err) {
+                console.error('[Consensus] Loop Error:', err);
             }
 
-            this.productionInterval = setTimeout(() => {
-                this.produceBlock();
-            }, 2000); // 2 second delay to batch transactions
-        });
+        }, 1000); // Check every second
 
-        console.log('Block production started (event-driven mode)');
+        console.log('✅ Consensus Loop Active. Waiting for turn...');
     }
 
     /**
@@ -102,11 +123,8 @@ export class BlockProducer extends EventEmitter {
 
         this.isProducing = false;
 
-        // Remove event listener
-        this.mempool.removeAllListeners('transactionAdded');
-
         if (this.productionInterval) {
-            clearTimeout(this.productionInterval);
+            clearInterval(this.productionInterval); // Use clearInterval for polling
             this.productionInterval = null;
         }
 
