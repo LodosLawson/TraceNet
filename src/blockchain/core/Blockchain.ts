@@ -3,7 +3,7 @@ import { GENESIS_BLOCK_DATA } from '../config/GenesisBlock';
 import { Transaction, TransactionModel, TransactionType } from '../models/Transaction';
 import { KeyManager } from '../crypto/KeyManager';
 import { ValidatorPool } from '../../consensus/ValidatorPool';
-import { TOKEN_CONFIG } from '../../economy/TokenConfig';
+import { TOKEN_CONFIG, TREASURY_ADDRESSES } from '../../economy/TokenConfig';
 import { MiningPool } from '../../consensus/MiningPool'; // NEW: Mining Pool
 
 /**
@@ -802,6 +802,9 @@ export class Blockchain extends EventEmitter {
                 // We just skip it.
                 // This prevents DoS where one bad tx kills the whole batch.
 
+                // Accumulate fees collected from inner transactions to credit the Validator
+                let totalCollectedFees = 0;
+
                 for (const innerTx of tx.payload.transactions) {
                     try {
                         // Apply inner transaction logic (e.g. deduct fee from user, increment user nonce)
@@ -859,6 +862,48 @@ export class Blockchain extends EventEmitter {
                         userAccount.balance -= innerTx.amount;
                         userAccount.nonce = innerTx.nonce;
 
+                        // FEE DISTRIBUTION (V2.6 - RECYCLING UPDATE)
+                        const fee = innerTx.amount;
+                        const pPool = TOKEN_CONFIG.FEE_TO_POOL_PERCENT / 100;       // 0.37
+                        const pDev = TOKEN_CONFIG.FEE_TO_DEV_PERCENT / 100;         // 0.08
+                        const pRecycle = TOKEN_CONFIG.FEE_TO_RECYCLE_PERCENT / 100; // 0.15
+                        // Primary share gets remainder (approx 0.40)
+
+                        const poolShare = Math.floor(fee * pPool);
+                        const devShare = Math.floor(fee * pDev);
+                        const recycleShare = Math.floor(fee * pRecycle);
+                        const primaryShare = fee - poolShare - devShare - recycleShare;
+
+                        // 1. Validator Pool Share (37%)
+                        const poolAddr = TREASURY_ADDRESSES.validator_pool;
+                        const poolAcc = state.get(poolAddr) || { address: poolAddr, balance: 0, nonce: 0 };
+                        poolAcc.balance += poolShare;
+                        state.set(poolAddr, poolAcc);
+
+                        // 2. Dev/Treasury Share (8%)
+                        const devAddr = TREASURY_ADDRESSES.development;
+                        const devAcc = state.get(devAddr) || { address: devAddr, balance: 0, nonce: 0 };
+                        devAcc.balance += devShare;
+                        state.set(devAddr, devAcc);
+
+                        // 3. Recycle Share (15%) - Returns to System Supply
+                        const recycleAddr = TREASURY_ADDRESSES.recycle;
+                        const recycleAcc = state.get(recycleAddr) || { address: recycleAddr, balance: 0, nonce: 0 };
+                        recycleAcc.balance += recycleShare;
+                        state.set(recycleAddr, recycleAcc);
+
+                        // 4. Primary Share (40%)
+                        // If Social, goes to Content Creator. If Message/Transfer, return to System (Main Treasury).
+                        let primaryAddr = TREASURY_ADDRESSES.main;
+                        if (['LIKE', 'COMMENT', 'SHARE', 'POST_ACTION', 'FOLLOW', 'UNFOLLOW'].includes(innerTx.type)) {
+                            // Correct: Social interactions pay the target user (Creator/Profile)
+                            primaryAddr = innerTx.to_wallet;
+                        }
+
+                        const primaryAcc = state.get(primaryAddr) || { address: primaryAddr, balance: 0, nonce: 0 };
+                        primaryAcc.balance += primaryShare;
+                        state.set(primaryAddr, primaryAcc);
+
                         // Update state
                         state.set(innerTx.from_wallet, userAccount);
 
@@ -867,6 +912,11 @@ export class Blockchain extends EventEmitter {
                         continue;
                     }
                 }
+
+                // Credit the Validator (Batch Sender) -> REMOVED.
+                // Fees are now distributed to the System Pool/Treasury directly.
+                // Validator gets paid via MiningPool distributions (Epochs).
+
 
                 // Validator pays for the batch wrapper?
                 // Usually negligible or covered by block reward.

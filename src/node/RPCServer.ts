@@ -6,7 +6,7 @@ import { Blockchain } from '../blockchain/core/Blockchain';
 import { Mempool } from './Mempool';
 import { WalletService } from '../wallet/WalletService';
 import { ValidatorPool } from '../consensus/ValidatorPool';
-import { TransactionModel, Transaction, InnerTransaction } from '../blockchain/models/Transaction';
+import { TransactionModel, Transaction, InnerTransaction, TransactionType } from '../blockchain/models/Transaction';
 import { KeyManager } from '../blockchain/crypto/KeyManager';
 import { UserService } from '../services/user/UserService';
 import { ContentService } from '../services/ContentService';
@@ -17,10 +17,8 @@ import { BlockProducer } from '../consensus/BlockProducer';
 
 
 
-/**
- * Fee threshold for Fast Lane (Immediate Mining)
- */
-const FAST_LANE_FEE = 0.00001;
+import { TOKEN_CONFIG } from '../economy/TokenConfig';
+
 
 /**
  * RPC Server for blockchain node
@@ -2074,8 +2072,14 @@ export class RPCServer {
 
         const toBatch = candidates.filter((msg: InnerTransaction) => {
             // FAST logic
-            if (msg.amount >= FAST_LANE_FEE) {
+            if (msg.amount >= TOKEN_CONFIG.FEE_TIERS.FAST) {
                 console.log(`[RPC] Candidate MATCHED Fast Lane: ${msg.amount}`);
+                return true;
+            }
+
+            // BATCH logic: Always promote ready-made batches from pool
+            if (msg.type === TransactionType.BATCH || msg.type === TransactionType.CONVERSATION_BATCH) {
+                console.log(`[RPC] Promoting READY BATCH: ${(msg as any).tx_id}`);
                 return true;
             }
 
@@ -2084,8 +2088,11 @@ export class RPCServer {
 
             // NORMAL/SLOW logic
             const age = now - (msg.timestamp || now);
-            if (msg.amount >= 0.000005) return age >= 600000;
-            return age >= 3600000;
+            // If fee >= NORMAL (but < FAST), wait 10 mins
+            if (msg.amount >= TOKEN_CONFIG.FEE_TIERS.NORMAL) return age >= 10 * 60 * 1000;
+
+            // Otherwise (Low fee), wait 1 hour
+            return age >= 60 * 60 * 1000;
         });
 
         if (toBatch.length > 0) {
@@ -2190,8 +2197,8 @@ export class RPCServer {
 
                 // OPTIMIZATION: Instant Mining for FAST messages
                 // If fee is high enough (FAST_LANE), trigger batching & mining immediately
-                if (innerTx.amount >= FAST_LANE_FEE) {
-                    console.log(`[RPC] Fast Message detected (Fee: ${innerTx.amount} >= ${FAST_LANE_FEE}). Promoting...`);
+                if (innerTx.amount >= TOKEN_CONFIG.FEE_TIERS.FAST) {
+                    console.log(`[RPC] Fast Message detected (Fee: ${innerTx.amount} >= ${TOKEN_CONFIG.FEE_TIERS.FAST}). Promoting...`);
 
                     // 1. Promote to Mempool immediately
                     this.promotePendingMessagesToMempool('FAST');
@@ -2201,7 +2208,7 @@ export class RPCServer {
                         .then(res => console.log(`[RPC] Instant mining result: ${res.success} - ${res.message || 'No msg'}`))
                         .catch(err => console.error("[RPC] Instant mining failed:", err));
                 } else {
-                    console.log(`[RPC] Standard Message (Fee: ${innerTx.amount} < ${FAST_LANE_FEE}). Waiting in pool.`);
+                    console.log(`[RPC] Standard Message (Fee: ${innerTx.amount} < ${TOKEN_CONFIG.FEE_TIERS.FAST}). Waiting in pool.`);
                 }
 
             } else {
@@ -2243,11 +2250,11 @@ export class RPCServer {
             const allMessages = this.messagePool.getMessages(1000, 0);
             res.json({
                 count: allMessages.length,
-                fast_threshold: FAST_LANE_FEE,
+                fast_threshold: TOKEN_CONFIG.FEE_TIERS.FAST,
                 messages: allMessages.map((m: any) => ({
                     id: `${m.from_wallet}:${m.nonce}`,
                     amount: m.amount,
-                    is_fast: m.amount >= FAST_LANE_FEE,
+                    is_fast: m.amount >= TOKEN_CONFIG.FEE_TIERS.FAST,
                     age_ms: Date.now() - m.timestamp
                 }))
             });

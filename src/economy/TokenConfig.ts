@@ -9,13 +9,23 @@ export const TOKEN_CONFIG = {
     INITIAL_MARKET_CAP_USD: 1000,
     INITIAL_PRICE_USD: 0.00001, // $1000 / 100M
 
+    // Fee Tiers (in LT)
+    // FAST: Instant Mining (Individual)
+    // NORMAL: 10 Minute Batch
+    // LOW: 1 Hour Batch
+    FEE_TIERS: {
+        FAST: 0.00001,      // 1000 units
+        NORMAL: 0.0000001,  // 10 units
+        LOW: 0.00000001     // 1 unit
+    },
+
     // Fees - Node wallet gets 50% if registered, remaining split varies by transaction type
     // Transfer: 50% node, 50% treasury
     // Social (like/comment/follow): 50% node, 25% content owner, 25% treasury
-    MESSAGE_FEE: 200, // 0.000002 LT (doubled)
-    LIKE_FEE: 2000, // 0.00002 LT (doubled)
-    COMMENT_FEE: 2000, // 0.00002 LT (doubled)
-    SHARE_FEE: 2000, // 0.00002 LT (doubled)
+    MESSAGE_FEE: 200, // 0.000002 LT (Normal Tier)
+    LIKE_FEE: 500, // 0.000005 LT (Normal Tier - was 2000/Fast)
+    COMMENT_FEE: 500, // 0.000005 LT (Normal Tier - was 2000/Fast)
+    SHARE_FEE: 500, // 0.000005 LT (Normal Tier - was 2000/Fast)
     FOLLOW_FEE: 100, // 0.000001 LT (half of message fee)
     UNFOLLOW_FEE: 100, // 0.000001 LT (half of message fee)
     PRIVACY_UPDATE_FEE: 500, // 0.000005 LT
@@ -44,11 +54,10 @@ export const TOKEN_CONFIG = {
 
     // Fee split percentages
     // Fee split percentages
-    // Fee split percentages
-    FEE_TO_PRIMARY_PERCENT: 50, // 50% (Content Creator)
-    FEE_TO_POOL_PERCENT: 40,    // 40% (Validator Pool - Distributed every 200 blocks)
-    FEE_TO_RECYCLE_PERCENT: 0,  // 0% (No Burn)
-    FEE_TO_DEV_PERCENT: 10,     // 10% (Treasury/Network Reserve)
+    FEE_TO_PRIMARY_PERCENT: 40, // 40% (Content Creator - Reduced from 50%)
+    FEE_TO_POOL_PERCENT: 37,    // 37% (Validator Pool - Reduced from 40%)
+    FEE_TO_DEV_PERCENT: 8,      // 8% (Treasury - Reduced from 10%)
+    FEE_TO_RECYCLE_PERCENT: 15, // 15% (Returns to Total Supply/Recycle System)
 
     // Deprecated but kept for compatibility until full refactor
     FEE_TO_NODE_OWNER_PERCENT: 45,
@@ -64,6 +73,7 @@ export const TREASURY_ADDRESSES = {
     reserve: 'TREASURY_RESERVE',
     development: 'TREASURY_DEV',
     validator_pool: 'VALIDATOR_POOL', // Accumulates 40% of fees for Epoch distribution
+    recycle: 'TREASURY_RECYCLE', // Accumulates recycled fees (15%) to be returned to supply
 };
 
 /**

@@ -1,5 +1,6 @@
 import { InnerTransaction, TransactionType } from '../blockchain/models/Transaction';
 import EventEmitter from 'events';
+import { TOKEN_CONFIG } from '../economy/TokenConfig';
 
 /**
  * Message pool entry
@@ -22,8 +23,9 @@ export class MessagePool extends EventEmitter {
     // Batching State
     // "NORMAL" -> 10 mins
     // "LOW" -> 60 mins
-    private batchWindows: Map<string, number> = new Map(); // priority -> endTime
-    private pendingBatches: Map<string, InnerTransaction[]> = new Map(); // priority -> messages[]
+    // Batching State
+    private batchWindows: Map<string, number> = new Map(); // key (tier_category) -> endTime
+    private pendingBatches: Map<string, InnerTransaction[]> = new Map(); // key -> messages[]
 
     constructor(maxSize: number = 50000, expirationTime: number = 24 * 60 * 60 * 1000) {
         super();
@@ -32,8 +34,9 @@ export class MessagePool extends EventEmitter {
         this.expirationTime = expirationTime;
 
         // Initialize batch containers
-        this.pendingBatches.set('NORMAL', []);
-        this.pendingBatches.set('LOW', []);
+
+        // Initialize batch containers will be dynamic based on keys
+
     }
 
     /**
@@ -65,42 +68,51 @@ export class MessagePool extends EventEmitter {
         // But `InnerTransaction` doesn't have a 'priority' string field.
         // We use Fee Thresholds.
 
-        const FEE_FAST = 0.00001;
-        const FEE_STANDARD = 0.0000001; // Normal
-        const FEE_LOW = 0.00000001;     // Low
+        const { FAST, NORMAL, LOW } = TOKEN_CONFIG.FEE_TIERS;
 
         let tier = 'FAST';
-        if (message.amount < FEE_FAST) {
-            if (message.amount >= FEE_STANDARD) tier = 'NORMAL';
+        if (message.amount < FAST) {
+            if (message.amount >= NORMAL) tier = 'NORMAL';
             else tier = 'LOW';
         }
 
         if (tier === 'NORMAL' || tier === 'LOW') {
-            const now = Date.now();
-            let endTime = this.batchWindows.get(tier);
+            const category = this.getCategory(message.type);
+            const batchKey = `${tier}_${category}`;
 
-            if (!endTime || now > endTime) {
-                // Start new window
-                const duration = tier === 'NORMAL' ? 10 * 60 * 1000 : 60 * 60 * 1000;
-                endTime = now + duration;
-                this.batchWindows.set(tier, endTime);
-                // Clear old batch if any remaining (should have been flushed, but just in case)
-                this.pendingBatches.set(tier, []);
-                console.log(`[MessagePool] Starting new ${tier} batch window. Ends at ${new Date(endTime).toISOString()}`);
+            // If category is NONE (e.g. Transfer), treat as individual/FAST regardless of fee? 
+            // Or maybe batch transfers too? User only asked for Social/Messages.
+            // Let's force transfers to individual for now unless low fee.
+            if (category === 'NONE') {
+                // Fallthrough to individual pool
+            } else {
+                const now = Date.now();
+                let endTime = this.batchWindows.get(batchKey);
+
+                if (!endTime || now > endTime) {
+                    // Start new window
+                    // const duration = tier === 'NORMAL' ? 10 * 60 * 1000 : 60 * 60 * 1000;
+                    // For dev/testing, let's keep it smaller or configurable?
+                    // User said "10 minutes".
+                    const duration = tier === 'NORMAL' ? 10 * 60 * 1000 : 60 * 60 * 1000;
+
+                    endTime = now + duration;
+                    this.batchWindows.set(batchKey, endTime);
+                    this.pendingBatches.set(batchKey, []);
+                    console.log(`[MessagePool] Starting new ${batchKey} batch window. Ends at ${new Date(endTime).toISOString()}`);
+                }
+
+                // Add to pending batch
+                let batch = this.pendingBatches.get(batchKey);
+                if (!batch) {
+                    batch = [];
+                    this.pendingBatches.set(batchKey, batch);
+                }
+                batch.push(message);
+
+                this.emit('messageAdded', message);
+                return { success: true };
             }
-
-            // Add to pending batch
-            const batch = this.pendingBatches.get(tier)!;
-            batch.push(message);
-
-            // We verify ID uniqueness inside batch too?
-            // Simple check
-            // We also add to main pool? 
-            // NO. Pending batch messages are NOT in the main pool for individual mining.
-            // They are held separately.
-
-            this.emit('messageAdded', message); // Emit so UI sees it
-            return { success: true };
         }
 
         // FAST messages go to standard pool
@@ -134,67 +146,44 @@ export class MessagePool extends EventEmitter {
 
         // CHECK BATCH WINDOWS
         // If a window has closed, we create a BATCH transaction and include it
-        ['NORMAL', 'LOW'].forEach(tier => {
-            const endTime = this.batchWindows.get(tier);
-            const pending = this.pendingBatches.get(tier) || [];
+        // CHECK BATCH WINDOWS
+        // Iterate all active windows
+        for (const [key, endTime] of this.batchWindows.entries()) {
+            const pending = this.pendingBatches.get(key) || [];
 
-            if (endTime && now >= endTime && pending.length > 0) {
-                console.log(`[MessagePool] Closing ${tier} batch window. Bundling ${pending.length} messages.`);
+            if (now >= endTime && pending.length > 0) {
+                console.log(`[MessagePool] Closing ${key} batch window. Bundling ${pending.length} messages.`);
 
-                // Create BATCH Transaction
-                // Note: The Miner/Validator calls getMessages. 
-                // We construct a BATCH tx here.
-                // The 'from_wallet' should be the Validator's ID? 
-                // We don't have the validator's private key here to sign.
-                // However, BATCH txs might be 'unsigned' container types if the block itself is signed?
-                // OR the Validator constructs it. 
-                // Detailed Design: "Validator ... signs the batch container".
-                // Detailed Design: MessagePool gives raw messages. Validator constructs block.
-                // If we return a "BATCH" type object here, the validator needs to sign it.
-                // But `getMessages` returns `InnerTransaction[]`.
-                // We'll wrap it in a special InnerTransaction or assume Validator handles it?
-                // Let's create a BATCH tx but we need a way to pass it.
-
-                // Hack/Pattern: We return a special "Pseudo-Transaction" that the Validator recognizes
-                // OR we just return the raw messages but the Validator logic in `RPCServer` or `Miner` needs to batch them.
-
-                // Better approach for this architecture:
-                // `MessagePool` is just a pool. 
-                // But the requirement says "Wait 10 mins then batch".
-                // If we just return them individually, the miner might include them individually.
-                // WE MUST BUNDLE THEM.
-
-                // We create a BATCH transaction. 
-                // Sender = "SYSTEM_BATCHER" (or similar placeholder), Signature = "PENDING_VALIDATOR_SIGN"
-                // The Block Creator (Miner) sees this, signs it, and puts it in block.
+                const category = key.split('_')[1]; // NORMAL_SOCIAL -> SOCIAL
+                const batchType = category === 'MESSAGE' ? TransactionType.CONVERSATION_BATCH : TransactionType.BATCH;
 
                 const batchTx: any = {
-                    type: 'BATCH', // or CONVERSATION_BATCH
-                    from_wallet: 'SYSTEM', // Miner will replace with their ID
+                    type: batchType,
+                    from_wallet: 'SYSTEM',
                     to_wallet: 'SYSTEM',
                     amount: 0,
-                    fee: 0, // Validator decides?
-                    nonce: 0, // Validator sets
+                    fee: 0,
+                    nonce: 0,
                     timestamp: now,
                     payload: {
-                        transactions: [...pending] // Copy
+                        transactions: [...pending]
                     },
-                    signature: '', // Miner signs
-                    tx_id: `BATCH-${tier}-${now}`
+                    signature: '',
+                    tx_id: `BATCH-${key}-${now}`
                 };
 
                 entries.push({
                     message: batchTx,
                     addedAt: now,
-                    priority: 99999, // High priority to ensure inclusion
+                    priority: 99999, // High priority
                     id: batchTx.tx_id
                 });
 
                 // Clear pending
-                this.pendingBatches.set(tier, []);
-                this.batchWindows.delete(tier);
+                this.pendingBatches.set(key, []);
+                this.batchWindows.delete(key);
             }
-        });
+        }
 
         // Sort by priority (descending)
         entries.sort((a, b) => b.priority - a.priority);
@@ -257,10 +246,23 @@ export class MessagePool extends EventEmitter {
         return {
             size: this.pool.size,
             totalPendingFees: Array.from(this.pool.values()).reduce((sum, e) => sum + e.message.amount, 0),
-            pendingBatches: {
-                NORMAL: this.pendingBatches.get('NORMAL')?.length || 0,
-                LOW: this.pendingBatches.get('LOW')?.length || 0
-            }
+            pendingBatches: Array.from(this.pendingBatches.entries()).map(([k, v]) => `${k}: ${v.length}`)
         };
+    }
+
+    private getCategory(type: TransactionType): 'SOCIAL' | 'MESSAGE' | 'NONE' {
+        switch (type) {
+            case TransactionType.LIKE:
+            case TransactionType.COMMENT:
+            case TransactionType.SHARE:
+            case TransactionType.POST_CONTENT:
+            case TransactionType.FOLLOW:
+            case TransactionType.UNFOLLOW:
+                return 'SOCIAL';
+            case TransactionType.PRIVATE_MESSAGE:
+                return 'MESSAGE';
+            default:
+                return 'NONE';
+        }
     }
 }

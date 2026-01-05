@@ -1,10 +1,22 @@
-
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Sphere, Box, Stars, Line } from '@react-three/drei';
+import { Sphere, Stars, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-// Helper to convert lat/lng to 3D vector
+// --- Constants & Config ---
+const GLOBE_RADIUS = 2;
+const NODE_COUNT = 80; // Increased density
+const CONNECTION_DISTANCE = 1.8; // Connection threshold
+const COLORS = {
+    background: '#1a0b0c', // Darkest Red/Black
+    globeBase: '#2f0205',  // Deep Pomegranate
+    globeWire: '#d90429',  // Bright Pomegranate
+    node: '#ef233c',       // High-vis Red
+    connection: '#ffb703', // Gold
+    active: '#ffffff'
+};
+
+// --- Helpers ---
 const getPosition = (lat: number, lng: number, radius: number) => {
     const phi = (90 - lat) * (Math.PI / 180);
     const theta = (lng + 180) * (Math.PI / 180);
@@ -14,109 +26,169 @@ const getPosition = (lat: number, lng: number, radius: number) => {
     return new THREE.Vector3(x, y, z);
 };
 
-// Generate random "Seed" nodes
-const generateNodes = (count: number, radius: number) => {
-    return Array.from({ length: count }).map((_, i) => ({
-        id: i,
-        lat: (Math.random() - 0.5) * 160, // Avoid poles
-        lng: (Math.random() - 0.5) * 360,
-        position: getPosition((Math.random() - 0.5) * 160, (Math.random() - 0.5) * 360, radius)
-    }));
+// Generate curved paths (Quadratic Bezier)
+const getCurve = (p1: THREE.Vector3, p2: THREE.Vector3) => {
+    const distance = p1.distanceTo(p2);
+    // Find midpoint
+    const mid = p1.clone().add(p2).multiplyScalar(0.5);
+    // Push midpoint OUT directly from center to create arc
+    const midLength = mid.length();
+    mid.normalize().multiplyScalar(midLength + distance * 0.5); // Curve height depends on distance
+
+    const curve = new THREE.QuadraticBezierCurve3(p1, mid, p2);
+    // Get distinct points
+    return curve.getPoints(20);
 };
 
-const NodeSeed = ({ position }: { position: THREE.Vector3 }) => {
-    const meshRef = useRef<THREE.Mesh>(null);
-    useFrame((state) => {
-        if (meshRef.current) {
-            meshRef.current.rotation.x += 0.01;
-            meshRef.current.rotation.y += 0.02;
-            // Pulse effect
-            const s = 1 + Math.sin(state.clock.elapsedTime * 2) * 0.1;
-            meshRef.current.scale.set(s, s, s);
-        }
-    });
+// --- Sub-Components ---
 
+const GlobeBase = () => {
     return (
-        <Box args={[0.08, 0.08, 0.08]} position={position} ref={meshRef}>
-            <meshStandardMaterial
-                color="#ef233c" // Pomegranate 500
-                emissive="#d90429"
-                emissiveIntensity={2}
-                roughness={0.2}
-                metalness={0.8}
-            />
-        </Box>
+        <group>
+            {/* Core Dark Sphere */}
+            <Sphere args={[GLOBE_RADIUS - 0.02, 64, 64]}>
+                <meshStandardMaterial
+                    color={COLORS.globeBase}
+                    roughness={0.7}
+                    metalness={0.1}
+                    emissive={COLORS.globeBase}
+                    emissiveIntensity={0.2}
+                />
+            </Sphere>
+
+            {/* Glowing Atmosphere/Rim */}
+            <Sphere args={[GLOBE_RADIUS, 64, 64]}>
+                <meshPhongMaterial
+                    color={COLORS.globeWire}
+                    transparent
+                    opacity={0.1}
+                    side={THREE.BackSide} /* Inner glow */
+                    blending={THREE.AdditiveBlending}
+                />
+            </Sphere>
+
+            {/* Tech Wireframe Overlay */}
+            <Sphere args={[GLOBE_RADIUS + 0.01, 32, 32]}>
+                <meshBasicMaterial
+                    color={COLORS.globeWire}
+                    wireframe
+                    transparent
+                    opacity={0.08}
+                />
+            </Sphere>
+        </group>
     );
 };
 
-export const NetworkGlobe = () => {
-    const groupRef = useRef<THREE.Group>(null);
-    const radius = 2;
-    const nodes = useMemo(() => generateNodes(30, radius), []);
+const NodesInstanced = ({ nodes }: { nodes: any[] }) => {
+    const meshRef = useRef<THREE.InstancedMesh>(null);
+    const tempObj = new THREE.Object3D();
 
-    useFrame(() => {
-        if (groupRef.current) {
-            groupRef.current.rotation.y += 0.0005; // Slow rotation
-        }
+    useFrame((state) => {
+        if (!meshRef.current) return;
+
+        const time = state.clock.getElapsedTime();
+
+        nodes.forEach((node, i) => {
+            tempObj.position.copy(node.position);
+            // Subtle "breathing" scale animation based on ID and Time
+            const scale = 1 + Math.sin(time * 2 + node.id) * 0.2;
+            tempObj.scale.set(scale, scale, scale);
+            tempObj.lookAt(0, 0, 0); // Orient towards center (or away)
+            tempObj.updateMatrix();
+            meshRef.current!.setMatrixAt(i, tempObj.matrix);
+        });
+        meshRef.current.instanceMatrix.needsUpdate = true;
     });
 
-    // Connections between close nodes
-    const connections = useMemo(() => {
-        const lines: THREE.Vector3[][] = [];
-        nodes.forEach((node, i) => {
-            nodes.forEach((other, j) => {
-                if (i < j) {
-                    const dist = node.position.distanceTo(other.position);
-                    if (dist < 1.5) {
-                        lines.push([node.position, other.position]);
-                    }
+    return (
+        <instancedMesh ref={meshRef} args={[undefined as any, undefined as any, nodes.length]}>
+            <boxGeometry args={[0.06, 0.06, 0.06]} />
+            <meshBasicMaterial color={COLORS.node} toneMapped={false} />
+        </instancedMesh>
+    );
+};
+
+const DataArcs = ({ nodes }: { nodes: any[] }) => {
+    // We compute the geometry ONCE (or when nodes change).
+    // Using simple Lines for performance, but formatted as arcs.
+
+    const geometry = useMemo(() => {
+        const points: THREE.Vector3[] = [];
+
+        // Connect nearby nodes
+        for (let i = 0; i < nodes.length; i++) {
+            // Limit connections per node to avoid mess
+            let connections = 0;
+            for (let j = i + 1; j < nodes.length; j++) {
+                if (connections > 2) break; // Max 2 connections outgoing per node
+
+                const dist = nodes[i].position.distanceTo(nodes[j].position);
+                // Connect if moderately close but not too close (looks better)
+                if (dist < CONNECTION_DISTANCE && dist > 0.5) {
+                    const curvePoints = getCurve(nodes[i].position, nodes[j].position);
+                    points.push(...curvePoints);
+                    connections++;
                 }
-            });
-        });
-        return lines;
+            }
+        }
+
+        const geo = new THREE.BufferGeometry().setFromPoints(points);
+        return geo;
     }, [nodes]);
 
     return (
-        <group ref={groupRef}>
-            {/* Core Earth */}
-            <Sphere args={[radius - 0.05, 64, 64]}>
-                <meshPhongMaterial
-                    color="#2f0205" // Deep Pomegranate Background
-                    emissive="#4a0404"
-                    emissiveIntensity={0.2}
-                    shininess={10}
-                    specular={new THREE.Color('#ef233c')}
-                />
-            </Sphere>
+        <lineSegments geometry={geometry}>
+            <lineBasicMaterial
+                color={COLORS.connection}
+                transparent
+                opacity={0.15}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+            />
+        </lineSegments>
+    );
+};
 
-            {/* Wireframe Atmosphere */}
-            <Sphere args={[radius, 32, 32]}>
-                <meshBasicMaterial
-                    color="#d90429"
-                    wireframe
-                    transparent
-                    opacity={0.15}
-                />
-            </Sphere>
+// --- Main Component ---
 
-            {/* Nodes (Seeds) */}
-            {nodes.map((node) => (
-                <NodeSeed key={node.id} position={node.position} />
-            ))}
+export const NetworkGlobe = () => {
+    // Generate stable random nodes
+    const nodes = useMemo(() => {
+        return Array.from({ length: NODE_COUNT }).map((_, i) => {
+            const lat = (Math.random() - 0.5) * 160;
+            const lng = (Math.random() - 0.5) * 360;
+            return {
+                id: i,
+                position: getPosition(lat, lng, GLOBE_RADIUS),
+                lat,
+                lng
+            };
+        });
+    }, []);
 
-            {/* Connections */}
-            {connections.map((line, i) => (
-                <Line
-                    key={i}
-                    points={line}
-                    color="#ffb703" // Gold
-                    transparent
-                    opacity={0.3}
-                    lineWidth={1}
-                />
-            ))}
+    return (
+        <group>
+            <GlobeBase />
+            <NodesInstanced nodes={nodes} />
+            <DataArcs nodes={nodes} />
 
-            <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+            {/* Background Stars - Subtle */}
+            <Stars radius={150} depth={50} count={3000} factor={4} saturation={0} fade speed={0.5} />
+
+            {/* Ambient Light & Controls */}
+            <ambientLight intensity={0.5} color={COLORS.globeWire} />
+            <pointLight position={[10, 10, 10]} intensity={1} color="#ffffff" />
+
+            {/* Mobile Optimization: Allow touch rotation, disable zoom to prevent breaking layout */}
+            <OrbitControls
+                enableZoom={false}
+                enablePan={false}
+                autoRotate
+                autoRotateSpeed={0.8}
+                minPolarAngle={Math.PI / 4}
+                maxPolarAngle={Math.PI - Math.PI / 4}
+            />
         </group>
     );
 };
