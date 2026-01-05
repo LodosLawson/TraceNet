@@ -307,13 +307,20 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
 
         SecureLogger.log(`[Setup] 💰 Node Wallet Address: ${nodeWalletPublicKey}`);
 
+        const rewardConfig: RewardConfig = {
+            blockReward: parseInt(process.env.BLOCK_REWARD || '0', 10),
+            signatureReward: parseInt(process.env.SIGNATURE_REWARD || '0', 10),
+            feeDistributionPercent: parseInt(process.env.FEE_DISTRIBUTION_PERCENT || '80', 10),
+        };
+        this.rewardDistributor = new RewardDistributor(this.blockchain, rewardConfig);
+
         const blockTime = parseInt(process.env.BLOCK_TIME_MS || '5000', 10);
         const maxTxPerBlock = parseInt(process.env.MAX_TRANSACTIONS_PER_BLOCK || '1000', 10);
         this.blockProducer = new BlockProducer(
             this.blockchain,
             this.validatorPool,
             this.mempool,
-            this.rewardDistributor, // Injected dependency
+            this.rewardDistributor, // Injected dependency (Now initialized!)
             blockTime,
             maxTxPerBlock,
             nodeWalletPublicKey
@@ -337,13 +344,6 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             this.blockchain,
             { publicKey: nodeWalletPublicKey, privateKey: nodeWalletPrivateKey || '' } // Using Node Wallet
         );
-
-        const rewardConfig: RewardConfig = {
-            blockReward: parseInt(process.env.BLOCK_REWARD || '0', 10),
-            signatureReward: parseInt(process.env.SIGNATURE_REWARD || '0', 10),
-            feeDistributionPercent: parseInt(process.env.FEE_DISTRIBUTION_PERCENT || '80', 10),
-        };
-        this.rewardDistributor = new RewardDistributor(this.blockchain, rewardConfig);
 
         // Initialize economy modules
         this.treasuryManager = new TreasuryManager(TREASURY_ADDRESSES.main);
