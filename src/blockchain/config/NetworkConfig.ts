@@ -26,7 +26,7 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     chainId: 'tracenet-mainnet-v3',
     networkName: 'TraceNet',
     developer: 'LodosLawson - M.S',  // Creator initials
-    version: '3.0.0',
+    version: '3.0.1',
     genesisTimestamp: 1735689600000, // 2025-01-01T00:00:00.000Z (V3.0 launch)
     maxSupply: 100_000_000, // 100 million TRN
     tokenSymbol: 'TRN', // TraceNet (changed from TNN)
