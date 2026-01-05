@@ -4,6 +4,7 @@ import { Blockchain } from '../blockchain/core/Blockchain';
 import { ValidatorPool } from './ValidatorPool';
 import { Mempool } from '../node/Mempool';
 import { KeyManager } from '../blockchain/crypto/KeyManager';
+import { RewardDistributor } from './RewardDistributor'; // NEW
 import EventEmitter from 'events';
 
 /**
@@ -13,6 +14,7 @@ export class BlockProducer extends EventEmitter {
     private blockchain: Blockchain;
     private validatorPool: ValidatorPool;
     private mempool: Mempool;
+    private rewardDistributor: RewardDistributor; // NEW
     private blockTime: number;
     private maxTransactionsPerBlock: number;
     private isProducing: boolean;
@@ -23,14 +25,16 @@ export class BlockProducer extends EventEmitter {
         blockchain: Blockchain,
         validatorPool: ValidatorPool,
         mempool: Mempool,
+        rewardDistributor: RewardDistributor, // NEW
         blockTime: number = 5000,
         maxTransactionsPerBlock: number = 1000,
-        nodeWalletAddress?: string // New parameter
+        nodeWalletAddress?: string
     ) {
         super();
         this.blockchain = blockchain;
         this.validatorPool = validatorPool;
         this.mempool = mempool;
+        this.rewardDistributor = rewardDistributor; // NEW
         this.blockTime = blockTime;
         this.maxTransactionsPerBlock = maxTransactionsPerBlock;
         this.nodeWalletAddress = nodeWalletAddress;
@@ -261,16 +265,45 @@ export class BlockProducer extends EventEmitter {
                 return;
             }
 
+            // NEW: Epoch Rewards (Every 200 blocks)
+            // We check the NEXT block index (nextIndex)
+            // If nextIndex % 200 === 0, we verify and distribute
+            // UPDATE: Distribute to ALL validators (User Request), not just online ones
+            const allValidators = this.validatorPool.getAllValidators().map(v => v.validator_id);
+            const epochRewards = this.rewardDistributor.distributeEpochRewards(nextIndex, allValidators);
+
+            if (epochRewards.length > 0) {
+                console.log(`[BlockProducer] Including ${epochRewards.length} Epoch Reward transactions in Block ${nextIndex} (All Validators)`);
+                // These are TransactionModel objects. Need to convert to Transaction interface or similar?
+                // TransactionModel usually implements Transaction.
+                // We add them to the FRONT of the validTransactions list to ensure they are processed first?
+                // Or just append. Since they are REWARD type, they should be valid.
+                // We need to validate them? Blockchain.validateTransaction checks balance.
+                // Epoch rewards come from VALIDATOR_POOL.
+                // We need to ensure VALIDATOR_POOL has balance in CURRENT state.
+                // We assume distributeEpochRewards checked current state balance.
+
+                // Cast to Transaction type just in case
+                const rewardTxs = epochRewards.map(t => t.toJSON() as Transaction);
+                validTransactions.push(...rewardTxs);
+            }
+
             // Create new block
             const newBlock = Block.create(
                 nextIndex,
                 latestBlock.hash!,
-                validTransactions, // Use filtered list
+                validTransactions, // Includes filtered user txs + epoch rewards
                 producer.validator_id,
-                stateRoot,
-                this.nodeWalletAddress, // Use the configured node wallet
-                nextTimestamp // Explicitly pass the calculated timestamp
+                stateRoot, // Note: State root is calculated from txs. If we added rewards, we should recalc state root?
+                // YES. We calculated stateRoot BEFORE adding rewards.
+                // We need to recalculate stateRoot or calculate it AFTER adding rewards.
+                // Let's move stateRoot calculation down.
+                this.nodeWalletAddress,
+                nextTimestamp
             );
+
+            // Recalculate State Root with ALL transactions
+            newBlock.state_root = this.blockchain.calculateStateRoot(validTransactions);
 
             // Sign block (in production, this would use the producer's private key)
             // For now, we'll create a placeholder signature
@@ -287,9 +320,10 @@ export class BlockProducer extends EventEmitter {
 
             if (result.success && result.block) {
                 // Remove mined transactions from mempool
-                for (const tx of validTransactions) {
+                for (const tx of transactions) { // Remove original user transactions
                     this.mempool.removeTransaction(tx.tx_id);
                 }
+                // Reward txs were not in mempool, so no need to remove them.
 
                 // Update validator stats
                 this.validatorPool.incrementBlocksProduced(producer.validator_id);

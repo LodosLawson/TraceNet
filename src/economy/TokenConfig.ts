@@ -44,10 +44,11 @@ export const TOKEN_CONFIG = {
 
     // Fee split percentages
     // Fee split percentages
-    FEE_TO_PRIMARY_PERCENT: 45, // 45% (Node or Creator)
-    FEE_TO_POOL_PERCENT: 30,    // 30% (Mining Pool)
-    FEE_TO_RECYCLE_PERCENT: 20, // 20% (Recycle/Burn)
-    FEE_TO_DEV_PERCENT: 5,      // 5% (Network Owner)
+    // Fee split percentages
+    FEE_TO_PRIMARY_PERCENT: 50, // 50% (Content Creator)
+    FEE_TO_POOL_PERCENT: 40,    // 40% (Validator Pool - Distributed every 200 blocks)
+    FEE_TO_RECYCLE_PERCENT: 0,  // 0% (No Burn)
+    FEE_TO_DEV_PERCENT: 10,     // 10% (Treasury/Network Reserve)
 
     // Deprecated but kept for compatibility until full refactor
     FEE_TO_NODE_OWNER_PERCENT: 45,
@@ -62,6 +63,7 @@ export const TREASURY_ADDRESSES = {
     main: 'TREASURY_MAIN',
     reserve: 'TREASURY_RESERVE',
     development: 'TREASURY_DEV',
+    validator_pool: 'VALIDATOR_POOL', // Accumulates 40% of fees for Epoch distribution
 };
 
 /**

@@ -1,5 +1,6 @@
 import { TransactionModel, TransactionType } from '../blockchain/models/Transaction';
 import { Blockchain } from '../blockchain/core/Blockchain';
+import { TREASURY_ADDRESSES } from '../economy/TokenConfig';
 
 /**
  * Reward configuration
@@ -256,5 +257,100 @@ export class RewardDistributor {
      */
     loadFromJSON(data: RewardRecord[]): void {
         this.rewards = [...data];
+    }
+    /**
+     * Distribute Epoch Rewards (Validator Pool)
+     * Triggered every 200 blocks.
+     */
+    distributeEpochRewards(
+        blockIndex: number,
+        activeValidatorIds: string[]
+    ): TransactionModel[] {
+        // 1. Check Epoch Trigger (Every 200 blocks)
+        const EPOCH_LENGTH = 200;
+        if (blockIndex === 0 || blockIndex % EPOCH_LENGTH !== 0) {
+            return [];
+        }
+
+        // 2. Check Validator Pool Balance
+        const poolAddress = TREASURY_ADDRESSES.validator_pool;
+        const poolBalance = this.blockchain.getBalance(poolAddress);
+
+        console.log(`[Epoch] 🔄 Epoch Triggered at Block ${blockIndex}. Pool Balance: ${poolBalance}, Active Validators: ${activeValidatorIds.length}`);
+
+        if (poolBalance <= 0) {
+            console.log('[Epoch] Pool is empty. No distribution.');
+            return [];
+        }
+
+        if (activeValidatorIds.length === 0) {
+            console.warn('[Epoch] No active validators found? Skipping distribution.');
+            return [];
+        }
+
+        // 3. Calculate Share per Validator
+        const rewardPerValidator = Math.floor(poolBalance / activeValidatorIds.length);
+
+        if (rewardPerValidator === 0) {
+            console.log('[Epoch] Reward per validator is 0 (dust). Skipping.');
+            return [];
+        }
+
+        const rewardTxs: TransactionModel[] = [];
+
+        // 4. Create Transactions
+        for (const validatorId of activeValidatorIds) {
+            // Validator ID 'validator_PUBKEY' -> Address is PUBKEY override? No, validatorId is usually the ID.
+            // But Transaction needs wallet address.
+            // We need to resolve ValidatorID -> WalletAddress.
+            // Usually ValidatorID = 'validator_' + pubKey.substring(0,8)
+            // But we can't easily reverse it without looking up the validator record.
+            // For now, let's assume the BlockProducer passes Wallet Addresses or we look them up.
+            // UPDATE: BlockProducer passes 'activeValidatorIds' which are IDs.
+            // We need the PUBLIC KEY (Address) to send money to.
+
+            const validator = this.blockchain.getValidator(validatorId);
+            const validatorAddress = validator ? validator.public_key : null;
+
+            if (!validatorAddress) {
+                console.warn(`[Epoch] Could not resolve address for validator ${validatorId}. Skipping.`);
+                continue;
+            }
+
+            const epochTx = TransactionModel.create(
+                poolAddress, // From Validator Pool
+                validatorAddress, // To Validator Wallet
+                TransactionType.REWARD,
+                rewardPerValidator,
+                0,
+                0, // Nonce (System handles nonces for special addresses usually, or we increment)
+                // Note: We might need to track nonce for Validator Pool wallet? 
+                // Blockchain.ts logic for REWARD checks balance but maybe not nonce strictness for SYSTEM/POOLS?
+                // Let's assume nonce 0 for REWARD type internal generation or handle in execution.
+                // Actually, REWARD type usually bypasses signature checks, but nonce checks apply if we treat it as transfer.
+                // Let's use a random nonce or time based for uniqueness.
+                {
+                    type: 'epoch_reward',
+                    epoch_index: blockIndex / EPOCH_LENGTH,
+                    block_index: blockIndex,
+                    description: `Epoch Reward (Block ${blockIndex})`,
+                }
+            );
+
+            rewardTxs.push(epochTx);
+
+            // Record reward
+            this.rewards.push({
+                validator_id: validatorId,
+                amount: rewardPerValidator,
+                type: 'fee_share', // Reusing fee_share type or new type?
+                block_index: blockIndex,
+                timestamp: Date.now(),
+                tx_id: epochTx.tx_id,
+            });
+        }
+
+        console.log(`[Epoch] ✅ Created ${rewardTxs.length} reward transactions of ${rewardPerValidator} each.`);
+        return rewardTxs;
     }
 }

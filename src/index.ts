@@ -247,16 +247,45 @@ class BlockchainNode {
                 }
             } else {
                 SecureLogger.log('[Setup] No Node Wallet found. Generating new one...');
-                const keyPair = KeyManager.generateKeyPair();
-                nodeWalletPrivateKey = keyPair.privateKey;
-                nodeWalletPublicKey = keyPair.publicKey;
+                // Use Mnemonic generation to give user access
+                const walletData = KeyManager.generateWalletFromMnemonic();
+                nodeWalletPrivateKey = walletData.privateKey;
+                nodeWalletPublicKey = walletData.publicKey;
 
-                // Try to save to KeyStore if password available
+                // Save to KeyStore if available
                 if (keystorePassword) {
                     keyStore.saveKey('node_wallet', nodeWalletPrivateKey, keystorePassword);
                     SecureLogger.log('[Setup] ✅ Generated and saved new Node Wallet to KeyStore');
                 } else {
-                    console.warn('[Setup] ⚠️  Generated temporary Node Wallet (No KeyStore password). Wallet will be lost on exit.');
+                    console.warn('[Setup] ⚠️  Generated temporary Node Wallet (No KeyStore password).');
+                }
+
+                // SAVE CREDENTIALS TO FILE (For User Access)
+                try {
+                    const credentials = `
+===================================================================
+             TRACENET NODE CREDENTIALS (DO NOT SHARE)
+===================================================================
+Thinking of this as your "Bank Account" for the Node.
+These credentials grant full access to the funds earned by this node.
+
+Generated: ${new Date().toISOString()}
+
+ADDRESS:    ${walletData.publicKey}  (Use this to receive funds)
+MNEMONIC:   ${walletData.mnemonic}   (12/24 Words - KEEP SAFE!)
+PRIVATE KEY:${walletData.privateKey} (For programmatic access)
+
+===================================================================
+⚠️  WARNING: ANYONE WITH THIS FILE CAN ACCESS YOUR FUNDS.
+    DELETE THIS FILE AFTER BACKING IT UP SECURELY!
+===================================================================
+`;
+                    // Using require('fs') to avoid import issues if not present at top
+                    require('fs').writeFileSync('./NODE_CREDENTIALS.txt', credentials);
+                    console.log('\n[SECURITY] 🔑 Node credentials saved to NODE_CREDENTIALS.txt');
+                    console.log('[SECURITY] ⚠️  PLEASE BACKUP AND DELETE THIS FILE IMMEDIATELY!\n');
+                } catch (err) {
+                    console.error('[Setup] Failed to save credentials file:', err);
                 }
             }
         } else {
@@ -276,6 +305,7 @@ class BlockchainNode {
             this.blockchain,
             this.validatorPool,
             this.mempool,
+            this.rewardDistributor, // Injected dependency
             blockTime,
             maxTxPerBlock,
             nodeWalletPublicKey

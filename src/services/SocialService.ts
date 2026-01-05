@@ -83,11 +83,19 @@ export class SocialService {
         }
 
         const totalFee = TOKEN_CONFIG.LIKE_FEE; // 1000 = 0.00001 LT
-        const creatorAmount = Math.floor(totalFee * 0.5); // 50%
-        const treasuryAmount = totalFee - creatorAmount; // 50%
+
+        // 50% to Creator
+        const creatorAmount = Math.floor(totalFee * (TOKEN_CONFIG.FEE_TO_PRIMARY_PERCENT / 100));
+
+        // 10% to Treasury
+        const treasuryAmount = Math.floor(totalFee * (TOKEN_CONFIG.FEE_TO_DEV_PERCENT / 100));
+
+        // 40% to Validator Pool (Remaining)
+        const poolAmount = totalFee - creatorAmount - treasuryAmount;
+
         const timestamp = Date.now();
 
-        // 1. Create INNER Like Transaction
+        // 1. Create INNER Like Transaction (Creator Share)
         const innerLike: InnerTransaction = {
             type: TransactionType.LIKE,
             from_wallet: options.wallet_id,
@@ -105,7 +113,7 @@ export class SocialService {
 
         // 2. Create INNER Treasury Transaction
         const innerTreasury: InnerTransaction = {
-            type: TransactionType.LIKE, // Or generic FEE type?
+            type: TransactionType.LIKE,
             from_wallet: options.wallet_id,
             to_wallet: TREASURY_ADDRESSES.main,
             amount: treasuryAmount,
@@ -119,9 +127,26 @@ export class SocialService {
             signature: 'PENDING'
         };
 
+        // 3. Create INNER Validator Pool Transaction (Epoch Reward Accumulation)
+        const innerPoolTx: InnerTransaction = {
+            type: TransactionType.LIKE,
+            from_wallet: options.wallet_id,
+            to_wallet: TREASURY_ADDRESSES.validator_pool, // 'VALIDATOR_POOL'
+            amount: poolAmount,
+            nonce: (timestamp % 1000000) + 2,
+            timestamp: timestamp,
+            payload: {
+                action_type: 'POOL_FEE',
+                content_id: options.content_id,
+                is_pool_fee: true
+            },
+            signature: 'PENDING'
+        };
+
         // Add to Social Pool (Batch Queue)
         this.socialPool.addSocialAction(innerLike);
         this.socialPool.addSocialAction(innerTreasury);
+        this.socialPool.addSocialAction(innerPoolTx);
 
         return {
             tx_id: `PENDING-BATCH-${timestamp}`,
@@ -165,8 +190,16 @@ export class SocialService {
         }
 
         const totalFee = TOKEN_CONFIG.COMMENT_FEE;
-        const creatorAmount = Math.floor(totalFee * 0.5);
-        const treasuryAmount = totalFee - creatorAmount;
+
+        // 50% to Creator
+        const creatorAmount = Math.floor(totalFee * (TOKEN_CONFIG.FEE_TO_PRIMARY_PERCENT / 100));
+
+        // 10% to Treasury
+        const treasuryAmount = Math.floor(totalFee * (TOKEN_CONFIG.FEE_TO_DEV_PERCENT / 100));
+
+        // 40% to Validator Pool
+        const poolAmount = totalFee - creatorAmount - treasuryAmount;
+
         const timestamp = Date.now();
 
         // Create comment ID
@@ -210,9 +243,26 @@ export class SocialService {
             signature: 'PENDING'
         };
 
+        // 3. Inner Validator Pool Tx
+        const innerPoolTx: InnerTransaction = {
+            type: TransactionType.COMMENT,
+            from_wallet: options.wallet_id,
+            to_wallet: TREASURY_ADDRESSES.validator_pool,
+            amount: poolAmount,
+            nonce: (timestamp % 1000000) + 2,
+            timestamp: timestamp,
+            payload: {
+                action_type: 'POOL_FEE',
+                content_id: options.content_id,
+                is_pool_fee: true
+            },
+            signature: 'PENDING'
+        };
+
         // Add to Social Pool
         this.socialPool.addSocialAction(innerComment);
         this.socialPool.addSocialAction(innerTreasury);
+        this.socialPool.addSocialAction(innerPoolTx);
 
         return {
             tx_id: `PENDING-BATCH-${timestamp}`,
