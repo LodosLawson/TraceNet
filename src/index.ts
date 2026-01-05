@@ -176,46 +176,7 @@ class BlockchainNode {
         // Only set online if WE are that validator (have the private key)
         let myValidatorId = null;
 
-        if (sysPrivateKey) {
-            // Check if our key matches Genesis Validator
-            let myPublicKey: string;
-            try {
-                const keyPair = KeyManager.getKeyPairFromPrivate(sysPrivateKey);
-                myPublicKey = keyPair.publicKey;
-            } catch (err) {
-                console.error('[Consensus] ❌ Invalid Private Key in configuration!');
-                myPublicKey = 'invalid_key';
-            }
 
-            if (myPublicKey === GENESIS_VALIDATOR_PUBLIC_KEY) {
-                // We are the System Validator
-                myValidatorId = systemValidatorId;
-                this.validatorPool.setOnline(systemValidatorId);
-                SecureLogger.log(`[Consensus] 👑 We are the Genesis Validator (${systemValidatorId}). Online & Ready.`);
-            } else {
-                // We are a NEW Validator
-                const myId = process.env.VALIDATOR_ID || 'validator_' + myPublicKey.substring(0, 8);
-                myValidatorId = myId;
-
-                // Register ourselves
-                this.validatorPool.registerValidator(myId, 'local_admin', myPublicKey);
-                this.validatorPool.setOnline(myId);
-                SecureLogger.log(`[Consensus] 🛡️  Active Validator Registered: ${myId}`);
-
-                // Note: In DPoA, we might need a stake transaction or existing validator approval.
-                // For V3.0 bootstrap, we allow immediate participation if listed in GENESIS or via governance.
-            }
-
-            // Keep myself online
-            if (myValidatorId) {
-                setInterval(() => {
-                    const currentHeight = this.blockchain.getLatestBlock().index;
-                    this.validatorPool.updateHeartbeat(myValidatorId!, currentHeight);
-                }, 10000);
-            }
-        } else {
-            console.log('[Consensus] 👁️  Observer Mode: No validator keys loaded.');
-        }
 
         // Initialize core components IN ORDER with correct parameters
         this.blockchain = new Blockchain(systemValidatorId, this.validatorPool);
@@ -293,6 +254,52 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             const keyPair = KeyManager.getKeyPairFromPrivate(nodeWalletPrivateKey);
             nodeWalletPublicKey = keyPair.publicKey;
             SecureLogger.log('[Setup] Loaded Node Wallet from KeyStore');
+        }
+
+        // ===================================
+        // VALIDATOR SELF-REGISTRATION (MOVED)
+        // ===================================
+        if (!sysPrivateKey && nodeWalletPrivateKey) {
+            sysPrivateKey = nodeWalletPrivateKey;
+            console.log('[Consensus] 🔗 Using Node Wallet key as Validator Key (First Setup).');
+        }
+
+        if (sysPrivateKey) {
+            // Check if our key matches Genesis Validator
+            let myPublicKey: string;
+            try {
+                const keyPair = KeyManager.getKeyPairFromPrivate(sysPrivateKey);
+                myPublicKey = keyPair.publicKey;
+            } catch (err) {
+                console.error('[Consensus] ❌ Invalid Private Key in configuration!');
+                myPublicKey = 'invalid_key';
+            }
+
+            if (myPublicKey === GENESIS_VALIDATOR_PUBLIC_KEY) {
+                // We are the System Validator
+                myValidatorId = systemValidatorId;
+                this.validatorPool.setOnline(systemValidatorId);
+                SecureLogger.log(`[Consensus] 👑 We are the Genesis Validator (${systemValidatorId}). Online & Ready.`);
+            } else {
+                // We are a NEW Validator
+                const myId = process.env.VALIDATOR_ID || 'validator_' + myPublicKey.substring(0, 8);
+                myValidatorId = myId;
+
+                // Register ourselves
+                this.validatorPool.registerValidator(myId, 'local_admin', myPublicKey);
+                this.validatorPool.setOnline(myId);
+                SecureLogger.log(`[Consensus] 🛡️  Active Validator Registered: ${myId}`);
+            }
+
+            // Keep myself online
+            if (myValidatorId) {
+                setInterval(() => {
+                    const currentHeight = this.blockchain.getLatestBlock().index;
+                    this.validatorPool.updateHeartbeat(myValidatorId!, currentHeight);
+                }, 10000);
+            }
+        } else {
+            console.log('[Consensus] 👁️  Observer Mode: No validator keys loaded.');
         }
 
         const encryptionKey = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
