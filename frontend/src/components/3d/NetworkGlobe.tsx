@@ -193,9 +193,24 @@ const Sun = () => {
 
 // --- Main Component ---
 
-export const NetworkGlobe = () => {
-    // Generate stable random nodes
+export const NetworkGlobe = ({ realNodes }: { realNodes?: any[] }) => {
+    // Generate nodes (use real data or fallback/random if empty for demo, but goal is fix)
     const nodes = useMemo(() => {
+        if (realNodes && realNodes.length > 0) {
+            return realNodes.map((n, i) => {
+                const lat = n.lat || (Math.random() - 0.5) * 160; // Fallback only if missing
+                const lng = n.lng || (Math.random() - 0.5) * 360;
+                return {
+                    id: i,
+                    position: getPosition(lat, lng, GLOBE_RADIUS),
+                    lat,
+                    lng,
+                    ...n
+                };
+            });
+        }
+
+        // Fallback to random if no real nodes (or initially)
         return Array.from({ length: NODE_COUNT }).map((_, i) => {
             const lat = (Math.random() - 0.5) * 160;
             const lng = (Math.random() - 0.5) * 360;
@@ -206,7 +221,7 @@ export const NetworkGlobe = () => {
                 lng
             };
         });
-    }, []);
+    }, [realNodes]);
 
     return (
         <group>

@@ -1,5 +1,5 @@
 
-const API_BASE = 'http://localhost:3000'; // Adjust if needed
+const API_BASE = '';
 
 export interface UserResponse {
     user: {
@@ -13,6 +13,15 @@ export interface UserResponse {
         mnemonic: string;
         privateKey: string;
     };
+}
+
+export interface NodeInfo {
+    url: string;
+    lat?: number;
+    lng?: number;
+    region?: string;
+    country?: string;
+    status: string;
 }
 
 export const api = {
@@ -39,5 +48,12 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ minerAddress })
         });
+    },
+
+    async getDiscoveredNodes(): Promise<NodeInfo[]> {
+        const response = await fetch(`${API_BASE}/api/nodes/discover`);
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.nodes;
     }
 };

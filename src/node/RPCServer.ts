@@ -13,6 +13,7 @@ import { UserService } from '../services/user/UserService';
 import { ContentService } from '../services/ContentService';
 import { SocialService } from '../services/SocialService';
 import { BlockProducer } from '../consensus/BlockProducer';
+import * as geoip from 'geoip-lite';
 
 
 
@@ -288,7 +289,9 @@ export class RPCServer {
                 ip: p.ip,
                 country: p.country,
                 region: p.region,
-                city: p.city
+                city: p.city,
+                lat: p.lat,
+                lng: p.lng
             }));
 
             // Get disconnected known peers
@@ -331,6 +334,17 @@ export class RPCServer {
             // Add self ONLY if we have a public URL
             const publicHost = process.env.PUBLIC_HOST;
             if (publicHost && !isLocalhost(publicHost)) {
+                // Lookup self location
+                let selfLat = 0, selfLng = 0;
+                try {
+                    const hostname = new URL(publicHost).hostname;
+                    const geo = geoip.lookup(hostname);
+                    if (geo && geo.ll) {
+                        selfLat = geo.ll[0];
+                        selfLng = geo.ll[1];
+                    }
+                } catch (e) { }
+
                 nodes.push({
                     url: publicHost,
                     region: process.env.REGION || 'unknown',
@@ -339,7 +353,9 @@ export class RPCServer {
                     lastSeen: Date.now(),
                     height: this.blockchain.getChainLength(),
                     latency: null,
-                    capabilities: ['rpc', 'websocket', 'p2p']
+                    capabilities: ['rpc', 'websocket', 'p2p'],
+                    lat: selfLat,
+                    lng: selfLng
                 });
             }
 
@@ -354,7 +370,9 @@ export class RPCServer {
                         lastSeen: Date.now(),
                         height: peer.height,
                         latency: null,
-                        capabilities: ['rpc']
+                        capabilities: ['rpc'],
+                        lat: peer.lat,
+                        lng: peer.lng
                     });
                 }
             }

@@ -21,6 +21,8 @@ interface Peer {
     region?: string;
     city?: string;
     ip?: string;
+    lat?: number;
+    lng?: number;
 }
 
 
@@ -427,7 +429,7 @@ export class P2PNetwork {
     /**
      * Extract IP from URL and lookup geolocation
      */
-    private getLocationFromUrl(url: string): { ip?: string; country?: string; region?: string; city?: string } {
+    private getLocationFromUrl(url: string): { ip?: string; country?: string; region?: string; city?: string; lat?: number; lng?: number } {
         try {
             // Extract hostname/IP from URL
             const urlObj = new URL(url);
@@ -435,7 +437,7 @@ export class P2PNetwork {
 
             // Skip localhost/private IPs
             if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.')) {
-                return { ip: hostname, country: 'Local', region: 'N/A', city: 'N/A' };
+                return { ip: hostname, country: 'Local', region: 'N/A', city: 'N/A', lat: 0, lng: 0 };
             }
 
             // Lookup geolocation
@@ -445,7 +447,9 @@ export class P2PNetwork {
                     ip: hostname,
                     country: geo.country,
                     region: geo.region,
-                    city: geo.city
+                    city: geo.city,
+                    lat: geo.ll ? geo.ll[0] : 0,
+                    lng: geo.ll ? geo.ll[1] : 0
                 };
             }
 
@@ -558,6 +562,8 @@ export class P2PNetwork {
                         country: geo.country,
                         region: geo.region,
                         city: geo.city,
+                        lat: geo.ll ? geo.ll[0] : 0,
+                        lng: geo.ll ? geo.ll[1] : 0,
                         asn: geo.area // Basic ASN approx usage if available otherwise ignored
                     };
                 } else {
@@ -566,12 +572,14 @@ export class P2PNetwork {
                         ip: clientIP,
                         country: this.isLocalOrPrivateIP(clientIP) ? 'Local/Private' : 'Unknown',
                         region: 'N/A',
-                        city: 'N/A'
+                        city: 'N/A',
+                        lat: 0,
+                        lng: 0
                     };
                 }
             } catch (err) {
                 console.warn(`[P2P] Geolocation failed for ${clientIP}:`, err);
-                location = { ip: clientIP, country: 'Unknown', region: 'N/A', city: 'N/A' };
+                location = { ip: clientIP, country: 'Unknown', region: 'N/A', city: 'N/A', lat: 0, lng: 0 };
             }
 
             // ✅ Register this IP -> Node ID mapping (anti-sybil tracking)
@@ -729,4 +737,3 @@ export class P2PNetwork {
         return 'UNKNOWN_ASN';
     }
 }
-

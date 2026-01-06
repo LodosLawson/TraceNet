@@ -5,12 +5,29 @@ import { motion } from 'framer-motion';
 import { NetworkGlobe } from '../components/3d/NetworkGlobe';
 import { Cuboid, Activity, Globe2 } from 'lucide-react';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 
 export const LandingPage = () => {
     const [loading, setLoading] = useState(false);
     const [newWallet, setNewWallet] = useState<any>(null);
+
+    const [nodes, setNodes] = useState<any[]>([]);
+
+    useEffect(() => {
+        // Poll for nodes
+        const fetchNodes = async () => {
+            try {
+                const n = await api.getDiscoveredNodes();
+                setNodes(n);
+            } catch (e) {
+                console.error("Failed to fetch nodes", e);
+            }
+        };
+        fetchNodes();
+        const interval = setInterval(fetchNodes, 5000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleCreateWallet = async () => {
         const nickname = prompt("Enter a nickname for your new wallet:");
@@ -38,7 +55,7 @@ export const LandingPage = () => {
                     <ambientLight intensity={0.5} />
                     <pointLight position={[10, 10, 10]} intensity={1} color="#ffb703" />
                     <pointLight position={[-10, -10, -10]} intensity={0.5} color="#d90429" />
-                    <NetworkGlobe />
+                    <NetworkGlobe realNodes={nodes} />
                     <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />
                     <Environment preset="city" />
                 </Canvas>
