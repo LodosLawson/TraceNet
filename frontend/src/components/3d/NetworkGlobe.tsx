@@ -150,6 +150,47 @@ const DataArcs = ({ nodes }: { nodes: any[] }) => {
     );
 };
 
+
+const Sun = () => {
+    const lightRef = useRef<THREE.DirectionalLight>(null);
+    const sunMeshRef = useRef<THREE.Mesh>(null);
+
+    useFrame((state) => {
+        const time = state.clock.getElapsedTime() * 0.2; // Day cycle speed
+
+        // Circular orbit
+        const x = Math.sin(time) * 10;
+        const z = Math.cos(time) * 10;
+
+        if (lightRef.current) {
+            lightRef.current.position.set(x, 5, z);
+            lightRef.current.lookAt(0, 0, 0);
+        }
+        if (sunMeshRef.current) {
+            sunMeshRef.current.position.set(x, 5, z);
+        }
+    });
+
+    return (
+        <group>
+            <directionalLight
+                ref={lightRef}
+                intensity={3}
+                color="#ffffff"
+                castShadow
+                shadow-mapSize={[1024, 1024]}
+            />
+            {/* Sun Visual */}
+            <mesh ref={sunMeshRef}>
+                <sphereGeometry args={[0.5, 32, 32]} />
+                <meshBasicMaterial color="#ffbd00" fog={false} />
+            </mesh>
+            {/* Opposite Fill Light (Moon/Fill) */}
+            <ambientLight intensity={0.8} color={COLORS.globeWire} />
+        </group>
+    );
+};
+
 // --- Main Component ---
 
 export const NetworkGlobe = () => {
@@ -169,16 +210,13 @@ export const NetworkGlobe = () => {
 
     return (
         <group>
+            <Sun />  {/* Added Day/Night Cycle */}
             <GlobeBase />
             <NodesInstanced nodes={nodes} />
             <DataArcs nodes={nodes} />
 
             {/* Background Stars - Subtle */}
             <Stars radius={150} depth={50} count={3000} factor={4} saturation={0} fade speed={0.5} />
-
-            {/* Ambient Light & Controls */}
-            <ambientLight intensity={0.5} color={COLORS.globeWire} />
-            <pointLight position={[10, 10, 10]} intensity={1} color="#ffffff" />
 
             {/* Mobile Optimization: Allow touch rotation, disable zoom to prevent breaking layout */}
             <OrbitControls

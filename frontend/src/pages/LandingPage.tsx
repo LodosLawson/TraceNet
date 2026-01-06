@@ -57,10 +57,13 @@ export const LandingPage = () => {
                     {/* Logo Mockup */}
                     <div className="mb-6 inline-block relative px-4">
                         <div className="absolute inset-0 bg-pomegranate-500 blur-3xl opacity-20 rounded-full"></div>
-                        <h1 className="relative text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-seed-100 to-pomegranate-500 tracking-tighter">
-                            TraceNet
-                        </h1>
-                        <p className="text-gold-500 tracking-[0.3em] text-xs md:text-sm mt-2 uppercase font-semibold">
+                        {/* User Provided Logo */}
+                        <img
+                            src="/tracenet_logo.png"
+                            alt="TraceNet Logo"
+                            className="relative h-32 md:h-40 mx-auto rounded-2xl shadow-2xl shadow-pomegranate-900/50"
+                        />
+                        <p className="text-gold-500 tracking-[0.3em] text-xs md:text-sm mt-4 uppercase font-semibold">
                             Secure P2P Neural Network
                         </p>
                     </div>
