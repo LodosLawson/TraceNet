@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -138,23 +139,14 @@ export class RPCServer {
      * Setup routes
      */
     private setupRoutes(): void {
-        // Serve static files from public directory
+
+        // Serve frontend static files
+        const frontendPath = path.join(__dirname, '../../../frontend/dist');
+        this.app.use(express.static(frontendPath));
+
+        // Serve legacy public files (if any needed, e.g. old explorer) - lower priority
         this.app.use(express.static('public'));
 
-        // Root route - serve documentation
-        this.app.get('/', (req: Request, res: Response) => {
-            res.sendFile('index.html', { root: 'public' });
-        });
-
-        // Explorer route
-        this.app.get('/explorer', (req: Request, res: Response) => {
-            res.sendFile('explorer.html', { root: 'public' });
-        });
-
-        // Health check
-        this.app.get('/health', (req: Request, res: Response) => {
-            res.json({ status: 'ok', timestamp: Date.now() });
-        });
 
         // Chain endpoint (full chain)
         this.app.get('/chain', (req: Request, res: Response) => {
@@ -256,6 +248,15 @@ export class RPCServer {
         this.app.get('/api/user/encryption-key/:identifier', this.getEncryptionKey.bind(this));
         this.app.post('/api/user/:userId/messaging-privacy', this.updateMessagingPrivacy.bind(this));
         this.app.get('/api/user/:userId/qr-code', this.generateQRCode.bind(this));
+
+        // Handle React Routing, return all requests to React app (SPA Catch-all)
+        // MUST BE AFTER ALL API ROUTES
+        this.app.get('*', (req: Request, res: Response) => {
+            // Re-define frontendPath just in case of scope confusion or if it's cleaner, 
+            // but strictly it should be in scope. 
+            // To be 100% safe against block scope issues if I miscounted, I will use the path directly.
+            res.sendFile(path.join(__dirname, '../../../frontend/dist', 'index.html'));
+        });
 
         // Error handler
         this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
@@ -465,7 +466,7 @@ export class RPCServer {
             let block;
 
             // Check if it's a number (index) or hash
-            if (/^\d+$/.test(indexOrHash)) {
+            if (/^\d+ $ /.test(indexOrHash)) {
                 const index = parseInt(indexOrHash, 10);
                 block = this.blockchain.getBlockByIndex(index);
             } else {

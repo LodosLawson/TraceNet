@@ -42,7 +42,8 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     ],
     initialValidators: [
         '25b86a85774d69db8af2a782f7fbf9c062054c48d4c2c3fac9ec4b10c54f43d7', // Genesis Validator (System)
-        'cd00b064e18f0326eff90e1802c92d8c4bc759148ab3a77af9097d6c79e02073'  // User Home Node Validator
+        'cd00b064e18f0326eff90e1802c92d8c4bc759148ab3a77af9097d6c79e02073',  // User Home Node Validator
+        '16f82568' // US Mainnet Validator (Added for Sync compatibility)
     ]
 };
 
