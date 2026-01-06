@@ -142,7 +142,22 @@ export class RPCServer {
     private setupRoutes(): void {
 
         // Serve frontend static files
-        const frontendPath = path.join(__dirname, '../../../frontend/dist');
+        // Serve frontend static files
+        // Assuming dist/ structure mirrors src/ or is flat. 
+        // If built to dist/src/node/RPCServer.js -> ../../../ is root.
+        // If built to dist/node/RPCServer.js -> ../../ is root.
+        // Let's try to resolve it relative to CWD if possible, or use robust check.
+
+        let frontendPath = path.join(__dirname, '../../../frontend/dist'); // Default assumption if deep nested
+
+        // Fix for standard tsc output (dist/src/node/...) vs (dist/node/...)
+        // We will try to find the folder. 
+        if (!require('fs').existsSync(frontendPath)) {
+            // Try one level up
+            frontendPath = path.join(__dirname, '../../frontend/dist');
+        }
+
+        console.log(`[RPC] Serving Frontend from: ${frontendPath}`);
         this.app.use(express.static(frontendPath));
 
         // Serve legacy public files (if any needed, e.g. old explorer) - lower priority

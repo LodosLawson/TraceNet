@@ -35,6 +35,8 @@ export class P2PNetwork {
     private myPort: number;
     private knownPeers: Set<string> = new Set();
     private isSyncing: boolean = false;
+    private lastSyncTime: number = 0;
+    private readonly SYNC_TIMEOUT = 30000; // 30 seconds deadlock protection
     private readonly MAX_PEERS = 50;
     private connectedIPs: Map<string, string> = new Map(); // IP -> Node ID (anti-sybil)
     // ✅ Policy: Directional Counters
@@ -67,6 +69,7 @@ export class P2PNetwork {
 
         this.loadPersistedPeers(); // Load peers on startup
         this.setupServerHandlers();
+        this.startSyncService();
 
         // Start Discovery
         const { PeerDiscovery } = require('./discovery/PeerDiscovery');
@@ -620,6 +623,7 @@ export class P2PNetwork {
             console.log(`[P2P] Peer ${peer.id} is ahead (${peer.height} > ${myHeight}). Requesting chain...`);
             peer.socket.emit('p2p:requestChain', { fromHeight: myHeight });
             this.isSyncing = true;
+            this.lastSyncTime = Date.now();
         }
     }
 
@@ -651,6 +655,7 @@ export class P2PNetwork {
                     // Or simply broadcast the request to everyone.
                     peer.socket.emit('p2p:requestChain', { fromHeight: latest.index + 1 });
                     this.isSyncing = true;
+                    this.lastSyncTime = Date.now();
                     break; // Ask one peer to avoid flooding
                 }
             }
@@ -735,5 +740,50 @@ export class P2PNetwork {
             return 'ASN_' + parts[0];
         }
         return 'UNKNOWN_ASN';
+    }
+
+
+    /**
+     * Periodic Sync Service
+     * - Resets "isSyncing" if stuck
+     * - Triggers sync if we are behind peers
+     */
+    private startSyncService() {
+        setInterval(() => {
+            const now = Date.now();
+
+            // 1. Deadlock Protection
+            if (this.isSyncing) {
+                if (now - this.lastSyncTime > this.SYNC_TIMEOUT) {
+                    console.warn(`[P2P] Sync deadlock detected (stuck for ${(now - this.lastSyncTime) / 1000}s). Resetting...`);
+                    this.isSyncing = false;
+                } else {
+                    return; // Still validly syncing
+                }
+            }
+
+            // 2. Check for better chains
+            const myHeight = this.blockchain.getChainLength();
+            const peers = this.getPeers();
+
+            // Find best peer
+            let bestPeer: Peer | null = null;
+            let maxHeight = myHeight;
+
+            for (const peer of peers) {
+                if (peer.height > maxHeight) {
+                    maxHeight = peer.height;
+                    bestPeer = peer;
+                }
+            }
+
+            if (bestPeer && maxHeight > myHeight) {
+                console.log(`[P2P] Periodic Sync: Peer ${bestPeer.id} is ahead (${maxHeight} > ${myHeight}). Requesting chain...`);
+                bestPeer.socket.emit('p2p:requestChain', { fromHeight: myHeight });
+                this.isSyncing = true;
+                this.lastSyncTime = now;
+            }
+
+        }, 10000); // Check every 10 seconds
     }
 }
