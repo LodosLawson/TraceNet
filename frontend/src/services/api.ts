@@ -61,5 +61,11 @@ export const api = {
         const response = await fetch(`${API_BASE}/rpc/peers`);
         if (!response.ok) return [];
         return response.json();
+    },
+
+    async getNetworkStats() {
+        const response = await fetch(`${API_BASE}/rpc/status`);
+        if (!response.ok) return null;
+        return response.json();
     }
 };

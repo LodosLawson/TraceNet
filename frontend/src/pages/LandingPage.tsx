@@ -13,13 +13,18 @@ export const LandingPage = () => {
     const [newWallet, setNewWallet] = useState<any>(null);
 
     const [nodes, setNodes] = useState<any[]>([]);
+    const [stats, setStats] = useState({
+        nodes: 0,
+        height: 0,
+        tps: 0
+    });
 
     useEffect(() => {
-        // Poll for nodes
-        // Poll for nodes
-        const fetchNodes = async () => {
+        // Poll for nodes & Stats
+        const fetchData = async () => {
             try {
                 const peers = await api.getPeers();
+                const networkStats = await api.getNetworkStats();
 
                 // Manually add "Local Node" (You)
                 // Defaulting to Turkey (User context) for visualization if unknown
@@ -33,16 +38,24 @@ export const LandingPage = () => {
                 };
 
                 // Combine: Local Node + Discovered Peers
-                setNodes([localNode, ...peers]);
+                const allNodes = [localNode, ...peers];
+                setNodes(allNodes);
+
+                // Update Stats
+                setStats({
+                    nodes: allNodes.length,
+                    height: networkStats?.blockchain?.blockCount || 0,
+                    tps: networkStats?.blockchain?.currentTps || 0
+                });
 
                 // Debug
-                console.log("Visualizing Nodes:", [localNode, ...peers]);
+                console.log("Visualizing Nodes:", allNodes);
             } catch (e) {
-                console.error("Failed to fetch nodes", e);
+                console.error("Failed to fetch data", e);
             }
         };
-        fetchNodes();
-        const interval = setInterval(fetchNodes, 5000);
+        fetchData();
+        const interval = setInterval(fetchData, 5000);
         return () => clearInterval(interval);
     }, []);
 
@@ -109,9 +122,9 @@ export const LandingPage = () => {
                         transition={{ delay: 0.5, duration: 1 }}
                         className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mt-8 md:mt-12 px-6 w-full max-w-4xl"
                     >
-                        <StatCard icon={<Globe2 />} label="Active Nodes" value="3,402" />
-                        <StatCard icon={<Cuboid />} label="Block Height" value="#892,101" />
-                        <StatCard icon={<Activity />} label="Network TPS" value="12,500" />
+                        <StatCard icon={<Globe2 />} label="Active Nodes" value={stats.nodes.toLocaleString()} />
+                        <StatCard icon={<Cuboid />} label="Block Height" value={`#${stats.height.toLocaleString()}`} />
+                        <StatCard icon={<Activity />} label="Network TPS" value={stats.tps.toLocaleString()} />
                     </motion.div>
 
                     {/* CTA Button */}
