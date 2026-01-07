@@ -55,5 +55,11 @@ export const api = {
         if (!response.ok) return [];
         const data = await response.json();
         return data.nodes;
+    },
+
+    async getPeers(): Promise<NodeInfo[]> {
+        const response = await fetch(`${API_BASE}/rpc/peers`);
+        if (!response.ok) return [];
+        return response.json();
     }
 };

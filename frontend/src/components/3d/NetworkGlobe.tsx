@@ -117,19 +117,14 @@ const DataArcs = ({ nodes }: { nodes: any[] }) => {
         const points: THREE.Vector3[] = [];
 
         // Connect nearby nodes
-        for (let i = 0; i < nodes.length; i++) {
-            // Limit connections per node to avoid mess
-            let connections = 0;
-            for (let j = i + 1; j < nodes.length; j++) {
-                if (connections > 2) break; // Max 2 connections outgoing per node
+        // Connect Local Node (Index 0) to all Peers
+        if (nodes.length > 1) {
+            const localNodePos = nodes[0].position;
 
-                const dist = nodes[i].position.distanceTo(nodes[j].position);
-                // Connect if moderately close but not too close (looks better)
-                if (dist < CONNECTION_DISTANCE && dist > 0.5) {
-                    const curvePoints = getCurve(nodes[i].position, nodes[j].position);
-                    points.push(...curvePoints);
-                    connections++;
-                }
+            for (let i = 1; i < nodes.length; i++) {
+                const peerPos = nodes[i].position;
+                const curvePoints = getCurve(localNodePos, peerPos);
+                points.push(...curvePoints);
             }
         }
 

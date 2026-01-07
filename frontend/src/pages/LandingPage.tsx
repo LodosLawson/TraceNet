@@ -16,10 +16,27 @@ export const LandingPage = () => {
 
     useEffect(() => {
         // Poll for nodes
+        // Poll for nodes
         const fetchNodes = async () => {
             try {
-                const n = await api.getDiscoveredNodes();
-                setNodes(n);
+                const peers = await api.getPeers();
+
+                // Manually add "Local Node" (You)
+                // Defaulting to Turkey (User context) for visualization if unknown
+                const localNode = {
+                    id: 'local-node',
+                    status: 'connected',
+                    lat: 39.9334,
+                    lng: 32.8597,
+                    ip: '127.0.0.1',
+                    city: 'Local Node'
+                };
+
+                // Combine: Local Node + Discovered Peers
+                setNodes([localNode, ...peers]);
+
+                // Debug
+                console.log("Visualizing Nodes:", [localNode, ...peers]);
             } catch (e) {
                 console.error("Failed to fetch nodes", e);
             }
