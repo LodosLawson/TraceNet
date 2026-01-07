@@ -78,6 +78,7 @@ const Globe = () => {
             {/* Fresnel Atmosphere (Glow) */}
             <mesh>
                 <sphereGeometry args={[GLOBE_RADIUS, 64, 64]} />
+                {/* @ts-ignore */}
                 <atmosphereMaterial
                     transparent
                     side={THREE.BackSide}
