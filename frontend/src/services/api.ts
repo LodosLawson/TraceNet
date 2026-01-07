@@ -67,5 +67,26 @@ export const api = {
         const response = await fetch(`${API_BASE}/rpc/status`);
         if (!response.ok) return null;
         return response.json();
+    },
+
+    async getBlocks(limit = 20): Promise<any[]> {
+        const response = await fetch(`${API_BASE}/rpc/blocks?limit=${limit}`);
+        if (!response.ok) return [];
+        return response.json();
+    },
+
+    async getRecentTransactions(limit = 20): Promise<any[]> {
+        // Fetch blocks and extract transactions
+        const blocks = await this.getBlocks(10); // Get last 10 blocks
+        const txs: any[] = [];
+        blocks.forEach(block => {
+            if (block.transactions) {
+                block.transactions.forEach((tx: any) => {
+                    txs.push({ ...tx, blockHeight: block.index, timestamp: block.timestamp });
+                });
+            }
+        });
+        // Sort by time new -> old and slice
+        return txs.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
     }
 };

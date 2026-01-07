@@ -8,7 +8,11 @@ import { Cuboid, Activity, Globe2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 
-export const LandingPage = () => {
+interface PageProps {
+    onNavigate: (page: string) => void;
+}
+
+export const LandingPage = ({ onNavigate }: PageProps) => {
     const [loading, setLoading] = useState(false);
     const [newWallet, setNewWallet] = useState<any>(null);
 
@@ -78,7 +82,7 @@ export const LandingPage = () => {
     };
 
     return (
-        <div className="relative w-full h-screen overflow-hidden bg-pomegranate-950">
+        <div className="relative w-full h-[100dvh] overflow-hidden bg-pomegranate-950">
             {/* 3D Background */}
             <div className="absolute inset-0 z-0">
                 <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
@@ -146,9 +150,9 @@ export const LandingPage = () => {
             >
                 <div className="text-xl md:text-2xl font-bold text-seed-100">Tn.</div>
                 <div className="hidden md:flex gap-8 text-sm font-medium text-seed-200">
-                    <a href="#" className="hover:text-white transition-colors">Nodes</a>
-                    <a href="#" className="hover:text-white transition-colors">Blocks</a>
-                    <a href="#" className="hover:text-white transition-colors">Transactions</a>
+                    <button onClick={() => onNavigate('nodes')} className="hover:text-white transition-colors cursor-pointer">Nodes</button>
+                    <button onClick={() => onNavigate('blocks')} className="hover:text-white transition-colors cursor-pointer">Blocks</button>
+                    <button onClick={() => onNavigate('transactions')} className="hover:text-white transition-colors cursor-pointer">Transactions</button>
                 </div>
                 <button
                     onClick={handleCreateWallet}
