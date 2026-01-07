@@ -6,7 +6,6 @@ import * as THREE from 'three';
 // --- Constants & Config ---
 const GLOBE_RADIUS = 2;
 const NODE_COUNT = 80; // Increased density
-const CONNECTION_DISTANCE = 1.8; // Connection threshold
 const COLORS = {
     background: '#1a0b0c', // Darkest Red/Black
     globeBase: '#2f0205',  // Deep Pomegranate
