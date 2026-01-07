@@ -207,9 +207,26 @@ export const LandingPage = () => {
 };
 
 const StatCard = ({ icon, label, value }: { icon: any, label: string, value: string }) => (
-    <div className="flex flex-col items-center p-4 md:p-6 bg-black/40 backdrop-blur-md rounded-2xl border border-white/5 shadow-xl min-w-[120px] md:min-w-[160px]">
-        <div className="text-pomegranate-500 mb-2 md:mb-3 scale-90 md:scale-100">{icon}</div>
-        <div className="text-2xl md:text-3xl font-bold text-seed-100">{value}</div>
-        <div className="text-[10px] md:text-xs text-seed-200 uppercase tracking-wider mt-1">{label}</div>
-    </div>
+    <motion.div
+        whileHover={{ y: -5, scale: 1.02 }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative group flex flex-col items-center p-6 bg-black/30 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden"
+    >
+        {/* Shine Effect */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+        {/* Glow Blob */}
+        <div className="absolute -inset-1 bg-gradient-to-r from-pomegranate-500/0 via-pomegranate-500/10 to-pomegranate-500/0 blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700" />
+
+        <div className="relative z-10 text-pomegranate-500 mb-3 p-3 bg-white/5 rounded-full ring-1 ring-white/10 group-hover:ring-pomegranate-500/50 transition-all">
+            {icon}
+        </div>
+        <div className="relative z-10 text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-seed-200 tracking-tight">
+            {value}
+        </div>
+        <div className="relative z-10 text-xs text-seed-300 uppercase tracking-[0.2em] mt-2 font-medium">
+            {label}
+        </div>
+    </motion.div>
 );
