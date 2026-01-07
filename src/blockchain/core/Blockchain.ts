@@ -1232,6 +1232,8 @@ export class Blockchain extends EventEmitter {
         accountCount: number;
         latestBlockHash: string;
         state_root: string;
+        currentTps: number;
+        maxTps: number;
     } {
         let totalTransactions = 0;
         for (const block of this.chain) {
