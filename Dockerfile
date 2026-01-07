@@ -10,7 +10,7 @@ COPY tsconfig.json ./
 # Install build dependencies for native modules (bcrypt)
 RUN apk add --no-cache python3 make g++
 
-RUN npm ci
+RUN npm ci --ignore-scripts && npm rebuild
 
 # Copy source code
 COPY src ./src
@@ -27,7 +27,8 @@ WORKDIR /app
 COPY package*.json ./
 # Install build tools, install modules, then remove build tools to keep image small
 RUN apk add --no-cache python3 make g++ && \
-  npm ci --only=production && \
+  npm ci --only=production --ignore-scripts && \
+  npm rebuild && \
   apk del python3 make g++ && \
   apk add --no-cache libstdc++
 
