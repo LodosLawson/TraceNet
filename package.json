@@ -10,6 +10,7 @@
     "build": "tsc",
     "build:all": "tsc && cd frontend && npm run build",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "install:all": "npm install && cd frontend && npm install",
     "start": "npm run build:all && node dist/index.js",
     "start:node": "node dist/index.js",
     "test": "jest",
