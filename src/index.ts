@@ -710,7 +710,7 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
         this.blockProducer.start();
 
         // Check if genesis block info can be logged now or needs delay (safe to log simplified)
-        console.log(`⛓️  Genesis Block Hash: ${this.blockchain.getLatestBlock().hash.substring(0, 16)}...`);
+        console.log(`⛓️  Genesis Block Hash: ${this.blockchain.getChain()[0].hash.substring(0, 16)}...`);
 
         // Periodic cleanup
         setInterval(() => {

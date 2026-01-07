@@ -13,6 +13,7 @@
     "install:all": "npm install && cd frontend && npm install",
     "postinstall": "cd frontend && npm install",
     "start": "npm run build:all && node dist/index.js",
+    "clean:db": "node -e \"require('fs').rmSync('data', { recursive: true, force: true }); console.log('Database wiped.');\"",
     "start:node": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
