@@ -3,39 +3,50 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy root package files
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install build dependencies for native modules (bcrypt)
-RUN apk add --no-cache python3 make g++
+# Copy frontend package files (Crucial for postinstall)
+COPY frontend/package*.json ./frontend/
 
-RUN npm ci --ignore-scripts && npm rebuild
+# Install dependencies (Root + Frontend via postinstall)
+# We trust the postinstall script now because we copied the frontend package.json
+RUN npm ci
 
-# Copy source code
-COPY src ./src
+# Copy all source code (backend and frontend)
+COPY . .
 
-# Build TypeScript
+# Build Backend
 RUN npm run build
+
+# Build Frontend
+# We manually run the frontend build here to ensure assets are generated
+RUN cd frontend && npm run build
 
 # Stage 2: Production
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install production dependencies only
+# Copy package files again for production install
 COPY package*.json ./
-# Install build tools, install modules, then remove build tools to keep image small
-RUN apk add --no-cache python3 make g++ && \
-  npm ci --only=production --ignore-scripts && \
+COPY frontend/package*.json ./frontend/
+
+# Install dependencies (Production only)
+# Use --ignore-scripts to avoid `postinstall` (we don't need frontend node_modules in prod)
+# We explicitely rebuild native modules
+RUN npm ci --only=production --ignore-scripts && \
   npm rebuild && \
-  apk del python3 make g++ && \
   apk add --no-cache libstdc++
 
-# Copy built files from builder
+# Copy Backend Build
 COPY --from=builder /app/dist ./dist
 
-# Copy public assets
+# Copy Frontend Build (The Assets)
+COPY --from=builder /app/frontend/dist ./frontend/dist
+
+# Copy public folder if needed (fallback)
 COPY public ./public
 
 # Create data directory for blockchain storage
@@ -52,7 +63,6 @@ USER blockchain
 # Expose ports
 EXPOSE 3000
 
-# Health check
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3000) + '/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
