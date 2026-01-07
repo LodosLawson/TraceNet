@@ -120,6 +120,7 @@ class BlockchainNode {
 
         // Attempt to load private key from KeyStore first
         let sysPrivateKey = keyStore.loadKey('validator_key', keystorePassword || '');
+        let myValidatorPublicKey: string | undefined;
 
         // Compatibility/Migration: Check env if not in KeyStore (Dev only)
         // Compatibility/Migration: Check env if not in KeyStore
@@ -276,27 +277,26 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
 
         if (sysPrivateKey) {
             // Check if our key matches Genesis Validator
-            let myPublicKey: string;
             try {
                 const keyPair = KeyManager.getKeyPairFromPrivate(sysPrivateKey);
-                myPublicKey = keyPair.publicKey;
+                myValidatorPublicKey = keyPair.publicKey;
             } catch (err) {
                 console.error('[Consensus] ❌ Invalid Private Key in configuration!');
-                myPublicKey = 'invalid_key';
+                myValidatorPublicKey = 'invalid_key';
             }
 
-            if (myPublicKey === GENESIS_VALIDATOR_PUBLIC_KEY) {
+            if (myValidatorPublicKey === GENESIS_VALIDATOR_PUBLIC_KEY) {
                 // We are the System Validator
                 myValidatorId = systemValidatorId;
                 this.validatorPool.setOnline(systemValidatorId);
                 SecureLogger.log(`[Consensus] 👑 We are the Genesis Validator (${systemValidatorId}). Online & Ready.`);
             } else {
                 // We are a NEW Validator
-                const myId = process.env.VALIDATOR_ID || 'validator_' + myPublicKey.substring(0, 8);
+                const myId = process.env.VALIDATOR_ID || 'validator_' + myValidatorPublicKey!.substring(0, 8);
                 myValidatorId = myId;
 
                 // Register ourselves
-                this.validatorPool.registerValidator(myId, 'local_admin', myPublicKey);
+                this.validatorPool.registerValidator(myId, 'local_admin', myValidatorPublicKey!);
                 this.validatorPool.setOnline(myId);
                 SecureLogger.log(`[Consensus] 🛡️  Active Validator Registered: ${myId}`);
             }
@@ -460,7 +460,8 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             this.validatorPool,
             this.wsServer.getIO(),
             port,
-            this.localDb // ✅ Inject DB
+            this.localDb, // ✅ Inject DB
+            myValidatorPublicKey // Pass my Public Key
         );
 
         // Connect to peers from env

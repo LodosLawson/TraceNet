@@ -23,12 +23,16 @@ interface Peer {
     ip?: string;
     lat?: number;
     lng?: number;
+    lastSeen: number;
+    publicKey?: string; // Added for Smart Handshake
 }
 
 
 export class P2PNetwork {
     private blockchain: Blockchain;
-    private mempool: Mempool;
+    private mempool: Mempool; // Keep mempool for transactions
+    private messagePool: any; // MessagePool type (assuming this is for general messages, if not, mempool might be used)
+    private myPublicKey?: string; // Store my public key
     private validatorPool: ValidatorPool;
     private peers: Map<string, Peer> = new Map();
     private server: SocketIOServer;
@@ -44,6 +48,7 @@ export class P2PNetwork {
     private outboundCount: number = 0;
     private readonly MAX_INBOUND = 20;
     private readonly MAX_OUTBOUND = 20;
+    private fullNode: boolean = true; // Added based on instruction
 
     private db: LocalDatabase; // Persistence
     private healthCheckInterval: NodeJS.Timeout | null = null;
@@ -58,14 +63,18 @@ export class P2PNetwork {
         validatorPool: ValidatorPool,
         server: SocketIOServer,
         port: number,
-        db: LocalDatabase // Inject DB
+        db: LocalDatabase, // Inject DB
+        myPublicKey?: string // Accept public key
     ) {
+        this.fullNode = true;
         this.blockchain = blockchain;
         this.mempool = mempool;
+        this.messagePool = mempool; // Assuming messagePool refers to mempool for now
         this.validatorPool = validatorPool;
         this.server = server;
-        this.myPort = port;
+        this.myPort = port; // Use myPort as existing
         this.db = db;
+        this.myPublicKey = myPublicKey;
 
         this.loadPersistedPeers(); // Load peers on startup
         this.setupServerHandlers();
@@ -132,20 +141,24 @@ export class P2PNetwork {
         });
 
         socket.on('connect', () => {
-            console.log(`[P2P] Connected to ${targetUrl}`);
+            console.log(`[P2P] Connected to peer: ${targetUrl}`);
             this.outboundCount++;
             this.setupClientHandlers(socket, targetUrl);
 
-            // Handshake with SECURITY check
-            const myGenesisHash = this.blockchain.getChain()[0]?.hash;
-            socket.emit('p2p:handshake', {
-                port: this.myPort,
-                id: this.getPeerId(), // We need a stable ID
-                publicHost: process.env.PUBLIC_HOST,
-                height: this.blockchain.getChainLength(),
-                version: '3.0.0', // TraceNet V3
-                genesisHash: myGenesisHash
-            });
+            // Send handshake
+            const handshakeData = {
+                type: 'p2p:handshake',
+                payload: {
+                    id: this.getPeerId(),
+                    height: this.blockchain.getChainLength(),
+                    version: NETWORK_CONFIG.version,
+                    genesisHash: this.blockchain.getChainLength() > 0 ? this.blockchain.getChain()[0].hash : null,
+                    port: this.myPort,
+                    publicUrl: process.env.PUBLIC_HOST || null,
+                    validatorPublicKey: this.myPublicKey // SMARTER HANDSHAKE: Send key
+                }
+            };
+            socket.emit('p2p:handshake', handshakeData.payload); // Changed to emit directly to p2p:handshake
         });
 
         socket.on('connect_error', (err) => {
@@ -202,41 +215,6 @@ export class P2PNetwork {
             // ✅ ANTI-SYBIL: Extract and check IP immediately
             const clientIP = this.extractClientIP(socket);
 
-            // Check how many connections from this IP
-            // We iterate connectedIPs map which is ClientIP -> NodeID. 
-            // WAIT: Map keys are UNIQUE. So standard Map only supports 1 ID per IP.
-            // We need to change the data structure or logic.
-
-            // LOGIC FIX: If we want multiple nodes per IP, we can't use Map<IP, ID>.
-            // We should iterate sockets or use a Map<ID, IP> and count.
-            // Since we persist `connectedIPs` as Map<string, string>, let's verify if we can support this easily.
-            // Current Map: clientIP -> NodeId. This ENFORCES 1-to-1.
-
-            // TEMPORARY FIX: Do not strictly block duplicate IPs for now, OR change structure.
-            // Changing structure is risky for regression.
-            // BETTER FIX: Allow replacing the connection? No.
-
-            // Let's iterate `this.server.sockets.sockets` to count IPs?
-            // Or change `connectedIPs` to store a counter? 
-
-            // SIMPLEST FIX for this session: Remove the blocker or allow multiple connections by NOT using IP as the unique Key in the Map.
-            // But we need to track them.
-
-            // Hack for now: validation disabled or relaxed.
-            // Since Map keys unique, we just log warning but allow it? 
-            // No, if we `.set` it will overwrite the previous NodeID for that IP. 
-            // This might break tracking of the old node if we rely on this map for disconnection.
-
-            // Let's look at disconnect handler:
-            // const nodeId = this.connectedIPs.get(clientIP); 
-            // If we overwrite, the old node disconnect won't clean up correctly.
-
-            // REFACTOR: Use Map<SocketID, IP> for tracking connections.
-            // This allows us to count IPs without unique key constraint.
-
-            // However, that's a larger refactor.
-            // IMMEDIATE FIX: Skip Sybil check if not strictly required or use a different tracking mechanism.
-
             // Let's implement a simple counter map.
             const connectionCount = Array.from(this.server.sockets.sockets.values())
                 .filter(s => this.extractClientIP(s) === clientIP)
@@ -286,7 +264,8 @@ export class P2PNetwork {
                     publicHost: process.env.PUBLIC_HOST,
                     height: this.blockchain.getChainLength(),
                     version: '3.0.0',
-                    genesisHash: myGenesisHash
+                    genesisHash: myGenesisHash,
+                    validatorPublicKey: this.myPublicKey // SMARTER HANDSHAKE: Send key
                 });
             });
 
@@ -380,10 +359,20 @@ export class P2PNetwork {
 
             peers.forEach(p => {
                 // Don't add myself or localhost to known list if I'm public
-                if (p !== `http://localhost:${this.myPort}` && !this.knownPeers.has(p)) {
-                    if (this.knownPeers.size < 500) { // Hardcoded limit for now, should use Config
-                        this.knownPeers.add(p);
-                        newPeersCount++;
+                if (p && typeof p === 'string' && p.startsWith('http')) {
+                    // Simple Validation
+                    try {
+                        const url = new URL(p);
+                        if (!url.hostname || !url.port) return; // Must have host and port
+
+                        if (p !== `http://localhost:${this.myPort}` && !this.knownPeers.has(p)) {
+                            if (this.knownPeers.size < 500) {
+                                this.knownPeers.add(p);
+                                newPeersCount++;
+                            }
+                        }
+                    } catch (e) {
+                        // Invalid URL
                     }
                 }
             });
@@ -514,7 +503,7 @@ export class P2PNetwork {
     }
 
     private handleHandshake(socket: any, data: any, isIncoming: boolean, peerUrl?: string) {
-        const theirId = peerUrl || `incoming_${socket.id}`; // Simple ID
+        const theirId = data.id || peerUrl || `incoming_${socket.id}`;
 
         // Extract client IP using consistent method
         const clientIP = this.extractClientIP(socket);
@@ -538,15 +527,8 @@ export class P2PNetwork {
             }
 
             // ✅ Policy: ASN Analysis (Max 3 per ASN)
-            // Even if GeoIP doesn't have ASN, we implement the structure.
-            // In future, replaced by: const asn = geoip.lookup(clientIP).asn;
             const asn = this.getASN(clientIP);
-            // We can map subnets to "mock" ASNs if needed, or assume UNKNOWN_ASN for now if not available.
-            // If ASN is unknown, we fall back to subnet/IP limits. 
             if (asn !== 'UNKNOWN_ASN') {
-                // Count peers in this ASN
-                // Note: We need to store ASN in Peer or tracked separately.
-                // For now, calculating by re-deriving ASN from connected IPs
                 const peersInASN = Array.from(this.connectedIPs.keys()).filter(ip => this.getASN(ip) === asn).length;
                 if (peersInASN >= 3 && process.env.NODE_ENV === 'production') {
                     console.warn(`[P2P] ❌ Rejected peer ${clientIP}: Too many peers from ASN ${asn}`);
@@ -567,10 +549,9 @@ export class P2PNetwork {
                         city: geo.city,
                         lat: geo.ll ? geo.ll[0] : 0,
                         lng: geo.ll ? geo.ll[1] : 0,
-                        asn: geo.area // Basic ASN approx usage if available otherwise ignored
+                        asn: geo.area
                     };
                 } else {
-                    // No geolocation data (localhost or private IP)
                     location = {
                         ip: clientIP,
                         country: this.isLocalOrPrivateIP(clientIP) ? 'Local/Private' : 'Unknown',
@@ -593,22 +574,51 @@ export class P2PNetwork {
             location = this.getLocationFromUrl(peerUrl);
         }
 
+        // Check Genesis Hash (Network Integrity)
+        if (data.genesisHash) {
+            const myGenesisHash = this.blockchain.getChainLength() > 0 ? this.blockchain.getChain()[0].hash : null;
+            if (myGenesisHash && data.genesisHash !== myGenesisHash) {
+                console.warn(`[P2P] Rejected peer ${theirId}: Genesis hash mismatch (Theirs: ${data.genesisHash}, Mine: ${myGenesisHash})`);
+                socket.disconnect();
+                return;
+            }
+        }
+
+        // SMART HANDSHAKE: Learn Validator Public Key
+        if (data.validatorPublicKey) {
+            const expectedIdFragment = data.validatorPublicKey.substring(0, 8);
+            // Basic check: ID should contain the key fragment if it follows convention
+            if (data.id && data.id.includes(expectedIdFragment)) {
+                // Check if we know this validator
+                const existing = this.validatorPool.getValidator(data.id);
+                if (existing) {
+                    if (existing.public_key !== data.validatorPublicKey) {
+                        console.log(`[P2P] 🔄 UPDATING Validator Key for ${data.id} via Smart Handshake!`);
+                        // Set the key by getting reference (assuming map stores reference)
+                        existing.public_key = data.validatorPublicKey;
+                        // Force update map just in case (though reference modification usually works)
+                        // But registerValidator would reset stats.
+                        // We need a way to persist this if the node restarts?
+                        // For now memory-only update is enough to sync.
+                    }
+                } else {
+                    console.log(`[P2P] Discovered NEW Validator via Handshake: ${data.id} (Key: ${data.validatorPublicKey.substring(0, 8)}...)`);
+                    // Optionally register dynamic validators here
+                }
+            }
+        }
+
         const peer: Peer = {
-            url: peerUrl || 'unknown', // If incoming, we don't strictly know their public URL unless they sent it
+            url: peerUrl || 'unknown',
             socket: socket,
-            id: data.id || theirId, // Prefer their announced ID
+            id: data.id || theirId,
             height: data.height || 0,
             version: data.version || 'unknown',
             genesisHash: data.genesisHash,
+            lastSeen: Date.now(),
+            publicKey: data.validatorPublicKey, // Store it
             ...location
         };
-
-        if (isIncoming && data.port) {
-            // Construct their likely URL assuming same IP
-            // For local network simulation this is tricky.
-            // But we'll trust their announced port?
-            // We won't connect back immediately to avoid loops, or we check if connected.
-        }
 
         this.peers.set(theirId, peer);
         console.log(`[P2P] Handshake with ${peer.id} (Height: ${peer.height}, Location: ${peer.city || 'N/A'}, ${peer.region || 'N/A'}, ${peer.country || 'Unknown'}, IP: ${peer.ip || 'N/A'})`);
