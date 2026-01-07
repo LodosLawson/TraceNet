@@ -53,14 +53,6 @@ const AtmosphereMaterial = shaderMaterial(
 extend({ AtmosphereMaterial });
 
 // --- Types ---
-// --- Types ---
-declare global {
-    namespace JSX {
-        interface IntrinsicElements {
-            atmosphereMaterial: any;
-        }
-    }
-}
 
 // --- Helpers ---
 const getPosition = (lat: number, lng: number, radius: number) => {
