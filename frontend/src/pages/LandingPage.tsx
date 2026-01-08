@@ -5,7 +5,14 @@ import { motion } from 'framer-motion';
 import { NetworkGlobe } from '../components/3d/NetworkGlobe';
 import { Cuboid, Activity, Globe2 } from 'lucide-react';
 
-import { useState, useEffect } from 'react';
+import { Suspense } from 'react';
+
+// ... (in component)
+                    <pointLight position={[-10, -10, -10]} intensity={0.5} color="#d90429" />
+                    <Suspense fallback={null}>
+                        <NetworkGlobe realNodes={nodes} />
+                    </Suspense>
+                    <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />
 import { api } from '../services/api';
 
 interface PageProps {
