@@ -137,9 +137,10 @@ export const LandingPage = ({ onNavigate }: PageProps) => {
 
                     {/* CTA Button */}
                     <motion.button
+                        onClick={() => onNavigate('nodes')}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        className="mt-12 md:mt-16 px-10 py-4 bg-gradient-to-r from-pomegranate-600 to-pomegranate-500 text-white rounded-full font-bold shadow-lg shadow-pomegranate-900/50 hover:shadow-pomegranate-500/30 transition-all border border-white/10"
+                        className="mt-12 md:mt-16 px-10 py-4 bg-gradient-to-r from-pomegranate-600 to-pomegranate-500 text-white rounded-full font-bold shadow-lg shadow-pomegranate-900/50 hover:shadow-pomegranate-500/30 transition-all border border-white/10 cursor-pointer"
                     >
                         Launch Visualizer
                     </motion.button>
