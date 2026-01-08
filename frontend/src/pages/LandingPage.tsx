@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { NetworkGlobe } from '../components/3d/NetworkGlobe';
 import { Cuboid, Activity, Globe2 } from 'lucide-react';
 
-import { Suspense } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 
 
 import { api } from '../services/api';
