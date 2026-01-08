@@ -7,12 +7,7 @@ import { Cuboid, Activity, Globe2 } from 'lucide-react';
 
 import { Suspense } from 'react';
 
-// ... (in component)
-                    <pointLight position={[-10, -10, -10]} intensity={0.5} color="#d90429" />
-                    <Suspense fallback={null}>
-                        <NetworkGlobe realNodes={nodes} />
-                    </Suspense>
-                    <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />
+
 import { api } from '../services/api';
 
 interface PageProps {
@@ -96,7 +91,9 @@ export const LandingPage = ({ onNavigate }: PageProps) => {
                     <ambientLight intensity={0.5} />
                     <pointLight position={[10, 10, 10]} intensity={1} color="#ffb703" />
                     <pointLight position={[-10, -10, -10]} intensity={0.5} color="#d90429" />
-                    <NetworkGlobe realNodes={nodes} />
+                    <Suspense fallback={null}>
+                        <NetworkGlobe realNodes={nodes} />
+                    </Suspense>
                     <OrbitControls enableZoom={false} autoRotate autoRotateSpeed={0.5} />
                     <Environment preset="city" />
                 </Canvas>
