@@ -1023,15 +1023,18 @@ export class Blockchain extends EventEmitter {
                     if (tx.payload.encryption_public_key) fromAccount.encryption_public_key = tx.payload.encryption_public_key;
                     if (tx.payload.nickname) fromAccount.nickname = tx.payload.nickname;
                 }
-                // Execute standard processing logic explicitly to avoid switch fallthrough error
-                if (tx.fee > 0) {
-                    if (fromAccount.balance < tx.fee) {
-                        return { success: false, error: 'Insufficient balance for fee' };
+
+                // Calculate total cost (Fee + Amount)
+                const profileUpdateCost = (tx.fee || 0) + (tx.amount || 0);
+
+                if (profileUpdateCost > 0) {
+                    if (fromAccount.balance < profileUpdateCost) {
+                        return { success: false, error: 'Insufficient balance for fee + amount' };
                     }
-                    fromAccount.balance -= tx.fee;
+                    fromAccount.balance -= profileUpdateCost;
                     fromAccount.nonce = tx.nonce;
                 } else {
-                    // Even if fee is 0, we must increment nonce
+                    // Even if cost is 0, we must increment nonce
                     fromAccount.nonce = tx.nonce;
                 }
 
@@ -1059,11 +1062,14 @@ export class Blockchain extends EventEmitter {
                     fromAccount.liked_content_ids.add(contentId);
                 }
 
-                // Deduct fee
-                if (fromAccount.balance < tx.fee) {
-                    return { success: false, error: 'Insufficient balance for fee' };
+                // Calculate total cost (Fee + Amount)
+                const likeTotalCost = (tx.fee || 0) + (tx.amount || 0);
+
+                // Deduct fee + amount
+                if (fromAccount.balance < likeTotalCost) {
+                    return { success: false, error: 'Insufficient balance for fee + amount' };
                 }
-                fromAccount.balance -= tx.fee;
+                fromAccount.balance -= likeTotalCost;
                 fromAccount.nonce = tx.nonce;
 
                 if (tx.amount > 0) {
@@ -1079,11 +1085,14 @@ export class Blockchain extends EventEmitter {
                     return { success: false, error: `${tx.type} requires minimum fee of ${MIN_SOCIAL_FEE} TNN` };
                 }
 
-                // Deduct fee
-                if (fromAccount.balance < tx.fee) {
-                    return { success: false, error: 'Insufficient balance for fee' };
+                // Calculate total cost (Fee + Amount)
+                const socialTotalCost = (tx.fee || 0) + (tx.amount || 0);
+
+                // Deduct fee + amount
+                if (fromAccount.balance < socialTotalCost) {
+                    return { success: false, error: 'Insufficient balance for fee + amount' };
                 }
-                fromAccount.balance -= tx.fee;
+                fromAccount.balance -= socialTotalCost;
                 fromAccount.nonce = tx.nonce;
 
                 if (tx.amount > 0) {
@@ -1098,11 +1107,14 @@ export class Blockchain extends EventEmitter {
                     return { success: false, error: `COMMENT requires minimum fee of ${MIN_COMMENT_FEE} TNN` };
                 }
 
-                // Deduct fee
-                if (fromAccount.balance < tx.fee) {
-                    return { success: false, error: 'Insufficient balance for fee' };
+                // Calculate total cost (Fee + Amount)
+                const commentTotalCost = (tx.fee || 0) + (tx.amount || 0);
+
+                // Deduct fee + amount
+                if (fromAccount.balance < commentTotalCost) {
+                    return { success: false, error: 'Insufficient balance for fee + amount' };
                 }
-                fromAccount.balance -= tx.fee;
+                fromAccount.balance -= commentTotalCost;
                 fromAccount.nonce = tx.nonce;
 
                 if (tx.amount > 0) {
@@ -1114,14 +1126,16 @@ export class Blockchain extends EventEmitter {
             case 'SHARE':
             case 'PRIVATE_MESSAGE':
                 // These may have fees or rewards
-                if (tx.fee > 0) {
-                    if (fromAccount.balance < tx.fee) {
-                        return { success: false, error: 'Insufficient balance for fee' };
+                const contentActionCost = (tx.fee || 0) + (tx.amount || 0);
+
+                if (contentActionCost > 0) {
+                    if (fromAccount.balance < contentActionCost) {
+                        return { success: false, error: 'Insufficient balance for fee + amount' };
                     }
-                    fromAccount.balance -= tx.fee;
+                    fromAccount.balance -= contentActionCost;
                     fromAccount.nonce = tx.nonce;
                 } else {
-                    // Even if fee is 0, we must increment nonce
+                    // Even if fee/cost is 0, we must increment nonce
                     fromAccount.nonce = tx.nonce;
                 }
 
