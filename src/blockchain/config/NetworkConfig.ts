@@ -36,6 +36,8 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     BOOTSTRAP_NODES: [
         ...(process.env.BOOTSTRAP_NODES ? process.env.BOOTSTRAP_NODES.split(',') : []),
         'https://tracenet-blockchain-136028201808.us-central1.run.app', // Active US Mainnet
+        'https://tracenet-blockchain-nodeeu-136028201808.europe-west1.run.app', // Europe Mainnet
+        'https://rotundly-symphysial-sharonda.ngrok-free.dev', // Local Developer Node
         'https://tracenet-node-1.run.app',
         'https://tracenet-node-2.run.app',
         'https://tracenet-mainnet-seed.herokuapp.com'
