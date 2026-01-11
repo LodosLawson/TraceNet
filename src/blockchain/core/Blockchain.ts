@@ -1104,6 +1104,11 @@ export class Blockchain extends EventEmitter {
                     }
                     fromAccount.balance -= profileUpdateCost;
                     fromAccount.nonce = tx.nonce;
+
+                    // FEE DISTRIBUTION for Profile Update
+                    if (tx.fee > 0) {
+                        this.distributeFees(tx.fee, state);
+                    }
                 } else {
                     // Even if cost is 0, we must increment nonce
                     fromAccount.nonce = tx.nonce;
@@ -1111,6 +1116,148 @@ export class Blockchain extends EventEmitter {
 
                 if (tx.amount > 0) {
                     toAccount.balance += tx.amount;
+                }
+                break;
+
+            case 'LIKE':
+            case 'COMMENT':
+            case 'POST_CONTENT':
+            case 'FOLLOW':
+            case 'UNFOLLOW':
+            case 'SHARE':
+            case 'PRIVATE_MESSAGE':
+                // Calculate total cost (Fee + Amount)
+                const actionTotalCost = (tx.fee || 0) + (tx.amount || 0);
+
+                // Deduct fee + amount
+                if (fromAccount.balance < actionTotalCost) {
+                    return { success: false, error: 'Insufficient balance for fee + amount' };
+                }
+                fromAccount.balance -= actionTotalCost;
+                fromAccount.nonce = tx.nonce;
+
+                if (tx.amount > 0) {
+                    toAccount.balance += tx.amount;
+                }
+
+                // Distribute Fees
+                if (tx.fee > 0) {
+                    this.distributeFees(tx.fee, state);
+                }
+                break;
+
+            case 'BATCH':
+            case 'CONVERSATION_BATCH':
+                // For Batches, the outer transaction usually pays the "Network Fee".
+                // INNER transactions are the ones that user pays for.
+
+                // 1. Deduct Batch Wrapper Fee (if any)
+                if (tx.fee > 0) {
+                    if (fromAccount.balance < tx.fee) {
+                        return { success: false, error: 'Insufficient balance for batch fee' };
+                    }
+                    fromAccount.balance -= tx.fee;
+                    this.distributeFees(tx.fee, state);
+                }
+                fromAccount.nonce = tx.nonce;
+
+                // 2. Process Inner Transactions
+                if (tx.payload && Array.isArray(tx.payload.transactions)) {
+                    for (const innerTx of tx.payload.transactions) {
+                        const innerFrom = state.get(innerTx.from_wallet);
+                        if (!innerFrom) continue;
+
+                        const innerCost = (innerTx.amount || 0);
+                        if (innerFrom.balance >= innerCost) {
+                            innerFrom.balance -= innerCost;
+                            state.set(innerTx.from_wallet, innerFrom);
+
+                            if (innerCost > 0) {
+                                this.distributeFees(innerCost, state);
+                            }
+                        }
+                    }
+                }
+                break;
+
+            case 'LIKE':
+            case 'COMMENT':
+            case 'POST_CONTENT':
+            case 'FOLLOW':
+            case 'UNFOLLOW':
+            case 'SHARE':
+            case 'PRIVATE_MESSAGE':
+                // Calculate total cost (Fee + Amount)
+                const actionTotalCost = (tx.fee || 0) + (tx.amount || 0);
+
+                // Deduct fee + amount
+                if (fromAccount.balance < actionTotalCost) {
+                    return { success: false, error: 'Insufficient balance for fee + amount' };
+                }
+                fromAccount.balance -= actionTotalCost;
+                fromAccount.nonce = tx.nonce;
+
+                if (tx.amount > 0) {
+                    toAccount.balance += tx.amount;
+                }
+
+                // Distribute Fees
+                if (tx.fee > 0) {
+                    this.distributeFees(tx.fee, state);
+                }
+                break;
+
+            case 'BATCH':
+            case 'CONVERSATION_BATCH':
+                // For Batches, the outer transaction usually pays the "Network Fee".
+                // INNER transactions are the ones that user pays for.
+                // However, how do we modify state for INNER transactions?
+
+                // 1. Deduct Batch Creator Fee (if any)
+                const batchCost = (tx.fee || 0);
+                if (fromAccount.balance < batchCost) {
+                    return { success: false, error: 'Insufficient balance for batch fee' };
+                }
+                fromAccount.balance -= batchCost;
+                fromAccount.nonce = tx.nonce;
+                if (tx.fee > 0) this.distributeFees(tx.fee, state);
+
+                // 2. Process Inner Transactions
+                // Only if payload has transactions
+                if (tx.payload && Array.isArray(tx.payload.transactions)) {
+                    for (const innerTx of tx.payload.transactions) {
+                        // We need to fetch inner sender account from state
+                        const innerFrom = state.get(innerTx.from_wallet);
+                        if (!innerFrom) {
+                            console.warn(`[Blockchain] Batch inner sender ${innerTx.from_wallet} not found`);
+                            continue; // Skip or fail? Skip is safer for now.
+                        }
+
+                        // Determine cost for inner tx
+                        // Inner tx usually has 'amount' that acts as the fee paid to network/creator
+                        const innerCost = (innerTx.amount || 0);
+
+                        if (innerFrom.balance < innerCost) {
+                            console.warn(`[Blockchain] Batch inner sender ${innerTx.from_wallet} insufficient balance`);
+                            // Mark as failed? We can't fail the whole block easily here without rollback.
+                            // TraceNet architecture typically validates this before batching.
+                            continue;
+                        }
+
+                        // Deduct from inner sender
+                        innerFrom.balance -= innerCost;
+                        // Update inner nonce? Usually Batch manages nonces or user nonces are tracked.
+                        // Let's increment nonce if it seems valid
+                        innerFrom.nonce = (innerFrom.nonce || 0) + 1;
+
+                        state.set(innerTx.from_wallet, innerFrom);
+
+                        // Distribute Inner Tx Fees (if they are considered fees)
+                        // Usually innerTx.amount acts as the fee
+                        if (innerCost > 0) {
+                            this.distributeFees(innerCost, state);
+                        }
+                    }
                 }
                 break;
 
@@ -1411,6 +1558,37 @@ export class Blockchain extends EventEmitter {
         const fee = parseFloat((amount * totalRate).toFixed(8));
         console.log(`[Blockchain] TotalRate: ${totalRate}, Calculated Fee: ${fee}`);
         return fee;
+    }
+
+    /**
+     * Helper to distribute fees to pools
+     */
+    private distributeFees(fee: number, state: Map<string, AccountState>): void {
+        const pPool = TOKEN_CONFIG.FEE_TO_POOL_PERCENT / 100;
+        const pDev = TOKEN_CONFIG.FEE_TO_DEV_PERCENT / 100;
+        const pRecycle = TOKEN_CONFIG.FEE_TO_RECYCLE_PERCENT / 100;
+
+        const poolShare = Math.floor(fee * pPool);
+        const devShare = Math.floor(fee * pDev);
+        const recycleShare = Math.floor(fee * pRecycle);
+        // Valid primaryShare calculation
+        const primaryShare = fee - poolShare - devShare - recycleShare;
+
+        const poolAcc = state.get(TREASURY_ADDRESSES.validator_pool) || { address: TREASURY_ADDRESSES.validator_pool, balance: 0, nonce: 0 };
+        poolAcc.balance += poolShare;
+        state.set(TREASURY_ADDRESSES.validator_pool, poolAcc);
+
+        const devAcc = state.get(TREASURY_ADDRESSES.development) || { address: TREASURY_ADDRESSES.development, balance: 0, nonce: 0 };
+        devAcc.balance += devShare;
+        state.set(TREASURY_ADDRESSES.development, devAcc);
+
+        const recycleAcc = state.get(TREASURY_ADDRESSES.recycle) || { address: TREASURY_ADDRESSES.recycle, balance: 0, nonce: 0 };
+        recycleAcc.balance += recycleShare;
+        state.set(TREASURY_ADDRESSES.recycle, recycleAcc);
+
+        const mainAcc = state.get(TREASURY_ADDRESSES.main) || { address: TREASURY_ADDRESSES.main, balance: 0, nonce: 0 };
+        mainAcc.balance += primaryShare;
+        state.set(TREASURY_ADDRESSES.main, mainAcc);
     }
 
     /**
