@@ -590,17 +590,33 @@ export class RPCServer {
 
             // 2. Calculate pending deductions from Mempool
             let pendingDeductions = 0;
-            const pendingTxs = this.mempool.getTransactionsByWallet(walletId);
+            const pendingTxs = this.mempool.getAllTransactions(); // Get ALL to check inner txs
 
             for (const tx of pendingTxs) {
-                // If we are the sender, we deduct amount + fee
+                // Case A: Direct Transaction (Normal Transfer)
                 if (tx.from_wallet === walletId) {
                     pendingDeductions += (tx.amount || 0) + (tx.fee || 0);
                 }
+
+                // Case B: Batched Transactions (User is inside the payload)
+                if (tx.type === 'BATCH' || tx.type === 'CONVERSATION_BATCH') {
+                    if (tx.payload && Array.isArray(tx.payload.transactions)) {
+                        for (const innerTx of tx.payload.transactions) {
+                            if (innerTx.from_wallet === walletId) {
+                                // For inner txs, 'amount' is usually the fee paid to creator/network
+                                pendingDeductions += (innerTx.amount || 0);
+                            }
+                        }
+                    }
+                }
             }
 
-            // 3. Calculate Available Balance
-            // Prevent negative available balance just in case
+            // 3. Calculate pending deductions from SocialPool (Waiting to be batched)
+            if (this.socialService) {
+                pendingDeductions += this.socialService.getPendingUserCost(walletId);
+            }
+
+            // 4. Calculate Available Balance
             const availableBalance = Math.max(0, confirmedBalance - pendingDeductions);
 
             res.json({

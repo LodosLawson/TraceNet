@@ -103,6 +103,13 @@ export class SocialPool extends EventEmitter {
     }
 
     /**
+     * Get pending actions for a specific wallet (for balance calculation)
+     */
+    getPendingActions(walletId: string): InnerTransaction[] {
+        return this.queue.filter(tx => tx.from_wallet === walletId);
+    }
+
+    /**
      * Force flush (for testing/debug)
      */
     forceFlush(): void {

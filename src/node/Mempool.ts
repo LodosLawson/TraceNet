@@ -100,6 +100,13 @@ export class Mempool extends EventEmitter {
     }
 
     /**
+     * Get ALL transactions (raw iterator)
+     */
+    getAllTransactions(): Transaction[] {
+        return Array.from(this.pool.values()).map(e => e.transaction);
+    }
+
+    /**
      * Get top N transactions for block creation
      */
     getTopTransactions(count: number): Transaction[] {

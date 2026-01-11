@@ -70,6 +70,15 @@ export class SocialService {
     }
 
     /**
+     * Get pending cost for a user (sum of amounts in SocialPool)
+     */
+    getPendingUserCost(walletId: string): number {
+        const pendingActions = this.socialPool.getPendingActions(walletId);
+        // Sum up amounts (which are the fees paid by user for inner txs)
+        return pendingActions.reduce((sum, action) => sum + (action.amount || 0), 0);
+    }
+
+    /**
      * Like content
      * Fee: 0.00001 LT (50% to content creator, 50% to blockchain)
      */
