@@ -117,22 +117,44 @@ export class RPCServer {
         this.app.use(express.json());
 
         // Security: Rate Limiting
-        const limiter = rateLimit({
+        // Security: Rate Limiting
+        // 1. Strict Limiter (Critical Ops: Wallet Gen, Transfer, General RPC)
+        const strictLimiter = rateLimit({
             windowMs: 15 * 60 * 1000, // 15 minutes
-            max: 20000, // INCREASED: limit each IP to 20000 requests per windowMs
+            max: 500, // 500 requests per 15 min for critical/general ops
             standardHeaders: true,
             legacyHeaders: false,
-            message: { error: 'Too many requests from this IP, please try again later.' },
+            message: { error: 'Too many requests. Please try again later.' },
             skip: (req) => {
-                // Trust localhost
                 const ip = req.ip || req.connection.remoteAddress;
                 return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
             }
         });
 
-        // Apply to all RPC/API routes
-        this.app.use('/rpc', limiter);
-        this.app.use('/api', limiter);
+        // 2. Social Limiter (High Volume: Chat, Like, Comment)
+        const socialLimiter = rateLimit({
+            windowMs: 1 * 60 * 1000, // 1 minute window for social
+            max: 5000, // 5000 requests per minute (effectively unlimited for humans)
+            standardHeaders: true,
+            legacyHeaders: false,
+            message: { error: 'Social rate limit exceeded.' },
+            skip: (req) => {
+                const ip = req.ip || req.connection.remoteAddress;
+                return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+            }
+        });
+
+        // Apply Strict Limiter to General RPC and Wallet/User Creation
+        this.app.use('/rpc', strictLimiter);
+        this.app.use('/api/user', strictLimiter);
+        this.app.use('/api/wallet', strictLimiter);
+        this.app.use('/api/validator', strictLimiter);
+
+        // Apply Social Limiter to High-Traffic Social/Content Endpoints
+        this.app.use('/api/social', socialLimiter);
+        this.app.use('/api/content', socialLimiter);
+        this.app.use('/api/messaging', socialLimiter);
+        this.app.use('/api/nodes', socialLimiter); // Discovery should be fast
 
         // Detailed Request logging
         this.app.use((req: Request, res: Response, next: NextFunction) => {
