@@ -1125,7 +1125,7 @@ export class Blockchain extends EventEmitter {
             case 'FOLLOW':
             case 'UNFOLLOW':
             case 'SHARE':
-            case 'PRIVATE_MESSAGE':
+            case 'PRIVATE_MESSAGE': {
                 // Calculate total cost (Fee + Amount)
                 const actionTotalCost = (tx.fee || 0) + (tx.amount || 0);
 
@@ -1145,6 +1145,7 @@ export class Blockchain extends EventEmitter {
                     this.distributeFees(tx.fee, state);
                 }
                 break;
+            }
 
             case 'BATCH':
             case 'CONVERSATION_BATCH':
