@@ -4,6 +4,8 @@ import { ContentModel, ContentType, ContentMetadata } from '../models/ContentMod
 import { TransactionModel, TransactionType } from '../blockchain/models/Transaction';
 import { UserService } from './user/UserService';
 
+import { KeyManager } from '../blockchain/crypto/KeyManager';
+
 /**
  * Content creation options
  */
@@ -17,6 +19,9 @@ export interface CreateContentOptions {
     duration?: number;
     size?: number;
     tags?: string[];
+    timestamp: number;
+    signature: string;
+    sender_public_key: string;
 }
 
 /**
@@ -57,6 +62,13 @@ export class ContentService {
         tx_id: string;
         success: boolean;
     } {
+        // VERIFY SIGNATURE (SECURITY FIX)
+        // Message format: walletId:POST_CONTENT:timestamp
+        const messageToVerify = `${options.wallet_id}:POST_CONTENT:${options.timestamp}`;
+        if (!KeyManager.verify(messageToVerify, options.signature, options.sender_public_key)) {
+            throw new Error('Invalid signature');
+        }
+
         // Get user nickname if available
         let nickname: string | undefined;
         if (this.userService) {
@@ -86,6 +98,8 @@ export class ContentService {
             throw new Error(validation.error);
         }
 
+        const timestamp = options.timestamp;
+
         // Create transaction
         const transaction = TransactionModel.create(
             options.wallet_id,
@@ -93,11 +107,15 @@ export class ContentService {
             TransactionType.POST_CONTENT,
             0, // No transfer amount for posting
             0, // No fee for posting content
-            (Date.now() % 1000000), // Nonce
+            (timestamp % 1000000), // Nonce
             {
                 content: contentModel.toJSON(),
+                timestamp: timestamp
             }
         );
+
+        // Assign signature
+        transaction.signature = options.signature;
 
         // Add to mempool
         const result = this.mempool.addTransaction(transaction.toJSON());

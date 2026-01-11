@@ -32,7 +32,9 @@ export class KeyManager {
      * Generate a new ED25519 key pair
      */
     static generateKeyPair(): KeyPair {
-        const keyPair = nacl.sign.keyPair();
+        // FIXED: Explicitly use crypto.randomBytes for reliable entropy
+        const seed = crypto.randomBytes(32);
+        const keyPair = nacl.sign.keyPair.fromSeed(new Uint8Array(seed));
 
         return {
             publicKey: Buffer.from(keyPair.publicKey).toString('hex'),
@@ -159,7 +161,9 @@ export class KeyManager {
      */
     static encrypt(data: string, encryptionKey: string): string {
         const iv = crypto.randomBytes(16);
-        const key = crypto.scryptSync(encryptionKey, 'salt', 32);
+        // FIXED: Use random salt specifically for this encryption
+        const salt = crypto.randomBytes(16);
+        const key = crypto.scryptSync(encryptionKey, salt, 32);
 
         const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
 
@@ -168,8 +172,8 @@ export class KeyManager {
 
         const authTag = cipher.getAuthTag();
 
-        // Return iv + authTag + encrypted data
-        return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+        // Return salt + iv + authTag + encrypted data
+        return salt.toString('hex') + ':' + iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
     }
 
     /**
@@ -177,15 +181,33 @@ export class KeyManager {
      */
     static decrypt(encryptedData: string, encryptionKey: string): string {
         const parts = encryptedData.split(':');
-        if (parts.length !== 3) {
+        // Now expects 4 parts: salt:iv:authTag:encrypted
+        if (parts.length !== 4) {
+            // Fallback for legacy format (temporary)
+            if (parts.length === 3) {
+                // Try treating first part as iv, use legacy 'salt'
+                // This is risky but allows reading old keys until migration is done.
+                // However, for strict security hardening, we might want to fail.
+                // Let's assume user wants to read old data for now.
+                const iv = Buffer.from(parts[0], 'hex');
+                const authTag = Buffer.from(parts[1], 'hex');
+                const encrypted = parts[2];
+                const key = crypto.scryptSync(encryptionKey, 'salt', 32); // Legacy hardcoded salt
+                const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+                decipher.setAuthTag(authTag);
+                let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+                decrypted += decipher.final('utf8');
+                return decrypted;
+            }
             throw new Error('Invalid encrypted data format');
         }
 
-        const iv = Buffer.from(parts[0], 'hex');
-        const authTag = Buffer.from(parts[1], 'hex');
-        const encrypted = parts[2];
+        const salt = Buffer.from(parts[0], 'hex');
+        const iv = Buffer.from(parts[1], 'hex');
+        const authTag = Buffer.from(parts[2], 'hex');
+        const encrypted = parts[3];
 
-        const key = crypto.scryptSync(encryptionKey, 'salt', 32);
+        const key = crypto.scryptSync(encryptionKey, salt, 32);
 
         const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
         decipher.setAuthTag(authTag);

@@ -9,9 +9,17 @@ import crypto from 'crypto';
 /**
  * Like action options
  */
+import { KeyManager } from '../blockchain/crypto/KeyManager';
+
+/**
+ * Like action options
+ */
 export interface LikeContentOptions {
     wallet_id: string;
     content_id: string;
+    timestamp: number; // Required for signature verification
+    signature: string;
+    sender_public_key: string;
 }
 
 /**
@@ -22,6 +30,9 @@ export interface CommentContentOptions {
     content_id: string;
     comment_text: string;
     parent_comment_id?: string; // For replies
+    timestamp: number;
+    signature: string;
+    sender_public_key: string;
 }
 
 /**
@@ -30,6 +41,9 @@ export interface CommentContentOptions {
 export interface FollowUserOptions {
     wallet_id: string;
     target_wallet_id: string;
+    timestamp: number;
+    signature: string;
+    sender_public_key: string;
 }
 
 /**
@@ -82,6 +96,12 @@ export class SocialService {
             throw new Error('You have already liked this content');
         }
 
+        // VERIFY SIGNATURE (SECURITY FIX)
+        const messageToVerify = `${options.wallet_id}:LIKE:${options.content_id}:${options.timestamp}`;
+        if (!KeyManager.verify(messageToVerify, options.signature, options.sender_public_key)) {
+            throw new Error('Invalid signature');
+        }
+
         const totalFee = TOKEN_CONFIG.LIKE_FEE; // 1000 = 0.00001 LT
 
         // 50% to Creator
@@ -93,7 +113,7 @@ export class SocialService {
         // 40% to Validator Pool (Remaining)
         const poolAmount = totalFee - creatorAmount - treasuryAmount;
 
-        const timestamp = Date.now();
+        const timestamp = options.timestamp;
 
         // 1. Create INNER Like Transaction (Creator Share)
         const innerLike: InnerTransaction = {
@@ -108,7 +128,7 @@ export class SocialService {
                 content_id: options.content_id,
                 target_content_id: options.content_id,
             },
-            signature: 'PENDING', // Client should sign, but for now we simulate
+            signature: options.signature, // Use actual signature
         };
 
         // 2. Create INNER Treasury Transaction
@@ -189,6 +209,12 @@ export class SocialService {
             throw new Error('Content not found');
         }
 
+        // VERIFY SIGNATURE (SECURITY FIX)
+        const messageToVerify = `${options.wallet_id}:COMMENT:${options.content_id}:${options.timestamp}:${options.comment_text}`;
+        if (!KeyManager.verify(messageToVerify, options.signature, options.sender_public_key)) {
+            throw new Error('Invalid signature');
+        }
+
         const totalFee = TOKEN_CONFIG.COMMENT_FEE;
 
         // 50% to Creator
@@ -200,7 +226,7 @@ export class SocialService {
         // 40% to Validator Pool
         const poolAmount = totalFee - creatorAmount - treasuryAmount;
 
-        const timestamp = Date.now();
+        const timestamp = options.timestamp;
 
         // Create comment ID
         const comment_id = crypto
@@ -224,7 +250,7 @@ export class SocialService {
                 comment_text: options.comment_text,
                 parent_comment_id: options.parent_comment_id,
             },
-            signature: 'PENDING'
+            signature: options.signature
         };
 
         // 2. Inner Treasury Tx
@@ -289,6 +315,14 @@ export class SocialService {
             throw new Error('You are already following this user');
         }
 
+        const timestamp = options.timestamp;
+
+        // VERIFY SIGNATURE (SECURITY FIX)
+        const messageToVerify = `${options.wallet_id}:FOLLOW:${options.target_wallet_id}:${timestamp}`;
+        if (!KeyManager.verify(messageToVerify, options.signature, options.sender_public_key)) {
+            throw new Error('Invalid signature');
+        }
+
         // Create FOLLOW transaction (no fee)
         const followTransaction = TransactionModel.create(
             options.wallet_id,
@@ -296,11 +330,11 @@ export class SocialService {
             TransactionType.FOLLOW,
             0, // No amount
             0, // No fee - following is FREE
-            (Date.now() % 1000000), // Nonce
+            (timestamp % 1000000), // Nonce
             {
                 action_type: 'FOLLOW',
                 target_wallet_id: options.target_wallet_id,
-                timestamp: Date.now(),
+                timestamp: timestamp,
             }
         );
 
@@ -328,6 +362,14 @@ export class SocialService {
             throw new Error('You are not following this user');
         }
 
+        const timestamp = options.timestamp;
+
+        // VERIFY SIGNATURE (SECURITY FIX)
+        const messageToVerify = `${options.wallet_id}:UNFOLLOW:${options.target_wallet_id}:${timestamp}`;
+        if (!KeyManager.verify(messageToVerify, options.signature, options.sender_public_key)) {
+            throw new Error('Invalid signature');
+        }
+
         // Create UNFOLLOW transaction (no fee)
         const unfollowTransaction = TransactionModel.create(
             options.wallet_id,
@@ -335,11 +377,11 @@ export class SocialService {
             TransactionType.UNFOLLOW,
             0,
             0,
-            (Date.now() % 1000000), // Nonce
+            (timestamp % 1000000), // Nonce
             {
                 action_type: 'UNFOLLOW',
                 target_wallet_id: options.target_wallet_id,
-                timestamp: Date.now(),
+                timestamp: timestamp,
             }
         );
 

@@ -242,8 +242,18 @@ export class Blockchain extends EventEmitter {
         this.chain.push(newBlock);
 
         // ✅ MINING POOL: Accumulate fees from this block
-        const totalBlockFees = transactions.reduce((sum, tx) => sum + (tx.fee || 0), 0);
+        // FIXED: Sum up fees from inner transactions for BATCH types too
+        const totalBlockFees = transactions.reduce((sum, tx) => {
+            let txFee = tx.fee || 0;
+            if ((tx.type === 'BATCH' || tx.type === 'CONVERSATION_BATCH') && tx.payload && Array.isArray(tx.payload.transactions)) {
+                // Add inner transaction amounts (which act as fees in the TraceNet model)
+                const innerFees = tx.payload.transactions.reduce((innerSum: number, innerTx: any) => innerSum + (innerTx.amount || 0), 0);
+                txFee += innerFees;
+            }
+            return sum + txFee;
+        }, 0);
         this.miningPool.accumulateFees(nextIndex, totalBlockFees);
+
 
         // ✅ Check if distribution is due (every 100 blocks)
         if (this.miningPool.isDistributionDue(nextIndex)) {
@@ -970,6 +980,38 @@ export class Blockchain extends EventEmitter {
                 // Add to receiver
                 toAccount.balance += tx.amount;
 
+                // FEE DISTRIBUTION (FIXED: Stop Burning Fees)
+                if (tx.fee > 0) {
+                    const fee = tx.fee;
+                    const pPool = TOKEN_CONFIG.FEE_TO_POOL_PERCENT / 100;
+                    const pDev = TOKEN_CONFIG.FEE_TO_DEV_PERCENT / 100;
+                    const pRecycle = TOKEN_CONFIG.FEE_TO_RECYCLE_PERCENT / 100;
+
+                    const poolShare = Math.floor(fee * pPool);
+                    const devShare = Math.floor(fee * pDev);
+                    const recycleShare = Math.floor(fee * pRecycle);
+                    // Primary share for transfers is usually burned or goes to system/treasury. 
+                    // Let's send it to Main Treasury to keep supply accounting clean.
+                    const primaryShare = fee - poolShare - devShare - recycleShare;
+
+                    const poolAcc = state.get(TREASURY_ADDRESSES.validator_pool) || { address: TREASURY_ADDRESSES.validator_pool, balance: 0, nonce: 0 };
+                    poolAcc.balance += poolShare;
+                    state.set(TREASURY_ADDRESSES.validator_pool, poolAcc);
+
+                    const devAcc = state.get(TREASURY_ADDRESSES.development) || { address: TREASURY_ADDRESSES.development, balance: 0, nonce: 0 };
+                    devAcc.balance += devShare;
+                    state.set(TREASURY_ADDRESSES.development, devAcc);
+
+                    const recycleAcc = state.get(TREASURY_ADDRESSES.recycle) || { address: TREASURY_ADDRESSES.recycle, balance: 0, nonce: 0 };
+                    recycleAcc.balance += recycleShare;
+                    state.set(TREASURY_ADDRESSES.recycle, recycleAcc);
+
+                    const mainAcc = state.get(TREASURY_ADDRESSES.main) || { address: TREASURY_ADDRESSES.main, balance: 0, nonce: 0 };
+                    mainAcc.balance += primaryShare;
+                    state.set(TREASURY_ADDRESSES.main, mainAcc);
+                }
+
+
                 // Increment recipient's incoming transfer count
                 toAccount.incomingTransferCount = (toAccount.incomingTransferCount || 0) + 1;
 
@@ -988,6 +1030,35 @@ export class Blockchain extends EventEmitter {
 
                 // Add to receiver
                 toAccount.balance += tx.amount;
+
+                // FEE DISTRIBUTION (FIXED: Stop Burning Fees)
+                if (tx.fee > 0) {
+                    const fee = tx.fee;
+                    const pPool = TOKEN_CONFIG.FEE_TO_POOL_PERCENT / 100;
+                    const pDev = TOKEN_CONFIG.FEE_TO_DEV_PERCENT / 100;
+                    const pRecycle = TOKEN_CONFIG.FEE_TO_RECYCLE_PERCENT / 100;
+
+                    const poolShare = Math.floor(fee * pPool);
+                    const devShare = Math.floor(fee * pDev);
+                    const recycleShare = Math.floor(fee * pRecycle);
+                    const primaryShare = fee - poolShare - devShare - recycleShare;
+
+                    const poolAcc = state.get(TREASURY_ADDRESSES.validator_pool) || { address: TREASURY_ADDRESSES.validator_pool, balance: 0, nonce: 0 };
+                    poolAcc.balance += poolShare;
+                    state.set(TREASURY_ADDRESSES.validator_pool, poolAcc);
+
+                    const devAcc = state.get(TREASURY_ADDRESSES.development) || { address: TREASURY_ADDRESSES.development, balance: 0, nonce: 0 };
+                    devAcc.balance += devShare;
+                    state.set(TREASURY_ADDRESSES.development, devAcc);
+
+                    const recycleAcc = state.get(TREASURY_ADDRESSES.recycle) || { address: TREASURY_ADDRESSES.recycle, balance: 0, nonce: 0 };
+                    recycleAcc.balance += recycleShare;
+                    state.set(TREASURY_ADDRESSES.recycle, recycleAcc);
+
+                    const mainAcc = state.get(TREASURY_ADDRESSES.main) || { address: TREASURY_ADDRESSES.main, balance: 0, nonce: 0 };
+                    mainAcc.balance += primaryShare;
+                    state.set(TREASURY_ADDRESSES.main, mainAcc);
+                }
 
                 break;
 

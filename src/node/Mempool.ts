@@ -87,6 +87,19 @@ export class Mempool extends EventEmitter {
     }
 
     /**
+     * Get transactions by wallet (from/to)
+     */
+    getTransactionsByWallet(walletId: string): Transaction[] {
+        const transactions: Transaction[] = [];
+        for (const entry of this.pool.values()) {
+            if (entry.transaction.from_wallet === walletId || entry.transaction.to_wallet === walletId) {
+                transactions.push(entry.transaction);
+            }
+        }
+        return transactions;
+    }
+
+    /**
      * Get top N transactions for block creation
      */
     getTopTransactions(count: number): Transaction[] {

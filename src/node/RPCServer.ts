@@ -584,8 +584,31 @@ export class RPCServer {
     private async getBalance(req: Request, res: Response): Promise<void> {
         try {
             const { walletId } = req.params;
-            const balance = this.blockchain.getBalance(walletId);
-            res.json({ wallet_id: walletId, balance });
+
+            // 1. Get confirmed balance from Blockchain State
+            const confirmedBalance = this.blockchain.getBalance(walletId);
+
+            // 2. Calculate pending deductions from Mempool
+            let pendingDeductions = 0;
+            const pendingTxs = this.mempool.getTransactionsByWallet(walletId);
+
+            for (const tx of pendingTxs) {
+                // If we are the sender, we deduct amount + fee
+                if (tx.from_wallet === walletId) {
+                    pendingDeductions += (tx.amount || 0) + (tx.fee || 0);
+                }
+            }
+
+            // 3. Calculate Available Balance
+            // Prevent negative available balance just in case
+            const availableBalance = Math.max(0, confirmedBalance - pendingDeductions);
+
+            res.json({
+                wallet_id: walletId,
+                balance: confirmedBalance,
+                available_balance: availableBalance,
+                pending_deductions: pendingDeductions
+            });
         } catch (error) {
             res.status(500).json({
                 error: error instanceof Error ? error.message : 'Unknown error',
@@ -1315,11 +1338,23 @@ export class RPCServer {
                 return;
             }
 
-            const { wallet_id, content_type, title, description, content_url, media_type, duration, size, tags } =
-                req.body;
+            const {
+                wallet_id,
+                content_type,
+                title,
+                description,
+                content_url,
+                media_type,
+                duration,
+                size,
+                tags,
+                timestamp,
+                signature,
+                public_key,
+            } = req.body;
 
-            if (!wallet_id || !content_type) {
-                res.status(400).json({ error: 'wallet_id and content_type are required' });
+            if (!wallet_id || !content_type || !timestamp || !signature || !public_key) {
+                res.status(400).json({ error: 'wallet_id, content_type, timestamp, signature, and public_key are required' });
                 return;
             }
 
@@ -1333,6 +1368,9 @@ export class RPCServer {
                 duration,
                 size,
                 tags,
+                timestamp,
+                signature,
+                sender_public_key: public_key,
             });
 
             res.json({
@@ -1450,16 +1488,19 @@ export class RPCServer {
                 return;
             }
 
-            const { wallet_id, content_id } = req.body;
+            const { wallet_id, content_id, timestamp, signature, public_key } = req.body;
 
-            if (!wallet_id || !content_id) {
-                res.status(400).json({ error: 'wallet_id and content_id are required' });
+            if (!wallet_id || !content_id || !timestamp || !signature || !public_key) {
+                res.status(400).json({ error: 'wallet_id, content_id, timestamp, signature, and public_key are required' });
                 return;
             }
 
             const result = this.socialService.likeContent({
                 wallet_id,
                 content_id,
+                timestamp,
+                signature,
+                sender_public_key: public_key,
             });
 
             res.json({
@@ -1489,10 +1530,20 @@ export class RPCServer {
                 return;
             }
 
-            const { wallet_id, content_id, comment_text, parent_comment_id } = req.body;
+            const {
+                wallet_id,
+                content_id,
+                comment_text,
+                parent_comment_id,
+                timestamp,
+                signature,
+                public_key,
+            } = req.body;
 
-            if (!wallet_id || !content_id || !comment_text) {
-                res.status(400).json({ error: 'wallet_id, content_id, and comment_text are required' });
+            if (!wallet_id || !content_id || !comment_text || !timestamp || !signature || !public_key) {
+                res.status(400).json({
+                    error: 'wallet_id, content_id, comment_text, timestamp, signature, and public_key are required',
+                });
                 return;
             }
 
@@ -1501,6 +1552,9 @@ export class RPCServer {
                 content_id,
                 comment_text,
                 parent_comment_id,
+                timestamp,
+                signature,
+                sender_public_key: public_key,
             });
 
             res.json({
@@ -1530,16 +1584,21 @@ export class RPCServer {
                 return;
             }
 
-            const { wallet_id, target_wallet_id } = req.body;
+            const { wallet_id, target_wallet_id, timestamp, signature, public_key } = req.body;
 
-            if (!wallet_id || !target_wallet_id) {
-                res.status(400).json({ error: 'wallet_id and target_wallet_id are required' });
+            if (!wallet_id || !target_wallet_id || !timestamp || !signature || !public_key) {
+                res.status(400).json({
+                    error: 'wallet_id, target_wallet_id, timestamp, signature, and public_key are required',
+                });
                 return;
             }
 
             const result = this.socialService.followUser({
                 wallet_id,
                 target_wallet_id,
+                timestamp,
+                signature,
+                sender_public_key: public_key,
             });
 
             res.json({
@@ -1564,16 +1623,21 @@ export class RPCServer {
                 return;
             }
 
-            const { wallet_id, target_wallet_id } = req.body;
+            const { wallet_id, target_wallet_id, timestamp, signature, public_key } = req.body;
 
-            if (!wallet_id || !target_wallet_id) {
-                res.status(400).json({ error: 'wallet_id and target_wallet_id are required' });
+            if (!wallet_id || !target_wallet_id || !timestamp || !signature || !public_key) {
+                res.status(400).json({
+                    error: 'wallet_id, target_wallet_id, timestamp, signature, and public_key are required',
+                });
                 return;
             }
 
             const result = this.socialService.unfollowUser({
                 wallet_id,
                 target_wallet_id,
+                timestamp,
+                signature,
+                sender_public_key: public_key,
             });
 
             res.json({
