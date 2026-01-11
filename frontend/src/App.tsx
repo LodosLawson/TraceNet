@@ -3,6 +3,7 @@ import { LandingPage } from './pages/LandingPage';
 import { NodesPage } from './pages/NodesPage';
 import { BlocksPage } from './pages/BlocksPage';
 import { TransactionsPage } from './pages/TransactionsPage';
+import { WalletPage } from './pages/WalletPage';
 
 function App() {
   const [currentView, setCurrentView] = useState('landing');
@@ -13,6 +14,7 @@ function App() {
       {currentView === 'nodes' && <NodesPage onNavigate={setCurrentView} />}
       {currentView === 'blocks' && <BlocksPage onNavigate={setCurrentView} />}
       {currentView === 'transactions' && <TransactionsPage onNavigate={setCurrentView} />}
+      {currentView === 'wallet' && <WalletPage onNavigate={setCurrentView} />}
     </>
   );
 }

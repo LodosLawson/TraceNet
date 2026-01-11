@@ -88,5 +88,19 @@ export const api = {
         });
         // Sort by time new -> old and slice
         return txs.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+    },
+
+    async fetchWalletInfo(walletId: string): Promise<{
+        wallet_id: string;
+        balance: number;
+        available_balance: number;
+        pending_deductions: number;
+        nonce: number;
+    }> {
+        const response = await fetch(`${API_BASE}/rpc/balance/${walletId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch wallet info');
+        }
+        return response.json();
     }
 };

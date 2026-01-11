@@ -158,6 +158,7 @@ export const LandingPage = ({ onNavigate }: PageProps) => {
                     <button onClick={() => onNavigate('nodes')} className="hover:text-white transition-colors cursor-pointer">Nodes</button>
                     <button onClick={() => onNavigate('blocks')} className="hover:text-white transition-colors cursor-pointer">Blocks</button>
                     <button onClick={() => onNavigate('transactions')} className="hover:text-white transition-colors cursor-pointer">Transactions</button>
+                    <button onClick={() => onNavigate('wallet')} className="hover:text-white transition-colors cursor-pointer text-amber-400">My Wallet</button>
                 </div>
                 <button
                     onClick={handleCreateWallet}
