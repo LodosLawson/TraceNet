@@ -115,7 +115,7 @@ export class ContentService {
         );
 
         // Assign signature
-        transaction.signature = options.signature;
+        transaction.sender_signature = options.signature;
 
         // Add to mempool
         const result = this.mempool.addTransaction(transaction.toJSON());

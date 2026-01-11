@@ -338,6 +338,9 @@ export class SocialService {
             }
         );
 
+        // Assign signature
+        followTransaction.sender_signature = options.signature;
+
         const result = this.mempool.addTransaction(followTransaction.toJSON());
 
         if (!result.success) {
@@ -384,6 +387,9 @@ export class SocialService {
                 timestamp: timestamp,
             }
         );
+
+        // Assign signature
+        unfollowTransaction.sender_signature = options.signature;
 
         const result = this.mempool.addTransaction(unfollowTransaction.toJSON());
 
