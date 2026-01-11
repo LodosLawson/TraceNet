@@ -121,7 +121,7 @@ export class RPCServer {
         // 1. Strict Limiter (Critical Ops: Wallet Gen, Transfer, General RPC)
         const strictLimiter = rateLimit({
             windowMs: 15 * 60 * 1000, // 15 minutes
-            max: 500, // 500 requests per 15 min for critical/general ops
+            max: 5000, // 5000 requests per 15 min (increased from 500 to prevent 429s)
             standardHeaders: true,
             legacyHeaders: false,
             message: { error: 'Too many requests. Please try again later.' },
