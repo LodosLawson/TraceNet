@@ -119,10 +119,15 @@ export class RPCServer {
         // Security: Rate Limiting
         const limiter = rateLimit({
             windowMs: 15 * 60 * 1000, // 15 minutes
-            max: 5000, // INCREASED: limit each IP to 5000 requests per windowMs
+            max: 20000, // INCREASED: limit each IP to 20000 requests per windowMs
             standardHeaders: true,
             legacyHeaders: false,
-            message: { error: 'Too many requests from this IP, please try again later.' }
+            message: { error: 'Too many requests from this IP, please try again later.' },
+            skip: (req) => {
+                // Trust localhost
+                const ip = req.ip || req.connection.remoteAddress;
+                return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+            }
         });
 
         // Apply to all RPC/API routes
