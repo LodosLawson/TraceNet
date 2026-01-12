@@ -16,11 +16,14 @@ export interface UserResponse {
 }
 
 export interface NodeInfo {
+    id?: string;
+    ip?: string;
     url: string;
     lat?: number;
     lng?: number;
     region?: string;
     country?: string;
+    city?: string; // Added city as well since backend sends it
     status: string;
 }
 
