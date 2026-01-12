@@ -116,7 +116,7 @@ export class RPCServer {
         // 1. Strict Limiter (Critical Ops: Wallet Gen, Transfer, General RPC)
         const strictLimiter = rateLimit({
             windowMs: 15 * 60 * 1000, // 15 minutes
-            max: 5000, // 5000 requests per 15 min (increased from 500 to prevent 429s)
+            max: 50000, // 50000 requests per 15 min (Relaxed to prevent 429s on Cloud Run)
             standardHeaders: true,
             legacyHeaders: false,
             message: { error: 'Too many requests. Please try again later.' },
@@ -129,7 +129,7 @@ export class RPCServer {
         // 2. Social Limiter (High Volume: Chat, Like, Comment)
         const socialLimiter = rateLimit({
             windowMs: 1 * 60 * 1000, // 1 minute window for social
-            max: 5000, // 5000 requests per minute (effectively unlimited for humans)
+            max: 20000, // 20000 requests per minute (effectively unlimited for humans, anti-spam only)
             standardHeaders: true,
             legacyHeaders: false,
             message: { error: 'Social rate limit exceeded.' },
