@@ -62,11 +62,6 @@ export class RPCServer {
         this.setupMiddleware();
         this.setupRoutes();
 
-        // Setup simple health check for Cloud Run
-        this.app.get('/health', (req, res) => {
-            res.status(200).send('OK');
-        });
-
         this.setupBlockchainListeners();
     }
 
@@ -292,13 +287,16 @@ export class RPCServer {
         this.app.post('/api/user/:userId/messaging-privacy', this.updateMessagingPrivacy.bind(this));
         this.app.get('/api/user/:userId/qr-code', this.generateQRCode.bind(this));
 
+        // Setup simple health check for Cloud Run (MUST be before catch-all)
+        this.app.get('/health', (req, res) => {
+            res.status(200).send('OK');
+        });
+
         // Handle React Routing, return all requests to React app (SPA Catch-all)
         // MUST BE AFTER ALL API ROUTES
         this.app.get('*', (req: Request, res: Response) => {
-            // Re-define frontendPath just in case of scope confusion or if it's cleaner, 
-            // but strictly it should be in scope. 
-            // To be 100% safe against block scope issues if I miscounted, I will use the path directly.
-            res.sendFile(path.join(__dirname, '../../../frontend/dist', 'index.html'));
+            // Use the already resolved frontendPath from the beginning of this method
+            res.sendFile(path.join(frontendPath, 'index.html'));
         });
 
         // Error handler
