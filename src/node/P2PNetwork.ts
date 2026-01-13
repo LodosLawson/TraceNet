@@ -683,13 +683,20 @@ export class P2PNetwork {
 
     private handleRequestChain(socket: any, data: any) {
         // Send blocks starting from requested height
-        // Limit to 500 blocks for example
+        // FIXED: Limit to 50 blocks to prevent WebSocket frame too large error
         const chain = this.blockchain.getChain();
         const start = data.fromHeight || 0;
-        const chunk = chain.slice(start); // Should limit size in production
+        const LIMIT = 50;
 
-        console.log(`[P2P] Sending ${chunk.length} blocks to peer`);
-        socket.emit('p2p:sendChain', { blocks: chunk.map(b => b.toJSON()) });
+        let end = start + LIMIT;
+        if (end > chain.length) end = chain.length;
+
+        const chunk = chain.slice(start, end);
+
+        if (chunk.length > 0) {
+            console.log(`[P2P] Sending chunk of ${chunk.length} blocks to peer (Range: ${start} to ${end - 1})`);
+            socket.emit('p2p:sendChain', { blocks: chunk.map(b => b.toJSON()) });
+        }
     }
 
     private handleReceiveChain(data: any) {
