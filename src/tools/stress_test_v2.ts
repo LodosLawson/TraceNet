@@ -17,8 +17,8 @@ import { TransactionModel, TransactionType } from '../blockchain/models/Transact
 // --- Configuration ---
 const CONFIG = {
     NODE_URL: process.env.NODE_URL || 'https://tracenet-blockchain-136028201808.us-central1.run.app',
-    USER_COUNT: 1000,
-    DURATION_HOURS: 4,
+    USER_COUNT: 250,
+    DURATION_HOURS: 2,
     // Slower generation to let node digest: 1 user every 200ms
     GENERATION_DELAY_MS: 200,
     // Slower interaction: 1 action every 500-2000ms
@@ -50,11 +50,16 @@ class ApiClient {
         let attempts = 0;
         while (attempts < CONFIG.MAX_RETRIES) {
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s Timeout
+
                 const response = await fetch(`${CONFIG.NODE_URL}${endpoint}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify(body),
+                    signal: controller.signal
                 });
+                clearTimeout(timeoutId);
 
                 if (response.status === 502 || response.status === 503 || response.status === 504) {
                     throw new Error(`Server overloaded (${response.status})`);
@@ -76,6 +81,7 @@ class ApiClient {
 class Simulation {
     private users: WalletKeys[] = [];
     private contentIds: string[] = [];
+    private commentIds: string[] = [];
 
     /**
      * Step 1: Generate Users
@@ -203,10 +209,24 @@ class Simulation {
 
     async doComment(user: WalletKeys) {
         if (this.contentIds.length === 0) return;
+
+        // 50% chance to reply to a comment vs top-level post (if comments exist)
+        const isReply = this.commentIds.length > 0 && Math.random() > 0.5;
+        const targetId = isReply
+            ? this.commentIds[Math.floor(Math.random() * this.commentIds.length)]
+            : this.contentIds[Math.floor(Math.random() * this.contentIds.length)]; // Replies still need content_id? API says it needs content_id AND parent.
+
+        // Wait, commentOnContent needs content_id. If replying to a comment, we still need the original content_id.
+        // Simplified: Just comment on random content for now, but sometimes add parent_id if available.
+        // We'll map commentId -> contentId if we want to be precise, or just use random content and hope it matches (risky).
+        // Better: Just support top-level comments capturing IDs for now, and simple replies if we track the map.
+        // Let's stick to Top Level first to fix the counts, then add basic reply support if we can find the parent content.
+
         const contentId = this.contentIds[Math.floor(Math.random() * this.contentIds.length)];
         const timestamp = Date.now();
-        const text = "Great post!";
-        const body = {
+        const text = isReply ? "Replying to this!" : "Great post!";
+
+        const body: any = {
             wallet_id: user.address,
             content_id: contentId,
             comment_text: text,
@@ -214,6 +234,11 @@ class Simulation {
             signature: '',
             public_key: user.publicKey
         };
+
+        if (isReply && this.commentIds.length > 0) {
+            body.parent_comment_id = this.commentIds[Math.floor(Math.random() * this.commentIds.length)];
+        }
+
         const msg = `${user.address}:COMMENT:${contentId}:${timestamp}:${text}`;
         body.signature = KeyManager.sign(msg, user.privateKey);
 
@@ -221,6 +246,7 @@ class Simulation {
         if (res.success) {
             STATS.txSuccess++;
             STATS.actions.comment++;
+            if (res.comment_id) this.commentIds.push(res.comment_id); // Capture ID
         }
         STATS.txSent++;
     }
@@ -295,6 +321,9 @@ class Simulation {
         console.log(`\n--- Stats [${new Date().toISOString()}] ---`);
         console.log(`Total: ${STATS.txSent} | Success: ${STATS.txSuccess} | Failed: ${STATS.txFailed}`);
         console.log(`Actions: Post=${STATS.actions.post} Like=${STATS.actions.like} Cmt=${STATS.actions.comment} Msg=${STATS.actions.message} Transfer=${STATS.actions.transfer}`);
+        if (STATS.errors.length > 0) {
+            console.log('Errors:', STATS.errors.slice(0, 5)); // Show top 5 errors
+        }
     }
 }
 

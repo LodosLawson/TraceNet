@@ -1601,6 +1601,7 @@ export class RPCServer {
             res.json({
                 success: true,
                 tx_id: result.tx_id,
+                comment_id: result.comment_id, // Forward ID
                 fee_breakdown: {
                     total_fee: result.fee_paid,
                     creator_received: result.creator_received,

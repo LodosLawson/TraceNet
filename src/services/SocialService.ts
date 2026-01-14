@@ -193,6 +193,7 @@ export class SocialService {
      */
     commentOnContent(options: CommentContentOptions): {
         tx_id: string;
+        comment_id: string; // Added field
         success: boolean;
         fee_paid: number;
         creator_received: number;
@@ -301,6 +302,7 @@ export class SocialService {
 
         return {
             tx_id: `PENDING-BATCH-${timestamp}`,
+            comment_id,
             success: true,
             fee_paid: totalFee,
             creator_received: creatorAmount,
