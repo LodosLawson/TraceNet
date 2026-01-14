@@ -524,7 +524,7 @@ export class RPCServer {
             let block;
 
             // Check if it's a number (index) or hash
-            if (/^\d+ $ /.test(indexOrHash)) {
+            if (/^\d+$/.test(indexOrHash)) {
                 const index = parseInt(indexOrHash, 10);
                 block = this.blockchain.getBlockByIndex(index);
             } else {
