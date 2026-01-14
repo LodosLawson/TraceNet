@@ -19,15 +19,22 @@ async function checkHealth() {
 
             if (response.ok) {
                 const status = await response.json();
+                const height = status.blockchain.height || status.blockchain.blockCount; // Use height, fallback to blockCount
+                const hash = status.blockchain.latestBlockHash;
+                const mempoolSize = status.mempool ? status.mempool.size : 0;
+                const lastBlockTime = status.blockchain.timestamp || status.timestamp; // Allow fallback
+                const ageSeconds = lastBlockTime ? ((Date.now() - lastBlockTime) / 1000).toFixed(1) : 'N/A';
+
                 results.push({
                     name: node.name,
                     url: node.url,
                     online: true,
-                    height: status.blockchain.blockCount,
-                    hash: status.blockchain.latestBlockHash,
+                    height: height,
+                    hash: hash,
                     peers: status.validators ? status.validators.count : '?', // Adjusted based on likely structure
-                    mempool: status.mempool ? status.mempool.size : 0,
-                    latency: latency
+                    mempool: mempoolSize,
+                    latency: latency,
+                    blockAge: ageSeconds
                 });
             } else {
                 results.push({
