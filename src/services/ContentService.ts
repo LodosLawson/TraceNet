@@ -154,13 +154,16 @@ export class ContentService {
                 if (tx.type === TransactionType.COMMENT && tx.payload?.comment_id === contentId) {
                     return {
                         content_id: contentId,
-                        wallet_id: tx.from_wallet, // The commenter is the owner
-                        content_type: ContentType.TEXT, // Treat as text content
+                        wallet_id: tx.from_wallet,
+                        owner_wallet: tx.from_wallet, // REQUIRED by ContentMetadata
+                        content_hash: tx.payload.comment_id, // Use comment ID as hash
+                        created_at: tx.timestamp, // REQUIRED
+                        content_type: ContentType.TEXT,
                         timestamp: tx.timestamp,
                         title: 'Comment',
                         description: tx.payload.comment_text,
                         tags: [],
-                        ...this.getContentStats(contentId), // Get likes/replies for this comment
+                        ...this.getContentStats(contentId),
                     } as ContentWithStats;
                 }
             }
@@ -186,6 +189,9 @@ export class ContentService {
                 return {
                     content_id: contentId,
                     wallet_id: tx.from_wallet,
+                    owner_wallet: tx.from_wallet, // REQUIRED
+                    content_hash: tx.payload.comment_id, // REQUIRED
+                    created_at: tx.timestamp, // REQUIRED
                     content_type: ContentType.TEXT,
                     timestamp: tx.timestamp,
                     title: 'Comment',
