@@ -135,7 +135,7 @@ export class ContentService {
      * Get content by ID
      */
     getContent(contentId: string): ContentWithStats | null {
-        // Search in blockchain
+        // 1. Search in Blockchain
         const chain = this.blockchain.getChain();
 
         for (const block of chain) {
@@ -150,6 +150,24 @@ export class ContentService {
                             ...stats,
                         };
                     }
+                }
+            }
+        }
+
+        // 2. Search in Mempool (for unmined content)
+        const mempoolTxs = this.mempool.getAllTransactions();
+        for (const tx of mempoolTxs) {
+            if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
+                const content = tx.payload.content as ContentMetadata;
+                if (content.content_id === contentId) {
+                    // Content is in mempool, so stats are likely 0 unless we also scan mempool for likes
+                    // For now, return basic stats
+                    return {
+                        ...content,
+                        likes_count: 0,
+                        comments_count: 0,
+                        shares_count: 0
+                    };
                 }
             }
         }
