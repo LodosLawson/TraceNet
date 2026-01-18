@@ -218,6 +218,7 @@ export class RPCServer {
         this.app.post('/rpc/transfer', this.sendTransfer.bind(this));
         // Alias for frontend compatibility
         this.app.post('/api/users/transaction', this.sendTransfer.bind(this));
+        this.app.post('/api/transaction', this.sendTransfer.bind(this)); // Alias for Netra compatibility
 
         // Mining endpoint
         this.app.post('/rpc/mine', this.triggerMining.bind(this));
