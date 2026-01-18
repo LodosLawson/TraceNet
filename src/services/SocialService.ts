@@ -20,6 +20,7 @@ export interface LikeContentOptions {
     timestamp: number; // Required for signature verification
     signature: string;
     sender_public_key: string;
+    instant?: boolean; // New: Bypass batching for 2x fee
 }
 
 /**
@@ -33,8 +34,10 @@ export interface CommentContentOptions {
     timestamp: number;
     signature: string;
     sender_public_key: string;
+    instant?: boolean; // New: Bypass batching for 2x fee
 }
 
+// ... (FollowUserOptions remains unchanged) ...
 /**
  * Follow action options
  */
@@ -51,6 +54,7 @@ export interface FollowUserOptions {
  * Manages social interactions with fee splitting (50% creator, 50% blockchain)
  */
 export class SocialService {
+    // ... (properties and constructor remain unchanged) ...
     private blockchain: Blockchain;
     private mempool: Mempool;
     private socialPool: SocialPool; // Injected
@@ -80,7 +84,7 @@ export class SocialService {
 
     /**
      * Like content
-     * Fee: 0.00001 LT (50% to content creator, 50% to blockchain)
+     * Fee: 0.00001 LT (Standard) | 0.00002 LT (Instant)
      */
     likeContent(options: LikeContentOptions): {
         tx_id: string;
@@ -111,7 +115,9 @@ export class SocialService {
             throw new Error('Invalid signature');
         }
 
-        const totalFee = TOKEN_CONFIG.LIKE_FEE; // 1000 = 0.00001 LT
+        // FEE CALCULATION
+        const baseFee = TOKEN_CONFIG.LIKE_FEE; // 1000 = 0.00001 LT
+        const totalFee = options.instant ? baseFee * 2 : baseFee;
 
         // 50% to Creator
         const creatorAmount = Math.floor(totalFee * (TOKEN_CONFIG.FEE_TO_PRIMARY_PERCENT / 100));
@@ -123,6 +129,60 @@ export class SocialService {
         const poolAmount = totalFee - creatorAmount - treasuryAmount;
 
         const timestamp = options.timestamp;
+
+        // --- INSTANT PATH (Direct to Mempool) ---
+        if (options.instant) {
+            console.log(`[SocialService] Processing INSTANT Like for ${options.wallet_id}. Fee: ${totalFee}`);
+
+            // Create Standard LIKE Transaction
+            const tx = TransactionModel.create(
+                options.wallet_id,
+                content.owner_wallet, // To Creator
+                TransactionType.LIKE,
+                creatorAmount, // Amount sent to creator
+                poolAmount + treasuryAmount, // Fee paid to network (approx) - Logic adjustment needed for standard TXs?
+                // Standard TX fee model separates 'amount' (transfer) and 'fee' (network).
+                // Here, the user pays 'totalFee'. 
+                // In standard Transfer: User pays Amount + Fee.
+                // In LIKE: User pays Fee. Amount goes to creator?
+
+                // Let's align with Standard Tx:
+                // User -> Creator (Amount = creatorAmount)
+                // User -> Network (Fee = poolAmount + treasuryAmount)
+
+                (timestamp % 1000000), // Nonce
+                {
+                    action_type: 'LIKE',
+                    content_id: options.content_id,
+                    target_content_id: options.content_id,
+                    is_instant: true
+                }
+            );
+
+            tx.sender_public_key = options.sender_public_key;
+            tx.sender_signature = options.signature;
+
+            // Override Fee to match our calculation
+            tx.fee = poolAmount + treasuryAmount;
+            tx.amount = creatorAmount;
+
+            const result = this.mempool.addTransaction(tx.toJSON());
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to submit instant transaction');
+            }
+
+            return {
+                tx_id: tx.tx_id,
+                success: true,
+                fee_paid: totalFee,
+                creator_received: creatorAmount,
+                treasury_received: treasuryAmount,
+                status: 'confirmed' // Sent to mempool immediately
+            };
+        }
+
+        // --- BATCHED PATH (SocialPool) ---
 
         // 1. Create INNER Like Transaction (Creator Share)
         const innerLike: InnerTransaction = {
@@ -189,7 +249,7 @@ export class SocialService {
 
     /**
      * Comment on content
-     * Fee: 0.00001 LT (50% to content creator, 50% to blockchain)
+     * Fee: 0.00001 LT (Standard) | 0.00002 LT (Instant)
      */
     commentOnContent(options: CommentContentOptions): {
         tx_id: string;
@@ -225,7 +285,9 @@ export class SocialService {
             throw new Error('Invalid signature');
         }
 
-        const totalFee = TOKEN_CONFIG.COMMENT_FEE;
+        // FEE CALCULATION
+        const baseFee = TOKEN_CONFIG.COMMENT_FEE;
+        const totalFee = options.instant ? baseFee * 2 : baseFee;
 
         // 50% to Creator
         const creatorAmount = Math.floor(totalFee * (TOKEN_CONFIG.FEE_TO_PRIMARY_PERCENT / 100));
@@ -243,6 +305,54 @@ export class SocialService {
             .createHash('sha256')
             .update(`${options.wallet_id}${options.content_id}${timestamp}`)
             .digest('hex');
+
+        // --- INSTANT PATH (Direct to Mempool) ---
+        if (options.instant) {
+            console.log(`[SocialService] Processing INSTANT Comment for ${options.wallet_id}. Fee: ${totalFee}`);
+
+            const tx = TransactionModel.create(
+                options.wallet_id,
+                content.owner_wallet, // To Creator
+                TransactionType.COMMENT,
+                creatorAmount, // Amount sent to creator
+                poolAmount + treasuryAmount, // Fee paid to network
+                (timestamp % 1000000), // Nonce
+                {
+                    action_type: 'COMMENT',
+                    comment_id,
+                    content_id: options.content_id,
+                    target_content_id: options.content_id,
+                    comment_text: options.comment_text,
+                    parent_comment_id: options.parent_comment_id,
+                    is_instant: true
+                }
+            );
+
+            tx.sender_public_key = options.sender_public_key;
+            tx.sender_signature = options.signature;
+
+            // Override Fee
+            tx.fee = poolAmount + treasuryAmount;
+            tx.amount = creatorAmount;
+
+            const result = this.mempool.addTransaction(tx.toJSON());
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to submit instant transaction');
+            }
+
+            return {
+                tx_id: tx.tx_id,
+                comment_id,
+                success: true,
+                fee_paid: totalFee,
+                creator_received: creatorAmount,
+                treasury_received: treasuryAmount,
+                status: 'confirmed'
+            };
+        }
+
+        // --- BATCHED PATH (SocialPool) ---
 
         // 1. Inner Comment Tx
         const innerComment: InnerTransaction = {

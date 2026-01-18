@@ -1529,7 +1529,7 @@ export class RPCServer {
                 return;
             }
 
-            const { wallet_id, content_id, timestamp, signature, public_key } = req.body;
+            const { wallet_id, content_id, timestamp, signature, public_key, instant } = req.body;
 
             if (!wallet_id || !content_id || !timestamp || !signature || !public_key) {
                 res.status(400).json({ error: 'wallet_id, content_id, timestamp, signature, and public_key are required' });
@@ -1542,6 +1542,7 @@ export class RPCServer {
                 timestamp,
                 signature,
                 sender_public_key: public_key,
+                instant: !!instant // Pass instant flag
             });
 
             res.json({
@@ -1552,6 +1553,7 @@ export class RPCServer {
                     creator_received: result.creator_received,
                     treasury_received: result.treasury_received,
                     fee_split: '50% creator / 50% treasury',
+                    is_instant: !!instant
                 },
             });
         } catch (error) {
@@ -1579,6 +1581,7 @@ export class RPCServer {
                 timestamp,
                 signature,
                 public_key,
+                instant
             } = req.body;
 
             if (!wallet_id || !content_id || !comment_text || !timestamp || !signature || !public_key) {
@@ -1596,6 +1599,7 @@ export class RPCServer {
                 timestamp,
                 signature,
                 sender_public_key: public_key,
+                instant: !!instant // Pass instant flag
             });
 
             res.json({
@@ -1607,6 +1611,7 @@ export class RPCServer {
                     creator_received: result.creator_received,
                     treasury_received: result.treasury_received,
                     fee_split: '50% creator / 50% treasury',
+                    is_instant: !!instant
                 },
             });
         } catch (error) {

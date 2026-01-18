@@ -105,5 +105,55 @@ export const api = {
             throw new Error('Failed to fetch wallet info');
         }
         return response.json();
+    },
+
+    // --- Content & Social API ---
+
+    async getContentFeed(limit = 20, offset = 0): Promise<any> {
+        const response = await fetch(`${API_BASE}/api/content/feed?limit=${limit}&offset=${offset}`);
+        if (!response.ok) return { contents: [], total: 0 };
+        return response.json();
+    },
+
+    async likeContent(data: {
+        wallet_id: string;
+        content_id: string;
+        timestamp: number;
+        signature: string;
+        public_key: string;
+        instant?: boolean;
+    }): Promise<any> {
+        const response = await fetch(`${API_BASE}/api/social/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to like content');
+        }
+        return response.json();
+    },
+
+    async commentContent(data: {
+        wallet_id: string;
+        content_id: string;
+        comment_text: string;
+        parent_comment_id?: string;
+        timestamp: number;
+        signature: string;
+        public_key: string;
+        instant?: boolean;
+    }): Promise<any> {
+        const response = await fetch(`${API_BASE}/api/social/comment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to comment');
+        }
+        return response.json();
     }
 };

@@ -155,6 +155,10 @@ export const LandingPage = ({ onNavigate }: PageProps) => {
             >
                 <div className="text-xl md:text-2xl font-bold text-seed-100">Tn.</div>
                 <div className="hidden md:flex gap-8 text-sm font-medium text-seed-200">
+                    <button onClick={() => onNavigate('feed')} className="hover:text-amber-400 transition-colors cursor-pointer flex items-center gap-1 group">
+                        <span className="w-2 h-2 rounded-full bg-pomegranate-500 group-hover:animate-pulse"></span>
+                        Social Feed
+                    </button>
                     <button onClick={() => onNavigate('nodes')} className="hover:text-white transition-colors cursor-pointer">Nodes</button>
                     <button onClick={() => onNavigate('blocks')} className="hover:text-white transition-colors cursor-pointer">Blocks</button>
                     <button onClick={() => onNavigate('transactions')} className="hover:text-white transition-colors cursor-pointer">Transactions</button>

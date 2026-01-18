@@ -10,8 +10,8 @@
 
 | İşlem | Minimum Ücret | Maksimum Ücret | Notlar |
 |-------|---------------|----------------|---------|
-| ❤️ **Beğeni (LIKE)** | 0.00001 TRN | Sınırsız | Spam önleme için zorunlu |
-| 💬 **Yorum (COMMENT)** | 0.00002 TRN | Sınırsız | Beğeniden 2x daha yüksek |
+| ❤️ **Beğeni (LIKE)** | 0.00001 TRN | Sınırsız | Spam önleme için zorunlu (Anında: 2x) |
+| 💬 **Yorum (COMMENT)** | 0.00002 TRN | Sınırsız | Beğeniden 2x daha yüksek (Anında: 2x) |
 | 👤 **Takip (FOLLOW)** | 0.00001 TRN | Sınırsız | Her takip işlemi için |
 | 👋 **Takipten Çık (UNFOLLOW)** | 0.00001 TRN | Sınırsız | Her çıkış işlemi için |
 | 📝 **Post Paylaş (POST_CONTENT)** | 0 TRN | Sınırsız | Şu an ücretsiz (geçici) |
@@ -22,6 +22,10 @@
 > - %30 → Mining Pool
 > - %20 → Recycle (Supply)
 > - %5 → Ağ Geliştirme
+>
+> **Anında İşlem (Instant Actions):**
+> Normal sosyal işlemler 5-10 dakika batch süresi ile kuyruğa girer.
+> Kullanıcı **anında onay** isterse (2x ücret) öder (Örn: Like için 0.00002 TRN) ve işlem kuyruğa girmeden direkt Mempool'a iletilir.
 
 ---
 
