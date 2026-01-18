@@ -4,15 +4,14 @@ import { Heart, MessageCircle, Share2, Zap, Clock } from 'lucide-react';
 import { api } from '../services/api';
 
 // Interface for Post
+// Interface for Post (Flattened to match Backend ContentWithStats)
 interface Post {
     content_id: string;
     wallet_id: string;
-    content: {
-        title?: string;
-        description?: string;
-        content_url?: string;
-        nickname?: string;
-    };
+    title?: string;
+    description?: string;
+    content_url?: string;
+    nickname?: string; // Author nickname
     likes_count: number;
     comments_count: number;
     timestamp: number;
@@ -148,11 +147,11 @@ const PostCard = ({ post, onLike, isInstant, isProcessing }: { post: Post, onLik
             {/* Author */}
             <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-black border border-white/10 flex items-center justify-center text-xs font-bold text-gray-400">
-                    {post.content.nickname?.[0] || '?'}
+                    {post.nickname?.[0] || '?'}
                 </div>
                 <div>
                     <div className="text-sm font-bold text-gray-200">
-                        {post.content.nickname || 'Anonymous Node'}
+                        {post.nickname || 'Anonymous Node'}
                     </div>
                     <div className="text-xs text-gray-500 font-mono">
                         {post.wallet_id.substring(0, 8)}...
@@ -166,11 +165,11 @@ const PostCard = ({ post, onLike, isInstant, isProcessing }: { post: Post, onLik
             {/* Content */}
             <div className="mb-6">
                 <p className="text-gray-300 leading-relaxed text-sm">
-                    {post.content.description || "No content data."}
+                    {post.description || "No content data."}
                 </p>
-                {post.content.content_url && (
+                {post.content_url && (
                     <div className="mt-4 rounded-lg overflow-hidden border border-white/5">
-                        <img src={post.content.content_url} alt="Post content" className="w-full h-48 object-cover opacity-80 hover:opacity-100 transition-opacity" />
+                        <img src={post.content_url} alt="Post content" className="w-full h-48 object-cover opacity-80 hover:opacity-100 transition-opacity" />
                     </div>
                 )}
             </div>
