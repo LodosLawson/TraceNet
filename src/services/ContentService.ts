@@ -140,28 +140,39 @@ export class ContentService {
 
         for (const block of chain) {
             for (const tx of block.transactions) {
+                // Check for POST_CONTENT
                 if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
                     const content = tx.payload.content as ContentMetadata;
                     if (content.content_id === contentId) {
-                        // Get stats
-                        const stats = this.getContentStats(contentId);
                         return {
                             ...content,
-                            ...stats,
+                            ...this.getContentStats(contentId),
                         };
                     }
+                }
+                // NEW: Check for COMMENT (to allow Liking/Replying to Comments)
+                if (tx.type === TransactionType.COMMENT && tx.payload?.comment_id === contentId) {
+                    return {
+                        content_id: contentId,
+                        wallet_id: tx.from_wallet, // The commenter is the owner
+                        content_type: ContentType.TEXT, // Treat as text content
+                        timestamp: tx.timestamp,
+                        title: 'Comment',
+                        description: tx.payload.comment_text,
+                        tags: [],
+                        ...this.getContentStats(contentId), // Get likes/replies for this comment
+                    } as ContentWithStats;
                 }
             }
         }
 
-        // 2. Search in Mempool (for unmined content)
+        // 2. Search in Mempool (for unmined content/comments)
         const mempoolTxs = this.mempool.getAllTransactions();
         for (const tx of mempoolTxs) {
+            // Check for POST_CONTENT
             if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
                 const content = tx.payload.content as ContentMetadata;
                 if (content.content_id === contentId) {
-                    // Content is in mempool, so stats are likely 0 unless we also scan mempool for likes
-                    // For now, return basic stats
                     return {
                         ...content,
                         likes_count: 0,
@@ -169,6 +180,21 @@ export class ContentService {
                         shares_count: 0
                     };
                 }
+            }
+            // NEW: Check for COMMENT in Mempool
+            if (tx.type === TransactionType.COMMENT && tx.payload?.comment_id === contentId) {
+                return {
+                    content_id: contentId,
+                    wallet_id: tx.from_wallet,
+                    content_type: ContentType.TEXT,
+                    timestamp: tx.timestamp,
+                    title: 'Comment',
+                    description: tx.payload.comment_text,
+                    tags: [],
+                    likes_count: 0,
+                    comments_count: 0,
+                    shares_count: 0
+                } as ContentWithStats;
             }
         }
 
