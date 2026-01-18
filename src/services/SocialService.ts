@@ -654,37 +654,42 @@ export class SocialService {
      * Check if user has liked content
      */
     private hasUserLiked(walletId: string, contentId: string): boolean {
+        // 1. Check Blockchain
         const chain = this.blockchain.getChain();
-
         for (const block of chain) {
             for (const tx of block.transactions) {
-                // Normal
-                if (
-                    tx.type === TransactionType.LIKE &&
-                    tx.from_wallet === walletId &&
-                    (tx.payload?.content_id === contentId || tx.payload?.target_content_id === contentId) &&
-                    !tx.payload?.is_treasury_fee
-                ) {
-                    return true;
-                }
-
-                // Batched
-                if (tx.type === TransactionType.BATCH && tx.payload && Array.isArray(tx.payload.transactions)) {
+                if (this.isLikeTx(tx, walletId, contentId)) return true;
+                if (tx.type === TransactionType.BATCH && tx.payload?.transactions) {
                     for (const innerTx of tx.payload.transactions) {
-                        if (
-                            innerTx.type === TransactionType.LIKE &&
-                            innerTx.from_wallet === walletId &&
-                            (innerTx.payload?.content_id === contentId || innerTx.payload?.target_content_id === contentId) &&
-                            !innerTx.payload?.is_treasury_fee
-                        ) {
-                            return true;
-                        }
+                        if (this.isLikeTx(innerTx, walletId, contentId)) return true;
                     }
                 }
             }
         }
 
+        // 2. Check Mempool (Instant Likes)
+        const mempoolTxs = this.mempool.getAllTransactions();
+        for (const tx of mempoolTxs) {
+            if (this.isLikeTx(tx, walletId, contentId)) return true;
+        }
+
+        // 3. Check SocialPool (Pending Batched Likes)
+        const pendingActions = this.socialPool.getPendingActions(walletId);
+        for (const action of pendingActions) {
+            if (this.isLikeTx(action as any, walletId, contentId)) return true;
+        }
+
         return false;
+    }
+
+    private isLikeTx(tx: any, walletId: string, contentId: string): boolean {
+        return (
+            tx.type === TransactionType.LIKE &&
+            tx.from_wallet === walletId &&
+            (tx.payload?.content_id === contentId || tx.payload?.target_content_id === contentId) &&
+            !tx.payload?.is_treasury_fee &&
+            !tx.payload?.is_pool_fee
+        );
     }
 
     /**

@@ -642,7 +642,7 @@ export class RPCServer {
             }
 
             // 4. Calculate Available Balance
-            const availableBalance = Math.max(0, confirmedBalance - pendingDeductions);
+            const availableBalance = Math.floor(Math.max(0, confirmedBalance - pendingDeductions));
 
             res.json({
                 wallet_id: walletId,

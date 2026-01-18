@@ -155,5 +155,64 @@ export const api = {
             throw new Error(err.error || 'Failed to comment');
         }
         return response.json();
+    },
+
+    async sendTransaction(data: {
+        from_wallet: string;
+        to_wallet: string;
+        amount: number;
+        fee?: number;
+        sender_public_key: string;
+        sender_signature: string;
+        priority?: string;
+    }): Promise<any> {
+        const response = await fetch(`${API_BASE}/rpc/transfer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to send transaction');
+        }
+        return response.json();
+    },
+
+    async sendBatch(data: {
+        transactions: any[];
+        sender_public_key: string;
+        sender_signature: string;
+        timestamp: number;
+    }): Promise<any> {
+        // Construct BATCH transaction payload
+        // This assumes the backend's /rpc/sendRawTx handles BATCH type
+        // Or we use a specific batch endpoint if it existed.
+        // For now, mapping to sendRawTx with type='BATCH'
+        const batchTx = {
+            from_wallet: data.transactions[0].from_wallet, // Assume all from same wallet for simplicity
+            to_wallet: 'BATCH_PROCESSOR', // or Network Address
+            type: 'BATCH',
+            amount: 0,
+            fee: 0, // Calculated by node or pre-calc
+            nonce: Date.now() % 1000000,
+            timestamp: data.timestamp,
+            sender_public_key: data.sender_public_key,
+            sender_signature: data.sender_signature,
+            payload: {
+                transactions: data.transactions
+            }
+        };
+
+        const response = await fetch(`${API_BASE}/rpc/sendRawTx`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(batchTx)
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to send batch');
+        }
+        return response.json();
     }
 };
