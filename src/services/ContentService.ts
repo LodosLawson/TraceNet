@@ -244,13 +244,21 @@ export class ContentService {
         const allContents: ContentMetadata[] = [];
         const chain = this.blockchain.getChain();
 
-        // Collect all content
+        // Collect all content from Blockchain
         for (let i = chain.length - 1; i >= 0; i--) {
             const block = chain[i];
             for (const tx of block.transactions) {
                 if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
                     allContents.push(tx.payload.content as ContentMetadata);
                 }
+            }
+        }
+
+        // Collect content from Mempool (Pending)
+        const mempoolTxs = this.mempool.getAllTransactions();
+        for (const tx of mempoolTxs) {
+            if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
+                allContents.unshift(tx.payload.content as ContentMetadata); // Add to top
             }
         }
 
