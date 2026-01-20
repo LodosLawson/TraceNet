@@ -62,62 +62,59 @@ export class BlockProducer extends EventEmitter {
     /**
      * Start block production (Consensus Loop)
      */
+    /**
+     * Start block production (Event-Driven Mode with Heartbeat)
+     */
     start(): void {
         if (this.isProducing) {
             return;
         }
 
         this.isProducing = true;
-        console.log('Starting Consensus Loop...');
 
-        // Check for existing transactions on startup
-        if (this.mempool.getSize() > 0) {
-            console.log(`[Consensus] Found ${this.mempool.getSize()} pending transactions.`);
+        // Check for existing transactions in mempool at startup
+        const existingTxCount = this.mempool.getSize();
+        if (existingTxCount > 0) {
+            console.log(`Found ${existingTxCount} existing transaction(s) in mempool, scheduling initial block production...`);
+            setTimeout(() => {
+                if (this.isProducing) {
+                    this.produceBlock();
+                }
+            }, 1000);
         }
 
-        // CONSENSUS POLLING LOOP (1000ms)
-        // Checks eligibility every second to handle round changes and timeouts
-        this.productionInterval = setInterval(async () => {
-            if (!this.isProducing) return;
+        // Listen for new transactions in mempool
+        this.mempool.on('transactionAdded', (tx) => {
+            // CHECK: Is this an instant transaction?
+            // Default to TRUE for standard transactions, check explicitly for false
+            const isInstant = tx.payload?.instant !== false;
 
-            // 1. Check if there are transactions to mine
-            if (this.mempool.getSize() === 0) return;
-
-            // 2. Determine if it is our turn to produce
-            try {
-                const latestBlock = this.blockchain.getLatestBlock();
-                const nextIndex = latestBlock.index + 1;
-
-                const elapsedTime = Date.now() - latestBlock.timestamp;
-                const currentRound = Math.max(0, Math.floor(elapsedTime / this.blockTime));
-
-                // Select expected producer for this round
-                const producer = this.validatorPool.selectBlockProducer(nextIndex, latestBlock.hash, currentRound);
-
-                if (producer) {
-                    // Check if WE are this producer (do we have the private key?)
-                    if (this.localValidators.has(producer.validator_id)) {
-                        console.log(`[Consensus] 🟢 It's my turn (Round ${currentRound}). Producer: ${producer.validator_id}. Mempool: ${this.mempool.getSize()}`);
-                        await this.produceBlock();
-                    } else {
-                        // Not our turn. Wait.
-                        // Optimization: Only log if we have something in mempool, to show we are waiting
-                        if (this.mempool.getSize() > 0) {
-                            console.log(`[Consensus] ⏳ Round ${currentRound}: Waiting for ${producer.validator_id} (Mempool: ${this.mempool.getSize()})`);
-                        }
-                    }
-                } else {
-                    console.warn('[Consensus] ⚠️ No producer selected for this round. Check active validators.');
-                    // Force start if mempool has items and we are local admin?
-                    // No, that breaks consensus.
-                }
-            } catch (err) {
-                console.error('[Consensus] Loop Error:', err);
+            if (!isInstant) {
+                console.log(`[BlockProducer] ⏳ Buffer Batch TX ${tx.tx_id.substring(0, 8)} (Waiting for batch/heartbeat)`);
+                return; // DO NOT trigger immediate mining
             }
 
-        }, 1000); // Check every second
+            // Use a small delay to batch multiple transactions into one block
+            if (this.productionInterval) {
+                clearTimeout(this.productionInterval);
+            }
 
-        console.log('✅ Consensus Loop Active. Waiting for turn...');
+            this.productionInterval = setTimeout(() => {
+                this.produceBlock();
+            }, 2000); // 2 second delay to batch transactions
+        });
+
+        // 🟢 NEW: Heartbeat for Batch Transactions (every 60s)
+        // Ensures that buffered 'instant: false' transactions eventually get mined
+        // even if no 'instant' transaction arrives to wake up the miner.
+        setInterval(() => {
+            if (this.mempool.getSize() > 0 && !this.productionInterval) {
+                console.log('[BlockProducer] ❤️ Heartbeat: Processing buffered batch transactions...');
+                this.produceBlock();
+            }
+        }, 60000); // Check every minute
+
+        console.log('Block production started (Event-Driven + Heartbeat Mode)');
     }
 
     /**
