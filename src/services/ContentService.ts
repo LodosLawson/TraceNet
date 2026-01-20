@@ -135,9 +135,50 @@ export class ContentService {
      * Get content by ID
      */
     getContent(contentId: string): ContentWithStats | null {
-        // 1. Search in Blockchain
-        const chain = this.blockchain.getChain();
         console.log(`[ContentService] Looking for contentId: ${contentId}`);
+
+        // 1. Search in Mempool (Pending) - FAST & FRESH
+        // Search here first to catch content before it gets mined (Race Condition Fix)
+        const mempoolTxs = this.mempool.getAllTransactions();
+        console.log(`[ContentService] Mempool has ${mempoolTxs.length} transactions`);
+
+        for (const tx of mempoolTxs) {
+            // Check for POST_CONTENT
+            if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
+                const content = tx.payload.content as ContentMetadata;
+                if (content.content_id === contentId) {
+                    console.log(`[ContentService] ✅ FOUND in mempool`);
+                    return {
+                        ...content,
+                        likes_count: 0,
+                        comments_count: 0,
+                        shares_count: 0
+                    };
+                }
+            }
+            // Check for COMMENT in Mempool
+            if (tx.type === TransactionType.COMMENT && tx.payload?.comment_id === contentId) {
+                console.log(`[ContentService] ✅ FOUND comment in mempool`);
+                return {
+                    content_id: contentId,
+                    wallet_id: tx.from_wallet,
+                    owner_wallet: tx.from_wallet, // REQUIRED
+                    content_hash: tx.payload.comment_id, // REQUIRED
+                    created_at: tx.timestamp, // REQUIRED
+                    content_type: ContentType.TEXT,
+                    timestamp: tx.timestamp,
+                    title: 'Comment',
+                    description: tx.payload.comment_text,
+                    tags: [],
+                    likes_count: 0,
+                    comments_count: 0,
+                    shares_count: 0
+                } as ContentWithStats;
+            }
+        }
+
+        // 2. Search in Blockchain (Confirmed)
+        const chain = this.blockchain.getChain();
         console.log(`[ContentService] Blockchain has ${chain.length} blocks`);
 
         let postContentCount = 0;
@@ -157,7 +198,7 @@ export class ContentService {
                         };
                     }
                 }
-                // NEW: Check for COMMENT (to allow Liking/Replying to Comments)
+                // Check for COMMENT
                 if (tx.type === TransactionType.COMMENT && tx.payload?.comment_id === contentId) {
                     commentCount++;
                     console.log(`[ContentService] ✅ FOUND comment in blockchain at block ${block.index}`);
@@ -192,45 +233,6 @@ export class ContentService {
                 }
             }
             console.log(`[ContentService] Available post IDs: ${foundPosts.join(', ')}`);
-        }
-
-        // 2. Search in Mempool (for unmined content/comments)
-        const mempoolTxs = this.mempool.getAllTransactions();
-        console.log(`[ContentService] Mempool has ${mempoolTxs.length} transactions`);
-
-        for (const tx of mempoolTxs) {
-            // Check for POST_CONTENT
-            if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
-                const content = tx.payload.content as ContentMetadata;
-                if (content.content_id === contentId) {
-                    console.log(`[ContentService] ✅ FOUND in mempool`);
-                    return {
-                        ...content,
-                        likes_count: 0,
-                        comments_count: 0,
-                        shares_count: 0
-                    };
-                }
-            }
-            // NEW: Check for COMMENT in Mempool
-            if (tx.type === TransactionType.COMMENT && tx.payload?.comment_id === contentId) {
-                console.log(`[ContentService] ✅ FOUND comment in mempool`);
-                return {
-                    content_id: contentId,
-                    wallet_id: tx.from_wallet,
-                    owner_wallet: tx.from_wallet, // REQUIRED
-                    content_hash: tx.payload.comment_id, // REQUIRED
-                    created_at: tx.timestamp, // REQUIRED
-                    content_type: ContentType.TEXT,
-                    timestamp: tx.timestamp,
-                    title: 'Comment',
-                    description: tx.payload.comment_text,
-                    tags: [],
-                    likes_count: 0,
-                    comments_count: 0,
-                    shares_count: 0
-                } as ContentWithStats;
-            }
         }
 
         console.log(`[ContentService] ❌ Content NOT FOUND: ${contentId}`);
