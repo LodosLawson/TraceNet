@@ -180,6 +180,20 @@ export class ContentService {
 
         console.log(`[ContentService] Searched blockchain: ${postContentCount} posts, ${commentCount} comments`);
 
+        // Log the actual posts we found (for debugging)
+        if (postContentCount > 0) {
+            const foundPosts: string[] = [];
+            for (const block of chain) {
+                for (const tx of block.transactions) {
+                    if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
+                        const content = tx.payload.content as ContentMetadata;
+                        foundPosts.push(content.content_id.substring(0, 16) + '...');
+                    }
+                }
+            }
+            console.log(`[ContentService] Available post IDs: ${foundPosts.join(', ')}`);
+        }
+
         // 2. Search in Mempool (for unmined content/comments)
         const mempoolTxs = this.mempool.getAllTransactions();
         console.log(`[ContentService] Mempool has ${mempoolTxs.length} transactions`);
