@@ -138,13 +138,19 @@ export class ContentService {
         // 1. Search in Blockchain
         const chain = this.blockchain.getChain();
         console.log(`[ContentService] Looking for contentId: ${contentId}`);
+        console.log(`[ContentService] Blockchain has ${chain.length} blocks`);
+
+        let postContentCount = 0;
+        let commentCount = 0;
 
         for (const block of chain) {
             for (const tx of block.transactions) {
                 // Check for POST_CONTENT
                 if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
+                    postContentCount++;
                     const content = tx.payload.content as ContentMetadata;
                     if (content.content_id === contentId) {
+                        console.log(`[ContentService] ✅ FOUND in blockchain at block ${block.index}`);
                         return {
                             ...content,
                             ...this.getContentStats(contentId),
@@ -153,6 +159,8 @@ export class ContentService {
                 }
                 // NEW: Check for COMMENT (to allow Liking/Replying to Comments)
                 if (tx.type === TransactionType.COMMENT && tx.payload?.comment_id === contentId) {
+                    commentCount++;
+                    console.log(`[ContentService] ✅ FOUND comment in blockchain at block ${block.index}`);
                     return {
                         content_id: contentId,
                         wallet_id: tx.from_wallet,
@@ -170,13 +178,18 @@ export class ContentService {
             }
         }
 
+        console.log(`[ContentService] Searched blockchain: ${postContentCount} posts, ${commentCount} comments`);
+
         // 2. Search in Mempool (for unmined content/comments)
         const mempoolTxs = this.mempool.getAllTransactions();
+        console.log(`[ContentService] Mempool has ${mempoolTxs.length} transactions`);
+
         for (const tx of mempoolTxs) {
             // Check for POST_CONTENT
             if (tx.type === TransactionType.POST_CONTENT && tx.payload?.content) {
                 const content = tx.payload.content as ContentMetadata;
                 if (content.content_id === contentId) {
+                    console.log(`[ContentService] ✅ FOUND in mempool`);
                     return {
                         ...content,
                         likes_count: 0,
@@ -187,6 +200,7 @@ export class ContentService {
             }
             // NEW: Check for COMMENT in Mempool
             if (tx.type === TransactionType.COMMENT && tx.payload?.comment_id === contentId) {
+                console.log(`[ContentService] ✅ FOUND comment in mempool`);
                 return {
                     content_id: contentId,
                     wallet_id: tx.from_wallet,
@@ -205,6 +219,7 @@ export class ContentService {
             }
         }
 
+        console.log(`[ContentService] ❌ Content NOT FOUND: ${contentId}`);
         return null;
     }
 
