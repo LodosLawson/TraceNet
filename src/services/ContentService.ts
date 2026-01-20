@@ -137,6 +137,7 @@ export class ContentService {
     getContent(contentId: string): ContentWithStats | null {
         // 1. Search in Blockchain
         const chain = this.blockchain.getChain();
+        console.log(`[ContentService] Looking for contentId: ${contentId}`);
 
         for (const block of chain) {
             for (const tx of block.transactions) {
