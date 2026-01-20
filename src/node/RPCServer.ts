@@ -1601,7 +1601,7 @@ export class RPCServer {
                 timestamp,
                 signature,
                 sender_public_key: public_key,
-                instant: !!instant // Pass instant flag
+                instant: String(instant) === 'true' // Strict boolean check (handles 'false' string)
             });
 
             res.json({
