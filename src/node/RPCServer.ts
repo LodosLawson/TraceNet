@@ -1912,7 +1912,7 @@ export class RPCServer {
 
                 const block = chain[i];
                 for (const tx of block.transactions) {
-                    if (tx.type === 'BATCH') {
+                    if (tx.type === 'BATCH' || tx.type === 'CONVERSATION_BATCH') {
                         const innerTxs: any[] = tx.payload?.transactions || [];
                         for (const inner of innerTxs) {
                             if (inner.type === 'PRIVATE_MESSAGE' && inner.to_wallet === walletId) {
