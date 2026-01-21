@@ -15,9 +15,6 @@ interface PageProps {
 }
 
 export const LandingPage = ({ onNavigate }: PageProps) => {
-    const [loading, setLoading] = useState(false);
-    const [newWallet, setNewWallet] = useState<any>(null);
-
     const [nodes, setNodes] = useState<any[]>([]);
     const [stats, setStats] = useState({
         nodes: 0,
@@ -153,56 +150,11 @@ export const LandingPage = ({ onNavigate }: PageProps) => {
                 </div>
                 <button
                     onClick={handleCreateWallet}
-                    disabled={loading}
-                    className="px-4 py-2 md:px-6 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-sm backdrop-blur-md disabled:opacity-50"
+                    className="px-4 py-2 md:px-6 rounded-full border border-white/10 bg-pomegranate-600/20 hover:bg-pomegranate-600/40 transition-all text-sm backdrop-blur-md text-pomegranate-200 hover:text-white border-pomegranate-500/50"
                 >
-                    {loading ? 'Creating...' : 'Create Wallet'}
+                    Launch Netra Wallet
                 </button>
             </motion.div>
-
-            {/* New Wallet Popup */}
-            {newWallet && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm pointer-events-auto p-4">
-                    <div className="bg-pomegranate-950/90 border border-pomegranate-500/30 p-6 md:p-8 rounded-2xl max-w-md w-full text-left relative shadow-2xl">
-                        <button onClick={() => setNewWallet(null)} className="absolute top-4 right-4 text-pomegranate-300 hover:text-white">✕</button>
-                        <h3 className="text-xl md:text-2xl font-bold text-seed-100 mb-4">Wallet Created!</h3>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs uppercase text-pomegranate-400 font-bold">Wallet ID</label>
-                                <div className="bg-black/50 p-3 rounded font-mono text-xs md:text-sm text-seed-200 break-all select-all">
-                                    {newWallet.wallet.wallet_id}
-                                </div>
-                            </div>
-
-                            {newWallet.credentials && (
-                                <div>
-                                    <label className="text-xs uppercase text-pomegranate-400 font-bold flex items-center gap-2">
-                                        Secret Mnemonic <span className="text-red-500 text-[10px]">(SAVE THIS SAFE!)</span>
-                                    </label>
-                                    <div className="bg-red-950/20 border border-red-500/20 p-3 rounded font-mono text-xs md:text-sm text-pomegranate-200 break-words select-all">
-                                        {newWallet.credentials.mnemonic}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="text-xs uppercase text-pomegranate-400 font-bold">Public Key</label>
-                                <div className="bg-black/50 p-3 rounded font-mono text-[10px] md:text-xs text-gray-400 break-all select-all">
-                                    {newWallet.user.public_key}
-                                </div>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => setNewWallet(null)}
-                            className="w-full mt-6 py-3 bg-pomegranate-600 text-white rounded-lg font-bold hover:bg-pomegranate-500 transition-colors"
-                        >
-                            I have saved my keys
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
