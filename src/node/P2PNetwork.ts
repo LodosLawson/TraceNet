@@ -1,11 +1,13 @@
 import io, { Socket } from 'socket.io-client';
 import { Server as SocketIOServer } from 'socket.io';
+import EventEmitter from 'events';
 import { Blockchain } from '../blockchain/core/Blockchain';
 import { Mempool } from './Mempool';
 import { Block } from '../blockchain/models/Block';
 import { Transaction } from '../blockchain/models/Transaction';
 import { ValidatorPool } from '../consensus/ValidatorPool';
 import { LocalDatabase } from '../database/LocalDatabase';
+import { KeyManager } from '../blockchain/crypto/KeyManager';
 import * as geoip from 'geoip-lite';
 
 import { NETWORK_CONFIG } from '../blockchain/config/NetworkConfig';
@@ -28,11 +30,12 @@ interface Peer {
 }
 
 
-export class P2PNetwork {
+export class P2PNetwork extends EventEmitter {
     private blockchain: Blockchain;
     private mempool: Mempool; // Keep mempool for transactions
     private messagePool: any; // MessagePool type (assuming this is for general messages, if not, mempool might be used)
     private myPublicKey?: string; // Store my public key
+    private myPrivateKey?: string; // Store my private key (for signing)
     private validatorPool: ValidatorPool;
     private peers: Map<string, Peer> = new Map();
     private server: SocketIOServer;
@@ -64,8 +67,10 @@ export class P2PNetwork {
         server: SocketIOServer,
         port: number,
         db: LocalDatabase, // Inject DB
-        myPublicKey?: string // Accept public key
+        myPublicKey?: string, // Accept public key
+        myPrivateKey?: string // Accept private key
     ) {
+        super();
         this.fullNode = true;
         this.blockchain = blockchain;
         this.mempool = mempool;
@@ -75,6 +80,7 @@ export class P2PNetwork {
         this.myPort = port; // Use myPort as existing
         this.db = db;
         this.myPublicKey = myPublicKey;
+        this.myPrivateKey = myPrivateKey;
 
         this.loadPersistedPeers(); // Load peers on startup
         this.setupServerHandlers();
@@ -192,10 +198,37 @@ export class P2PNetwork {
     /**
      * Broadcast a new transaction
      */
+    /**
+     * Broadcast a new transaction
+     */
     public broadcastTransaction(tx: Transaction): void {
         this.server.emit('p2p:newTransaction', tx);
         this.peers.forEach(peer => {
             peer.socket.emit('p2p:newTransaction', tx);
+        });
+    }
+
+    /**
+     * Broadcast a block proposal (Consensus Phase 1)
+     */
+    public broadcastProposal(block: Block): void {
+        console.log(`[P2P] 🗳️ Broadcasting Proposal for Block ${block.index}`);
+        const payload = block.toJSON();
+        this.server.emit('p2p:blockProposal', payload);
+        this.peers.forEach(peer => {
+            peer.socket.emit('p2p:blockProposal', payload);
+        });
+    }
+
+    /**
+     * Broadcast a block signature (Consensus Phase 2)
+     */
+    public broadcastSignature(blockHash: string, signature: string, validatorId: string): void {
+        // console.log(`[P2P] ✍️ Broadcasting Signature from ${validatorId}`);
+        const payload = { blockHash, signature, validatorId };
+        this.server.emit('p2p:blockSignature', payload);
+        this.peers.forEach(peer => {
+            peer.socket.emit('p2p:blockSignature', payload);
         });
     }
 
@@ -287,6 +320,15 @@ export class P2PNetwork {
                 this.handleNewTransaction(txData);
             });
 
+            // Consensus Handlers
+            socket.on('p2p:blockProposal', (blockData: any) => {
+                this.handleBlockProposal(blockData);
+            });
+
+            socket.on('p2p:blockSignature', (sigData: any) => {
+                this.handleBlockSignature(sigData);
+            });
+
             socket.on('p2p:requestChain', (data: any) => {
                 this.handleRequestChain(socket, data);
             });
@@ -347,6 +389,15 @@ export class P2PNetwork {
 
         socket.on('p2p:newTransaction', (txData: any) => {
             this.handleNewTransaction(txData);
+        });
+
+        // Consensus Handlers
+        socket.on('p2p:blockProposal', (blockData: any) => {
+            this.handleBlockProposal(blockData);
+        });
+
+        socket.on('p2p:blockSignature', (sigData: any) => {
+            this.handleBlockSignature(sigData);
         });
 
         socket.on('p2p:sendChain', (data: any) => {
@@ -713,6 +764,60 @@ export class P2PNetwork {
             console.error(`[P2P] Sync failed: ${result.error}`);
             this.isSyncing = false;
         }
+    }
+
+    /**
+     * Handle Block Proposal (Validator Mode)
+     */
+    private handleBlockProposal(blockData: any) {
+        // 1. Check if we are a validator
+        if (!this.myPrivateKey || !this.myPublicKey) {
+            return;
+        }
+
+        const block = new Block(blockData);
+
+        // 2. Validate Block (Signature check + Structure)
+        const latestBlock = this.blockchain.getLatestBlock();
+        if (block.index !== latestBlock.index + 1) return;
+
+        const validation = this.blockchain.validateBlock(block, latestBlock);
+
+        if (!validation.valid) {
+            console.warn(`[P2P] ❌ Rejected Proposal for Block ${block.index}: ${validation.error}`);
+            return;
+        }
+
+        // 3. Sign it!
+        console.log(`[P2P] ✍️ Co-signing Proposal for Block ${block.index}`);
+        const signableData = block.hash || block.calculateHash(); // Sign the HASH
+        const mySignature = KeyManager.sign(signableData, this.myPrivateKey);
+
+        // 4. Determine my Validator ID
+        let myId = 'validator_' + this.myPublicKey.substring(0, 8);
+        const allValidators = this.validatorPool.getAllValidators();
+        const me = allValidators.find(v => v.public_key === this.myPublicKey);
+        if (me) {
+            myId = me.validator_id;
+        }
+
+        // 5. Broadcast Signature
+        this.broadcastSignature(block.hash!, mySignature, myId);
+    }
+
+    /**
+     * Handle Block Signature
+     */
+    private handleBlockSignature(data: any) {
+        const { blockHash, signature, validatorId } = data;
+        if (!blockHash || !signature || !validatorId) return;
+
+        // Emit for BlockProducer to handle (Signature Aggregation)
+        this.emit('blockSignatureReceived', {
+            validatorId,
+            signature,
+            blockHash
+        });
     }
 
     public getPeers(): Peer[] {

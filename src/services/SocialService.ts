@@ -525,14 +525,13 @@ export class SocialService {
     }
 
     /**
-     * Get content likes
+     * Get content likes (Verified + Pending)
      */
     getContentLikes(contentId: string): Transaction[] {
         const likes: Transaction[] = [];
         const chain = this.blockchain.getChain();
 
-        // TODO: Also search SocialPool?
-
+        // 1. Blockchain (Confirmed)
         for (const block of chain) {
             for (const tx of block.transactions) {
                 // Handle Normal Likes
@@ -560,16 +559,52 @@ export class SocialService {
             }
         }
 
+        // 2. Mempool (Instant - Pending)
+        const mempoolTxs = this.mempool.getAllTransactions();
+        for (const tx of mempoolTxs) {
+            if (this.isLikeTx(tx, tx.from_wallet, contentId)) { // Reusing isLikeTx logic loosely or direct check
+                // isLikeTx requires walletId, here we want ALL likes for content. 
+                // Direct check:
+                if (
+                    tx.type === TransactionType.LIKE &&
+                    (tx.payload?.content_id === contentId || tx.payload?.target_content_id === contentId) &&
+                    !tx.payload?.is_treasury_fee
+                ) {
+                    likes.push(tx);
+                }
+            }
+        }
+
+        // 3. SocialPool (Batched - Pending)
+        // We need to inspect the queues
+        // Ideally SocialPool exposes a specific getter, but for now we iterate public queue if accessible or use a helper
+        // Since queues are private, we need a method in SocialPool or make them public.
+        // Let's assume we add `getPendingLikesForContent` to SocialPool or just iterate via `getPendingActions` (inefficient).
+        // Better: Access specific structure if possible. 
+        // For this task, let's use a new helper in SocialPool or just casting since we are inside the module structure (if friendly).
+        // Actually, SocialPool instance is private. We need to add a method to SocialPool.
+
+        // TEMPORARY FIX: We can't access private queues directly.
+        // Adding a TODO/Method call to SocialPool is cleaner.
+        // But to save time/tools, let's see if we can use existing public methods.
+        // `getPendingActions` filters by walletId. We need by contentId.
+
+        // Let's UPDATE SocialPool to accept a filter or getAllPending.
+        // For now, let's just create a quick getter in SocialPool.
+        const pendingBatchLikes = this.socialPool.getPendingLikesForContent(contentId);
+        likes.push(...(pendingBatchLikes as any[]));
+
         return likes;
     }
 
     /**
-     * Get content comments
+     * Get content comments (Verified + Pending)
      */
     getContentComments(contentId: string): Transaction[] {
         const comments: Transaction[] = [];
         const chain = this.blockchain.getChain();
 
+        // 1. Blockchain (Confirmed)
         for (const block of chain) {
             for (const tx of block.transactions) {
                 if (
@@ -594,6 +629,22 @@ export class SocialService {
                 }
             }
         }
+
+        // 2. Mempool (Instant - Pending)
+        const mempoolTxs = this.mempool.getAllTransactions();
+        for (const tx of mempoolTxs) {
+            if (
+                tx.type === TransactionType.COMMENT &&
+                (tx.payload?.content_id === contentId || tx.payload?.target_content_id === contentId) &&
+                !tx.payload?.is_treasury_fee
+            ) {
+                comments.push(tx);
+            }
+        }
+
+        // 3. SocialPool (Batched - Pending)
+        const pendingBatchComments = this.socialPool.getPendingCommentsForContent(contentId);
+        comments.push(...(pendingBatchComments as any[]));
 
         return comments;
     }

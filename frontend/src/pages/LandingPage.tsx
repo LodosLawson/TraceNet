@@ -65,22 +65,9 @@ export const LandingPage = ({ onNavigate }: PageProps) => {
         return () => clearInterval(interval);
     }, []);
 
-    const handleCreateWallet = async () => {
-        const nickname = prompt("Enter a nickname for your new wallet:");
-        if (!nickname) return;
-
-        setLoading(true);
-        try {
-            const res = await api.createUser(nickname);
-            setNewWallet(res);
-            // Auto-mine to confirm
-            await api.mine(res.wallet.wallet_id);
-            alert(`✅ Wallet Created!\n\nID: ${res.wallet.wallet_id}\n\nPlease check console for credentials if in dev mode.`);
-        } catch (err: any) {
-            alert("❌ Error creating wallet: " + err.message);
-        } finally {
-            setLoading(false);
-        }
+    const handleCreateWallet = () => {
+        // Redirect to Netra Wallet Application
+        window.open('https://netra.locktraceapp.com', '_blank');
     };
 
     return (

@@ -1,5 +1,6 @@
 import { InnerTransaction, TransactionModel, TransactionType } from '../blockchain/models/Transaction';
 import { Mempool } from './Mempool';
+import { KeyManager } from '../blockchain/crypto/KeyManager';
 import EventEmitter from 'events';
 
 /**
@@ -8,6 +9,8 @@ import EventEmitter from 'events';
  */
 export class SocialPool extends EventEmitter {
     private mempool: Mempool;
+    private nodePrivateKey: string;
+    private nodePublicKey: string;
 
     // Separate queues for different batching policies
     private likeQueue: InnerTransaction[] = [];
@@ -26,9 +29,15 @@ export class SocialPool extends EventEmitter {
     // private readonly LIKE_BATCH_WINDOW_MS = 20 * 1000; 
     // private readonly COMMENT_BATCH_WINDOW_MS = 10 * 1000;
 
-    constructor(mempool: Mempool) {
+    constructor(
+        mempool: Mempool,
+        nodePrivateKey: string,
+        nodePublicKey: string
+    ) {
         super();
         this.mempool = mempool;
+        this.nodePrivateKey = nodePrivateKey;
+        this.nodePublicKey = nodePublicKey;
     }
 
     /**
@@ -101,8 +110,8 @@ export class SocialPool extends EventEmitter {
     private createBatchTransaction(actions: InnerTransaction[], batchTypeTag: string): void {
         // Create BATCH Transaction
         const batchTx = TransactionModel.create(
-            'BATCH_SERVICE', // Sender
-            'BATCH_SERVICE', // Recipient
+            this.nodePublicKey, // Sender: The Node itself (Batch Relayer)
+            'BATCH_SERVICE', // Recipient (System ID)
             TransactionType.BATCH,
             0,
             0,
@@ -113,8 +122,12 @@ export class SocialPool extends EventEmitter {
             }
         );
 
+        // Sign the transaction
+        const signature = KeyManager.sign(batchTx.tx_id, this.nodePrivateKey);
+        batchTx.sender_signature = signature;
+
         this.mempool.addTransaction(batchTx.toJSON());
-        console.log(`[SocialPool] Batch ${batchTx.tx_id} (${batchTypeTag}) created and sent to Mempool.`);
+        console.log(`[SocialPool] Batch ${batchTx.tx_id} (${batchTypeTag}) created, signed, and sent to Mempool.`);
         this.emit('batchCreated', batchTx);
     }
 
@@ -133,6 +146,27 @@ export class SocialPool extends EventEmitter {
         const likes = this.likeQueue.filter(tx => tx.from_wallet === walletId);
         const comments = this.commentQueue.filter(tx => tx.from_wallet === walletId);
         return [...likes, ...comments];
+    }
+
+    /**
+     * Get pending likes for content
+     */
+    getPendingLikesForContent(contentId: string): InnerTransaction[] {
+        // We only care about the LIKE action, not the Fee/Pool actions
+        return this.likeQueue.filter(tx =>
+            tx.type === TransactionType.LIKE &&
+            (tx.payload?.content_id === contentId || tx.payload?.target_content_id === contentId)
+        );
+    }
+
+    /**
+     * Get pending comments for content
+     */
+    getPendingCommentsForContent(contentId: string): InnerTransaction[] {
+        return this.commentQueue.filter(tx =>
+            tx.type === TransactionType.COMMENT &&
+            (tx.payload?.content_id === contentId || tx.payload?.target_content_id === contentId)
+        );
     }
 
     /**

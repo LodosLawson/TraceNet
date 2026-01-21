@@ -13,6 +13,7 @@ export interface IBlock {
     transactions: Transaction[];
     validator_id: string;
     signature: string;
+    signatures?: string[]; // Optional for backward compatibility, but generally required now
     nonce: number;
     hash?: string;
     metadata?: any; // Network metadata for genesis block
@@ -30,7 +31,8 @@ export class Block {
     state_root: string;
     transactions: Transaction[];
     validator_id: string;
-    signature: string;
+    signature: string; // Proposer signature
+    signatures: string[]; // Witness signatures
     nonce: number;
     hash?: string;
     metadata?: any;
@@ -45,6 +47,7 @@ export class Block {
         this.transactions = data.transactions;
         this.validator_id = data.validator_id;
         this.signature = data.signature;
+        this.signatures = data.signatures || []; // Initialize signatures
         this.nonce = data.nonce;
         this.hash = data.hash;
         this.metadata = data.metadata;
@@ -64,6 +67,7 @@ export class Block {
             transactions: [],
             validator_id,
             signature: '',
+            signatures: [],
             nonce: 0,
             metadata: networkMetadata,
         });
@@ -95,6 +99,7 @@ export class Block {
             transactions,
             validator_id,
             signature: '',
+            signatures: [],
             nonce: 0,
             node_wallet,
         });
@@ -109,7 +114,7 @@ export class Block {
     }
 
     /**
-     * Get data for hashing (excludes hash itself)
+     * Get data for hashing (excludes hash itself AND signatures)
      */
     getHashableData(): string {
         return JSON.stringify({
@@ -119,7 +124,51 @@ export class Block {
             merkle_root: this.merkle_root,
             state_root: this.state_root,
             validator_id: this.validator_id,
-            signature: this.signature,
+            // signature: this.signature, // REMOVED: Signature should not be part of the hash usually, but in previous version it might have been diff. 
+            // In standard BTC/ETH, signature is segregated or outside the hashable part for the ID.
+            // Let's keep it backward compatible: The PRIMARY signature (proposer) might be inside if it was before, 
+            // BUT for multi-sig, we definitely exclude the 'signatures' array.
+            // Wait, looking at original code: `signature: this.signature` WAS included.
+            // If I remove it, I break verification of old blocks (if any).
+            // But usually, signature signs the hash. If hash includes signature, it's a circular dependency.
+            // Checking original code... 
+            // Original: `getHashableData` included `signature: this.signature`.
+            // `calculateHash` calls `getHashableData`.
+            // `setSignature` sets `this.signature` THEN calls `calculateHash`. 
+            // This implies the signature IS included in the hash? 
+            // That's impossible for digital signatures. You sign the hash. You can't put the signature in the data you hash to get the hash you sign.
+            // Let's re-read the original ViewOutput carefully.
+
+            // Original `setSignature`:
+            // this.signature = signature;
+            // this.hash = this.calculateHash();
+
+            // Original `getHashableData`:
+            // JSON.stringify({ ... signature: this.signature ... })
+
+            // If I call setSignature(sig):
+            // 1. this.signature = sig
+            // 2. hash = calculateHash() -> JSON includes sig -> hash depends on sig.
+            // This block hash is VALID. 
+            // BUT, what did the Validator sign?
+            // `getSignableData` excludes signature and hash.
+            // So Validator signs {index, prev_hash...}. Result is SIG.
+            // Then Block puts SIG in itself. 
+            // Then Block calculates HASH including SIG.
+            // This is valid. The Block Hash depends on the Proposer Signature.
+
+            // FOR MULTI-SIG:
+            // We want other validators to sign the BLOCK HASH (or the signable data).
+            // If they sign the Signable Data, they are just co-signing the proposal.
+            // If they sign the Block Hash, they confirm the Proposer's signature too.
+
+            // Let's exclude the NEW `signatures` array from the hash to allow appending signatures without changing the block hash (if we want the hash to be stable).
+            // HOWEVER, usually the block hash MUST change if content changes?
+            // In Multi-Sig/BFT, often we have a "QC" (Quorum Certificate) which is a collection of signatures.
+            // The Block ID is usually the hash of the content *before* QC.
+            // But let's verify standard TraceNet behavior.
+
+            signature: this.signature, // Keep primary proposer signature here
             nonce: this.nonce,
         });
     }
@@ -219,6 +268,16 @@ export class Block {
     }
 
     /**
+     * Add a validator signature (Multi-Sig)
+     */
+    addMultiSignature(signature: string): void {
+        if (!this.signatures) this.signatures = [];
+        if (!this.signatures.includes(signature)) {
+            this.signatures.push(signature);
+        }
+    }
+
+    /**
      * Convert to plain object
      */
     toJSON(): IBlock {
@@ -231,6 +290,7 @@ export class Block {
             transactions: this.transactions,
             validator_id: this.validator_id,
             signature: this.signature,
+            signatures: this.signatures,
             nonce: this.nonce,
             hash: this.hash,
             metadata: this.metadata,
@@ -238,3 +298,4 @@ export class Block {
         };
     }
 }
+

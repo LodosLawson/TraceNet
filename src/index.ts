@@ -32,6 +32,7 @@ import { AutoUpdater } from './node/AutoUpdater';
 import { CloudStorageBackup } from './database/CloudStorageBackup';
 import { getBootstrapNodes } from './config/BootstrapNodes';
 import { IMMUTABLE_CONSENSUS_RULES } from './config/ConsensusRules';
+import { Block } from './blockchain/models/Block';
 
 
 import { NETWORK_CONFIG } from './blockchain/config/NetworkConfig';
@@ -87,8 +88,8 @@ class BlockchainNode {
         const mempoolExpiration = parseInt(process.env.MEMPOOL_EXPIRATION_MS || '3600000', 10);
         this.mempool = new Mempool(maxMempoolSize, mempoolExpiration);
 
-        // Initialize SocialPool
-        this.socialPool = new SocialPool(this.mempool);
+        // Initialize SocialPool - MOVED DOWN
+        // this.socialPool = new SocialPool(this.mempool);
 
         // Initialize MessagePool
         // Import must be at top, using require here for simplicity in this edit block or I should add import
@@ -266,6 +267,9 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             nodeWalletPublicKey = keyPair.publicKey;
             SecureLogger.log('[Setup] Loaded Node Wallet from KeyStore');
         }
+
+        // Initialize SocialPool (Late Init for Keys)
+        this.socialPool = new SocialPool(this.mempool, nodeWalletPrivateKey, nodeWalletPublicKey);
 
         // ===================================
         // VALIDATOR SELF-REGISTRATION (MOVED)
@@ -461,7 +465,8 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             this.wsServer.getIO(),
             port,
             this.localDb, // ✅ Inject DB
-            myValidatorPublicKey // Pass my Public Key
+            myValidatorPublicKey, // Pass my Public Key
+            sysPrivateKey // ✅ Pass my Private Key for Consensus Signing
         );
 
         // Connect to peers from env
@@ -498,7 +503,7 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
         this.cloudBackup = new CloudStorageBackup();
 
         // Setup Event Handlers (Moved to start())
-        // this.setupEventHandlers();
+        this.setupEventHandlers();
 
         console.log('Blockchain Node initialized successfully');
     }
@@ -512,11 +517,10 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             console.log(`New block produced: ${data.block.index}`);
 
             // Persist chain to local database
-            // Note: In production we'd append, but for prototype saving full chain is safer/easier
             this.localDb.saveChain(this.blockchain.getChain()).catch(console.error);
 
             // ✅ NEW: Auto-backup to Google Cloud Storage (Cloud Run persistence)
-            this.cloudBackup.backup(this.blockchain.getChain()).catch((err) => {
+            this.cloudBackup.backup(this.blockchain.getChain()).catch((err: any) => {
                 console.warn('[GCS] Backup failed (non-critical):', err.message);
             });
 
@@ -529,14 +533,11 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             // ✅ Update UserService with new block
             this.userService.processBlock(data.block);
 
-            // Distribute rewards (system transactions, not added to mempool)
+            // Distribute rewards (system transactions)
             const blockRewards = this.rewardDistributor.distributeBlockReward(
                 data.block.index,
                 data.producer
             );
-
-            // Note: Reward transactions are NOT added to mempool
-            // They are system-generated and should not trigger new blocks
 
             // Broadcast transaction confirmations
             for (const tx of data.block.transactions) {
@@ -544,7 +545,19 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             }
         });
 
-        // Handle signature requests
+        // --- CONSENSUS EVENTS ---
+
+        // 1. Handle Block Proposal (Producer -> Network)
+        this.blockProducer.on('blockProposed', (block: Block) => {
+            this.p2pNetwork.broadcastProposal(block);
+        });
+
+        // 2. Handle Signature Reception (Network -> Producer)
+        this.p2pNetwork.on('blockSignatureReceived', (data: any) => {
+            this.blockProducer.addSignature(data.validatorId, data.signature);
+        });
+
+        // Handle signature requests (Old Logic? Or kept for InnerTransaction?)
         this.signatureCoordinator.on('signRequest', (data: any) => {
             this.wsServer.sendSignRequest([data.validator_id], data.tx_id, data.transaction);
         });
