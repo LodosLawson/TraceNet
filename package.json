@@ -1,6 +1,6 @@
 {
   "name": "tracenet-blockchain",
-  "version": "3.0.1",
+  "version": "3.0.01",
   "description": "Blockchain ecosystem with Delegated Proof of Activity consensus",
   "bin": {
     "tracenet": "./dist/cli/index.js"
