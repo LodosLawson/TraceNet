@@ -387,9 +387,31 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
         // 1. Strict CORS
         const cors = require('cors');
         const corsOptions = {
-            origin: process.env.NODE_ENV === 'production'
-                ? (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []) // Strict list in prod
-                : '*', // Allow all in dev
+            origin: (origin: any, callback: any) => {
+                // Allow requests with no origin (like mobile apps or curl requests)
+                if (!origin) return callback(null, true);
+
+                // CRITICAL: Explicitly allow frontend domains
+                const defaultAllowed = [
+                    'https://netra.locktraceapp.com',
+                    'https://tracenet.locktraceapp.com',
+                    'http://localhost:5173',
+                    'http://localhost:3000'
+                ];
+
+                // Allow if in dev, or explicitly allowed, or configured in env
+                const envAllowed = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [];
+
+                if (process.env.NODE_ENV !== 'production' ||
+                    envAllowed.includes('*') ||
+                    defaultAllowed.includes(origin) ||
+                    envAllowed.includes(origin)) {
+                    callback(null, true);
+                } else {
+                    console.warn(`[CORS] Blocked request from: ${origin}`);
+                    callback(new Error('Not allowed by CORS'));
+                }
+            },
             methods: ['GET', 'POST'],
             allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
             credentials: true,
