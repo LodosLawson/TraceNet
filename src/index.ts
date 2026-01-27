@@ -413,7 +413,7 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
                 }
             },
             methods: ['GET', 'POST'],
-            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+            allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'ngrok-skip-browser-warning'],
             credentials: true,
             maxAge: 86400 // 24 hours
         };
