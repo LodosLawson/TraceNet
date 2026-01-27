@@ -39,6 +39,13 @@ It uses a unique **Delegated Proof of Activity (DPoA)** consensus mechanism that
     *   **LOW:** 1-hour batch window (Ultra-low fee).
 *   **Privacy:** Native X25519 encryption for all partial messages.
 
+### 🌐 Dynamic Discovery Protocol (Meeting Point)
+*   **Automated Registration:** Nodes automatically announce themselves to the network upon startup.
+*   **Self-Healing:** A distributed "Meeting Point" system allows isolated nodes to find peers via bootstrap nodes.
+*   **Quality Assurance:**
+    *   **Reachability Checks:** The network only registers nodes that pass a health check (`/health` ping).
+    *   **Auto-Pruning:** Dead or unresponsive nodes are automatically removed from the global registry every 5 minutes.
+
 ---
 
 ## 🛠️ Architecture
