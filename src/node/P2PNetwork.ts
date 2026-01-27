@@ -85,6 +85,7 @@ export class P2PNetwork extends EventEmitter {
         this.loadPersistedPeers(); // Load peers on startup
         this.setupServerHandlers();
         this.startSyncService();
+        this.startCleaningService(); // 🧹 NEW: Keep the peer list clean
 
         // Start Discovery
         const { PeerDiscovery } = require('./discovery/PeerDiscovery');
@@ -832,6 +833,18 @@ export class P2PNetwork extends EventEmitter {
         return Array.from(this.knownPeers);
     }
 
+    /**
+     * Add a peer to known list (used by Registration API)
+     */
+    public addKnownPeer(url: string): void {
+        if (!url || this.knownPeers.has(url)) return;
+        this.knownPeers.add(url);
+        // Persist immediately?
+        if (this.db) {
+            this.db.savePeers(Array.from(this.knownPeers));
+        }
+    }
+
     private getPeerId(): string {
         // Ideally derived from public key, but for now strict random or env
         return process.env.PEER_ID || 'node_' + Math.random().toString(36).substr(2, 9);
@@ -907,5 +920,46 @@ export class P2PNetwork extends EventEmitter {
             }
 
         }, 10000); // Check every 10 seconds
+    }
+
+    /**
+     * 🧹 Cleaning Service: Prune dead peers
+     * Ensures the "Meeting Point" list stays healthy
+     */
+    private startCleaningService() {
+        setInterval(async () => {
+            if (this.knownPeers.size === 0) return;
+
+            console.log(`[P2P] 🧹 Cleaning Service: Checking ${this.knownPeers.size} known peers...`);
+            const peersArray = Array.from(this.knownPeers);
+            const deadPeers: string[] = [];
+
+            // Check health of 10 random known peers each cycle to avoid flooding
+            const candidates = peersArray.sort(() => Math.random() - 0.5).slice(0, 10);
+
+            for (const url of candidates) {
+                // Keep bootstrap nodes!
+                if (NETWORK_CONFIG.BOOTSTRAP_NODES.includes(url)) continue;
+                // Don't prune currently connected peers
+                if (Array.from(this.peers.values()).some(p => p.url === url)) continue;
+
+                try {
+                    const check = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) });
+                    if (!check.ok) deadPeers.push(url);
+                } catch (err) {
+                    deadPeers.push(url);
+                }
+            }
+
+            if (deadPeers.length > 0) {
+                console.log(`[P2P] 🧹 Removing ${deadPeers.length} dead peers from list.`);
+                deadPeers.forEach(url => this.knownPeers.delete(url));
+
+                // Persist changes
+                if (this.db) {
+                    this.db.savePeers(Array.from(this.knownPeers));
+                }
+            }
+        }, 300000); // Check every 5 minutes
     }
 }

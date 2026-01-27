@@ -17,6 +17,7 @@ export interface NetworkMetadata {
     BOOTSTRAP_NODES: string[];
     GENESIS_VALIDATOR_PUBLIC_KEY?: string; // Optional if not always present
     initialValidators: string[];
+    DNS_SEEDS?: string[];
 }
 
 /**
@@ -46,6 +47,12 @@ export const NETWORK_CONFIG: NetworkMetadata = {
         '25b86a85774d69db8af2a782f7fbf9c062054c48d4c2c3fac9ec4b10c54f43d7', // Genesis Validator (System)
         'cd00b064e18f0326eff90e1802c92d8c4bc759148ab3a77af9097d6c79e02073',  // User Home Node Validator
         '16f82568' // US Mainnet Validator (Added for Sync compatibility)
+    ],
+    // 🌍 DNS / HTTP Seeds: The "Phonebook" of the network
+    // Nodes fetch these URLs to find active peers when they are isolated.
+    DNS_SEEDS: [
+        'https://raw.githubusercontent.com/LodosLawson/TraceNet-V3-Clean/main/active_nodes.json', // Main Repo Seed
+        'https://tracenet-seed.vercel.app/api/nodes', // Fallback Vercel Seed (Mock)
     ]
 };
 

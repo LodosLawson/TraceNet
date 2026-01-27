@@ -27,7 +27,8 @@ export const NodesPage = ({ onNavigate }: PageProps) => {
     const fetchNodes = async () => {
         setLoading(true);
         try {
-            const peers = await api.getPeers();
+            // Upgrade: Use getDiscoveredNodes to show ALL known nodes (Meeting Point logic)
+            const peers = await api.getDiscoveredNodes();
 
             // Current User / Local Node
             const localNode: VisNode = {

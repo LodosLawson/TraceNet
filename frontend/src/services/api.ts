@@ -60,6 +60,23 @@ export const api = {
         return data.nodes;
     },
 
+    async announceNode(url: string): Promise<{ success: boolean; message: string }> {
+        const response = await fetch(`${API_BASE}/api/nodes/announce`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url }),
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.message || 'Failed to announce node');
+        }
+
+        return response.json();
+    },
+
     async getPeers(): Promise<NodeInfo[]> {
         const response = await fetch(`${API_BASE}/rpc/peers`);
         if (!response.ok) return [];

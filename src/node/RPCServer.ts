@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+﻿import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -209,9 +209,10 @@ export class RPCServer {
         this.app.get('/rpc/balance/:walletId', this.getBalance.bind(this));
         this.app.get('/rpc/accounts', this.getAllAccounts.bind(this));
 
-        // Network endpoints
-        this.app.get('/rpc/peers', this.getPeers.bind(this));
-        this.app.get('/api/nodes/discover', this.discoverNodes.bind(this));
+        this.app.get('/api/nodes/discover', this.getDiscoveredNodes.bind(this));
+        this.app.post('/api/nodes/announce', this.registerNode.bind(this));
+
+        // ... rest of routes
 
         // Dynamic transfer fee endpoints
         this.app.post('/rpc/calculateTransferFee', this.calculateTransferFee.bind(this));
@@ -526,7 +527,7 @@ export class RPCServer {
             let block;
 
             // Check if it's a number (index) or hash
-            if (/^\d+$/.test(indexOrHash)) {
+            if (/^\d+ $ /.test(indexOrHash)) {
                 const index = parseInt(indexOrHash, 10);
                 block = this.blockchain.getBlockByIndex(index);
             } else {
@@ -2421,7 +2422,7 @@ export class RPCServer {
         const shouldAutoMine = stats.totalValidators <= 1;
 
         if (shouldAutoMine) {
-            console.log(`[AutoMiner] Single node detected (${stats.totalValidators} validator). Starting Auto-Miner Service 🛠️`);
+            console.log(`[AutoMiner] Single node detected (${stats.totalValidators} validator). Starting Auto-Miner Service ðŸ› ï¸`);
 
             setInterval(async () => {
                 try {
@@ -2436,12 +2437,12 @@ export class RPCServer {
                         const result = await this.processMiningCycle();
                         if (result.success) {
                             if (result.block) {
-                                console.log(`[AutoMiner] ✅ Block Mined! Hash: ${result.block.hash}`);
+                                console.log(`[AutoMiner] âœ… Block Mined! Hash: ${result.block.hash}`);
                             } else {
-                                console.log(`[AutoMiner] ℹ️  Mining cycle completed (No block produced).`);
+                                console.log(`[AutoMiner] â„¹ï¸  Mining cycle completed (No block produced).`);
                             }
                         } else {
-                            console.error(`[AutoMiner] ❌ Mining failed: ${result.error}`);
+                            console.error(`[AutoMiner] âŒ Mining failed: ${result.error}`);
                         }
                     }
                 } catch (err) {
@@ -2450,6 +2451,160 @@ export class RPCServer {
             }, 600000); // Check every 10 minutes (batch processing)
         } else {
             console.log(`[AutoMiner] Multiple validators detected (${stats.totalValidators}). Auto-Miner DISABLED.`);
+        }
+    }
+
+    /**
+     * Node discovery endpoint for frontend auto-connect
+     */
+    private async getDiscoveredNodes(req: Request, res: Response): Promise<void> {
+        try {
+            const peers = this.p2pNetwork?.getPeers() || [];
+            const knownPeers = this.p2pNetwork?.getKnownPeers() || [];
+            const nodes: any[] = [];
+
+            // Helper: Check if URL is localhost/private
+            const isLocalhost = (url: string): boolean => {
+                if (!url || url === 'unknown') return true;
+                return url.includes('localhost') ||
+                    url.includes('127.0.0.1') ||
+                    url.includes('192.168.') ||
+                    url.includes('10.0.') ||
+                    url.includes('172.16.');
+            };
+
+            // Add self ONLY if we have a public URL
+            const publicHost = process.env.PUBLIC_HOST;
+            if (publicHost && !isLocalhost(publicHost)) {
+                // Lookup self location
+                let selfLat = 0, selfLng = 0;
+                try {
+                    const hostname = new URL(publicHost).hostname;
+                    const geo = geoip.lookup(hostname);
+                    if (geo && geo.ll) {
+                        selfLat = geo.ll[0];
+                        selfLng = geo.ll[1];
+                    }
+                } catch (e) { }
+
+                nodes.push({
+                    url: publicHost,
+                    region: process.env.REGION || 'unknown',
+                    country: 'US',
+                    status: 'healthy',
+                    lastSeen: Date.now(),
+                    height: this.blockchain.getChainLength(),
+                    latency: null,
+                    capabilities: ['rpc', 'websocket', 'p2p'],
+                    lat: selfLat,
+                    lng: selfLng
+                });
+            }
+
+            // Add all known peers (connected + disconnected)
+            // Use specialized Set to avoid duplicates
+            const visited = new Set<string>();
+            if (publicHost) visited.add(publicHost);
+
+            const addNode = (url: string, status: string, peerObj?: any) => {
+                if (visited.has(url)) return;
+                if (isLocalhost(url) && process.env.NODE_ENV === 'production') return;
+
+                visited.add(url);
+
+                let lat = peerObj?.lat || 0;
+                let lng = peerObj?.lng || 0;
+
+                // Try geoip if missing
+                if (lat === 0 && lng === 0) {
+                    try {
+                        const hostname = new URL(url).hostname;
+                        const geo = geoip.lookup(hostname);
+                        if (geo && geo.ll) {
+                            lat = geo.ll[0];
+                            lng = geo.ll[1];
+                        }
+                    } catch (e) { }
+                }
+
+                nodes.push({
+                    url: url,
+                    region: peerObj?.region || 'unknown',
+                    country: peerObj?.country || 'Unknown',
+                    status: status,
+                    lastSeen: peerObj?.lastSeen || Date.now(),
+                    height: peerObj?.height || 0,
+                    latency: null,
+                    capabilities: ['rpc'],
+                    lat: lat,
+                    lng: lng
+                });
+            };
+
+            // 1. Connected Peers
+            peers.forEach((p: any) => addNode(p.url, 'healthy', p));
+
+            // 2. Known Peers (Offline/Disconnected)
+            knownPeers.forEach((url: string) => addNode(url, 'unknown', {}));
+
+            res.json({
+                nodes: nodes.slice(0, 100), // Limit to 100 to prevent payload explosion
+                recommended: null,
+                timestamp: Date.now()
+            });
+        } catch (error) {
+            console.error('Discovery Error:', error);
+            res.status(500).json({ error: 'Node discovery failed' });
+        }
+    }
+
+    /**
+     * Register a new node (Announcement)
+     * allows nodes to "write themselves" into the network phonebook
+     */
+    private async registerNode(req: Request, res: Response): Promise<void> {
+        try {
+            const { url } = req.body;
+
+            if (!url || typeof url !== 'string') {
+                res.status(400).json({ error: 'Valid URL is required' });
+                return;
+            }
+
+            // Basic Validation
+            try {
+                const urlObj = new URL(url);
+                if (!urlObj.protocol.startsWith('http')) {
+                    res.status(400).json({ error: 'Must use HTTP/HTTPS' });
+                    return;
+                }
+            } catch (e) {
+                res.status(400).json({ error: 'Invalid URL format' });
+                return;
+            }
+
+            // 🔍 Reachability Check (Ping)
+            // We only add nodes that respond to /health or /rpc/status
+            try {
+                const check = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
+                if (!check.ok) {
+                    throw new Error('Node unreachable');
+                }
+            } catch (err) {
+                console.warn(`[API] ⚠️ Node ${url} failed reachability check, skipping registration.`);
+                res.status(400).json({ error: 'Node unreachable or health check failed' });
+                return;
+            }
+
+            // Add to P2P Network (if available)
+            if (this.p2pNetwork) {
+                this.p2pNetwork.addKnownPeer(url);
+                console.log(`[API] 📢 Node registered and verified: ${url}`);
+            }
+
+            res.json({ success: true, message: 'Node registered and verified' });
+        } catch (error) {
+            res.status(500).json({ error: 'Registration failed' });
         }
     }
 

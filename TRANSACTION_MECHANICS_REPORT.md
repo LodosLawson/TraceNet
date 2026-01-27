@@ -155,8 +155,8 @@ const response = await fetch('https://tracenet-blockchain-136028201808.us-centra
 });
 ```
 
-### 6.3. Liking Content (Social Action)
-Uses the **Batch** system by default (cheaper).
+### 6.3. Liking Content (Batch - Default)
+**Recommended.** Uses the SocialPool. Cheaper, cleaner, but takes 5-10m to finalize on-chain.
 
 ```javascript
 // POST /api/social/like
@@ -166,41 +166,56 @@ const payload = {
     timestamp: Date.now(),
     sender_public_key: "...",
     // Signature of: `${wallet_id}:LIKE:${content_id}:${timestamp}`
-    signature: "...", 
-    instant: false // Set TRUE to bypass batching (2x Fee)
+    signature: "..." 
 };
 
-const response = await fetch('https://tracenet-blockchain-136028201808.us-central1.run.app/api/social/like', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-});
-
-/* Output: 
-{ "status": "queued", "tx_id": "PENDING-BATCH-..." } 
-*/
+// ... Standard Fetch ...
 ```
 
-### 6.4. Posting a Comment
-Also uses the **Batch** system by default.
+### 6.4. Liking Content (Instant - Urgent)
+**CRITICAL:** To do an **Instant** Like, you CANNOT use the `/api/social/like` endpoint because it cannot generate a valid user signature for a standard transaction.
+Instead, you must construct and sign a full `Transaction` on the client side.
+
+```javascript
+// POST /api/transaction/create
+// NOTE: You must calculate the fee manually (e.g. 0.00002 LT)
+
+const txPayload = {
+    action_type: 'LIKE',
+    content_id: "post_123",
+    target_content_id: "post_123"
+};
+
+const transactionData = {
+    from_wallet: "TRN_USER...",
+    to_wallet: "TRN_CREATOR...", // You must know the creator's address!
+    type: "LIKE",
+    amount: 100, // Creator Share
+    fee: 100, // Validator Fee
+    nonce: Date.now() % 1000000,
+    payload: txPayload,
+    timestamp: Date.now(),
+    sender_public_key: "..."
+};
+
+// Sign the full transaction structure (Client Side)
+// Signature of JSON.stringify({ tx_id, from, to, type, payload, amount, fee ... })
+transactionData.sender_signature = signTransaction(transactionData);
+
+const response = await fetch('https://tracenet-blockchain-136028201808.us-central1.run.app/api/transaction/create', {
+    method: 'POST',
+    body: JSON.stringify(transactionData)
+});
+```
+
+### 6.5. Posting a Comment (Batch)
+Comments follow the same batching logic.
 
 ```javascript
 // POST /api/social/comment
 const payload = {
-    wallet_id: "TRN_USER...",
-    content_id: "post_123",
-    comment_text: "Nice update!",
-    timestamp: Date.now(),
-    sender_public_key: "...",
-    // Signature of: `${wallet_id}:COMMENT:${content_id}:${timestamp}:${text}`
-    signature: "...",
-    instant: false
+  // ... standard comment payload ...
+  instant: false // Always false for simple endpoint
 };
-
-const response = await fetch('https://tracenet-blockchain-136028201808.us-central1.run.app/api/social/comment', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-});
 ```
 
