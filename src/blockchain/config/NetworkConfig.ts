@@ -38,10 +38,7 @@ export const NETWORK_CONFIG: NetworkMetadata = {
         ...(process.env.BOOTSTRAP_NODES ? process.env.BOOTSTRAP_NODES.split(',') : []),
         'https://tracenet-blockchain-136028201808.us-central1.run.app', // Active US Mainnet
         'https://tracenet-blockchain-nodeeu-136028201808.europe-west1.run.app', // Europe Mainnet
-        'https://rotundly-symphysial-sharonda.ngrok-free.dev', // Local Developer Node
-        'https://tracenet-node-1.run.app',
-        'https://tracenet-node-2.run.app',
-        'https://tracenet-mainnet-seed.herokuapp.com'
+        'https://rotundly-symphysial-sharonda.ngrok-free.dev'
     ],
     initialValidators: [
         '25b86a85774d69db8af2a782f7fbf9c062054c48d4c2c3fac9ec4b10c54f43d7', // Genesis Validator (System)
@@ -51,7 +48,7 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     // 🌍 DNS / HTTP Seeds: The "Phonebook" of the network
     // Nodes fetch these URLs to find active peers when they are isolated.
     DNS_SEEDS: [
-        'https://raw.githubusercontent.com/LodosLawson/TraceNet-V3-Clean/main/active_nodes.json', // Main Repo Seed
+        'https://raw.githubusercontent.com/LodosLawson/TraceNet/main/active_nodes.json', // Main Repo Seed (Fixed Repo Name)
         'https://tracenet-seed.vercel.app/api/nodes', // Fallback Vercel Seed (Mock)
     ]
 };
