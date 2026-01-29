@@ -35,10 +35,7 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     MAX_KNOWN_PEERS: 500,
     MIN_PEERS: 3,
     BOOTSTRAP_NODES: [
-        ...(process.env.BOOTSTRAP_NODES ? process.env.BOOTSTRAP_NODES.split(',') : []),
-        'https://tracenet-blockchain-136028201808.us-central1.run.app', // Active US Mainnet
-        'https://tracenet-blockchain-nodeeu-136028201808.europe-west1.run.app', // Europe Mainnet
-        'https://rotundly-symphysial-sharonda.ngrok-free.dev'
+        ...(process.env.BOOTSTRAP_NODES ? process.env.BOOTSTRAP_NODES.split(',') : [])
     ],
     initialValidators: [
         '25b86a85774d69db8af2a782f7fbf9c062054c48d4c2c3fac9ec4b10c54f43d7', // Genesis Validator (System)
