@@ -28,7 +28,7 @@ export const NETWORK_CONFIG: NetworkMetadata = {
     networkName: 'TraceNet',
     developer: 'LodosLawson - M.S',  // Creator initials
     version: '3.0.1',
-    genesisTimestamp: 1735689600000, // 2025-01-01T00:00:00.000Z (V3.0 launch)
+    genesisTimestamp: 1767464105000, // 2026-01-03T18:15:05.000Z
     maxSupply: 100_000_000, // 100 million TRN
     tokenSymbol: 'TRN', // TraceNet (changed from TNN)
     tokenDecimals: 8,
