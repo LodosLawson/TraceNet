@@ -11,6 +11,7 @@ import { KeyManager } from '../blockchain/crypto/KeyManager';
 import * as geoip from 'geoip-lite';
 
 import { NETWORK_CONFIG } from '../blockchain/config/NetworkConfig';
+import { PeerStore, PeerMetadata } from './PeerStore';
 
 interface Peer {
     url: string;
@@ -54,6 +55,7 @@ export class P2PNetwork extends EventEmitter {
     private fullNode: boolean = true; // Added based on instruction
 
     private db: LocalDatabase; // Persistence
+    private peerStore: PeerStore; // Dedicated Peer Persistence
     private healthCheckInterval: NodeJS.Timeout | null = null;
     private discoveryService: any; // Type: PeerDiscovery (using any to avoid circular import issues)
 
@@ -66,26 +68,28 @@ export class P2PNetwork extends EventEmitter {
         validatorPool: ValidatorPool,
         server: SocketIOServer,
         port: number,
-        db: LocalDatabase, // Inject DB
-        myPublicKey?: string, // Accept public key
-        myPrivateKey?: string // Accept private key
+        db: LocalDatabase,
+        peerStore: PeerStore,
+        myPublicKey?: string,
+        myPrivateKey?: string
     ) {
         super();
         this.fullNode = true;
         this.blockchain = blockchain;
         this.mempool = mempool;
-        this.messagePool = mempool; // Assuming messagePool refers to mempool for now
+        this.messagePool = mempool;
         this.validatorPool = validatorPool;
         this.server = server;
-        this.myPort = port; // Use myPort as existing
+        this.myPort = port;
         this.db = db;
+        this.peerStore = peerStore;
         this.myPublicKey = myPublicKey;
         this.myPrivateKey = myPrivateKey;
 
         this.loadPersistedPeers(); // Load peers on startup
         this.setupServerHandlers();
         this.startSyncService();
-        this.startCleaningService(); // 🧹 NEW: Keep the peer list clean
+        this.startCleaningService(); // 🧹 Keep the peer list clean
 
         // Start Discovery
         const { PeerDiscovery } = require('./discovery/PeerDiscovery');
@@ -102,9 +106,9 @@ export class P2PNetwork extends EventEmitter {
             return;
         }
 
-        const peers = await this.db.loadPeers();
+        const peers = await this.peerStore.loadPeers();
         if (peers && peers.length > 0) {
-            peers.forEach(p => this.knownPeers.add(p));
+            peers.forEach(p => this.knownPeers.add(p.url));
         }
 
         // Try to connect to a few random ones if we have no connections?
@@ -405,7 +409,7 @@ export class P2PNetwork extends EventEmitter {
             this.handleReceiveChain(data);
         });
 
-        socket.on('p2p:sendPeers', (peers: string[]) => {
+        socket.on('p2p:sendPeers', async (peers: string[]) => {
             console.log(`[P2P] Received ${peers.length} peers from ${peerUrl}`);
             let newPeersCount = 0;
 
@@ -433,7 +437,12 @@ export class P2PNetwork extends EventEmitter {
                 console.log(`[P2P] Added ${newPeersCount} new peers. Total known: ${this.knownPeers.size}`);
 
                 // 💾 Persist new peer list
-                this.db.savePeers(Array.from(this.knownPeers));
+                // Convert string[] to PeerMetadata[] for new peers
+                for (const p of Array.from(this.knownPeers)) {
+                    // Check if exists to avoid overwriting metadata
+                    // This is inefficient loop, but fine for now. Better to use updatePeer individually.
+                    await this.peerStore.updatePeer(p, {});
+                }
 
                 // 🚀 FAILOVER / AUTO-CONNECT
                 // If we have few connections, try connecting to these new peers
@@ -447,15 +456,34 @@ export class P2PNetwork extends EventEmitter {
     /**
      * Connect to random peers from known list
      */
-    private connectToRandomPeers() {
+    /**
+     * Connect to random peers from known list (Smart Retry Enhanced)
+     */
+    private async connectToRandomPeers() {
         if (this.isSyncing) return;
 
-        let candidates = Array.from(this.knownPeers).filter(p => !this.peers.has(p));
+        // 1. Get all known peers with metadata
+        const allPeers = await this.peerStore.loadPeers();
+
+        // 2. Filter Candidates (Smart Retry Logic)
+        let candidates = allPeers.filter(p => {
+            // A. Already connected?
+            if (this.peers.has(this.getPeerIdFromUrl(p.url))) return false;
+
+            // B. Archived?
+            if (p.status === 'archived') return false;
+
+            // C. In Retry Cooldown?
+            if (p.nextRetryTime && p.nextRetryTime > Date.now()) return false;
+
+            return true;
+        }).map(p => p.url);
+
 
         // 🚀 Fallback to Bootstrap Nodes if no candidates
         if (candidates.length === 0) {
-            console.log('[P2P] No known candidates. Falling back to BOOTSTRAP_NODES...');
-            candidates = NETWORK_CONFIG.BOOTSTRAP_NODES.filter(p => !this.peers.has(p));
+            console.log('[P2P] No via candidates. Falling back to BOOTSTRAP_NODES...');
+            candidates = NETWORK_CONFIG.BOOTSTRAP_NODES.filter(p => !this.peers.has(this.getPeerIdFromUrl(p)));
         }
 
         // Shuffle
@@ -465,6 +493,70 @@ export class P2PNetwork extends EventEmitter {
         for (let i = 0; i < Math.min(3, candidates.length); i++) {
             this.connectToPeer(candidates[i]);
         }
+    }
+
+    /**
+     * Handle Connection Failure (Smart Retry)
+     */
+    private async handleConnectionFailure(url: string) {
+        // 1. Get current metadata
+        const peers = await this.peerStore.loadPeers();
+        const peer = peers.find(p => p.url === url);
+
+        if (!peer) return; // Should connect be called only on known peers?
+
+        const now = Date.now();
+        let firstFailure = peer.firstFailureTime || now;
+
+        // If it was active before, this is the first failure
+        if (peer.status === 'active') {
+            firstFailure = now;
+        }
+
+        const duration = now - firstFailure;
+        let backoff = 0;
+        let newStatus: 'failing' | 'archived' = 'failing';
+
+        // 📅 RETRY SCHEDULE
+        if (duration < 24 * 60 * 60 * 1000) {
+            // Day 1: Retry every 5 minutes
+            backoff = 5 * 60 * 1000;
+        } else if (duration < 48 * 60 * 60 * 1000) {
+            // Day 2: Retry every 1 hour
+            backoff = 60 * 60 * 1000;
+        } else if (duration < 72 * 60 * 60 * 1000) {
+            // Day 3: Retry every 2 hours
+            backoff = 2 * 60 * 60 * 1000;
+        } else if (duration < 7 * 24 * 60 * 60 * 1000) {
+            // Day 4-7: Retry once a day (Random time)
+            backoff = Math.floor(Math.random() * 24 * 60 * 60 * 1000);
+        } else {
+            // > 7 Days: Archive it
+            newStatus = 'archived';
+            console.log(`[P2P] 🗑️ Archiving dead peer: ${url} (Offline for >7 days)`);
+        }
+
+        // Update DB
+        await this.peerStore.updatePeer(url, {
+            status: newStatus,
+            firstFailureTime: firstFailure,
+            nextRetryTime: newStatus === 'archived' ? undefined : now + backoff,
+            lastAttemptTime: now,
+            failedConnections: (peer.failedConnections || 0) + 1
+        });
+
+        if (newStatus !== 'archived') {
+            console.log(`[P2P] ⏳ Scheduled retry for ${url} in ${backoff / 1000 / 60}m`);
+        }
+    }
+
+    private getPeerIdFromUrl(url: string): string {
+        // This is tricky as we key peers by ID, but known list is mostly URLs
+        // Simplification: We check if any connected peer has this URL
+        for (const [id, peer] of this.peers) {
+            if (peer.url === url) return id;
+        }
+        return url; // Fallback
     }
 
     // Correction: I will only replace connectToRandomPeers and ADD getASN

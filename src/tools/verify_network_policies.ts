@@ -71,6 +71,12 @@ class MockSocket extends EventEmitter {
 async function runTests() {
     console.log('🛡️  Starting Network Policy Verification...\n');
 
+    const mockPeerStore = {
+        loadPeers: async () => [],
+        savePeer: async () => { },
+        updatePeer: async () => { }
+    } as unknown as any; // Type 'any' to avoid import issues in this script
+
     // Instantiate P2PNetwork
     const p2p = new P2PNetwork(
         mockBlockchain,
@@ -78,7 +84,8 @@ async function runTests() {
         mockValidatorPool,
         mockServer,
         3000,
-        mockDb
+        mockDb,
+        mockPeerStore
     );
 
     // Access private methods/properties using 'any'

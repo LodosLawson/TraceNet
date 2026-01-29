@@ -16,6 +16,11 @@ export interface PeerMetadata {
     city?: string;
     successfulConnections: number;
     failedConnections: number;
+    // Smart Retry Fields
+    status: 'active' | 'failing' | 'archived';
+    firstFailureTime?: number;
+    nextRetryTime?: number;
+    lastAttemptTime?: number;
 }
 
 export class PeerStore {
@@ -75,8 +80,9 @@ export class PeerStore {
                 height: 0,
                 successfulConnections: 0,
                 failedConnections: 0,
+                status: 'active', // Default status
                 ...updates
-            };
+            } as PeerMetadata;
             await this.savePeer(newPeer);
         }
     }

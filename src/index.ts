@@ -479,6 +479,10 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             this.validatorPool
         );
 
+        // Initialize Peer Store properly
+        const { PeerStore } = require('./node/PeerStore');
+        const peerStore = new PeerStore();
+
         // Initialize P2P Network
         this.p2pNetwork = new P2PNetwork(
             this.blockchain,
@@ -487,8 +491,9 @@ PRIVATE KEY:${walletData.privateKey} (For programmatic access)
             this.wsServer.getIO(),
             port,
             this.localDb, // ✅ Inject DB
-            myValidatorPublicKey, // Pass my Public Key
-            sysPrivateKey // ✅ Pass my Private Key for Consensus Signing
+            peerStore,    // ✅ Inject PeerStore
+            myValidatorPublicKey,
+            sysPrivateKey
         );
 
         // Connect to peers from env
