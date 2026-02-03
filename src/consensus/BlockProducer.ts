@@ -393,9 +393,9 @@ export class BlockProducer extends EventEmitter {
         if (result.success && result.block) {
             // Remove mined transactions
             for (const tx of newBlock.transactions) {
-                if (tx.type !== 'REWARD') { // Don't try to remove system rewards
-                    this.mempool.removeTransaction(tx.tx_id);
-                }
+                // Ensure ALL mined transactions are removed from mempool, including REWARDs (like Airdrops)
+                // If it wasn't in the mempool (like a Block Reward), this is a safe no-op.
+                this.mempool.removeTransaction(tx.tx_id);
             }
 
             // Update stats

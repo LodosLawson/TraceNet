@@ -2586,7 +2586,11 @@ export class RPCServer {
             // 🔍 Reachability Check (Ping)
             // We only add nodes that respond to /health or /rpc/status
             try {
-                const check = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
+                const check = await fetch(`${url}/health`, {
+                    method: 'GET',
+                    headers: { 'ngrok-skip-browser-warning': 'true' }, // Bypass Ngrok warning
+                    signal: AbortSignal.timeout(3000)
+                });
                 if (!check.ok) {
                     throw new Error('Node unreachable');
                 }
