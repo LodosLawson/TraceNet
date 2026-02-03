@@ -36,6 +36,9 @@ import { Block } from './blockchain/models/Block';
 
 
 import { NETWORK_CONFIG } from './blockchain/config/NetworkConfig';
+import { MessagePool } from './node/MessagePool';
+import { KeyStore } from './blockchain/utils/KeyStore';
+import { SecureLogger } from './utils/SecureLogger';
 
 // Load environment variables
 dotenv.config();
@@ -93,12 +96,11 @@ class BlockchainNode {
 
         // Initialize MessagePool
         // Import must be at top, using require here for simplicity in this edit block or I should add import
-        const { MessagePool } = require('./node/MessagePool');
+        // Initialize MessagePool
         this.messagePool = new MessagePool();
 
         // 🔐 SECURITY: Load keys from Encrypted KeyStore
-        const { KeyStore } = require('./blockchain/utils/KeyStore');
-        const { SecureLogger } = require('./utils/SecureLogger'); // Import SecureLogger
+        // 🔐 SECURITY: Load keys from Encrypted KeyStore
         const keyStore = new KeyStore();
 
         // System Validator Setup

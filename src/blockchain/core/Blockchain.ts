@@ -779,6 +779,14 @@ export class Blockchain extends EventEmitter {
             if (!KeyManager.verify(signableData, tx.sender_signature, verifyKey)) {
                 return { success: false, error: 'Invalid signature' };
             }
+
+            // CRITICAL SECURITY FIX: Verify Address Derivation
+            // Ensure the public key used for verification actually belongs to the sender
+            // This prevents "Sender Impersonation" where I sign with MY key but say 'from_wallet' is YOU.
+            const derivedAddress = KeyManager.deriveAddress(verifyKey);
+            if (derivedAddress !== tx.from_wallet) {
+                return { success: false, error: `Public Key mismatch: Key derives to ${derivedAddress} but sender is ${tx.from_wallet}` };
+            }
         }
 
         let toAccount: AccountState;
